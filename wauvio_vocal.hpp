@@ -2,8 +2,8 @@
 
 #include "wauvio.hpp"
 #include "wauvio_ext.hpp"
-#include "wauvio_vocal/japanese.hpp"
-#include "wauvio_vocal/voice.hpp"
-#include "wauvio_vocal/pitch.hpp"
-#include "wauvio_vocal/synth.hpp"
-#include "wauvio_vocal/singer.hpp"
+#include "wauvio_vocal/yune-v1/japanese.hpp"
+#include "wauvio_vocal/yune-v1/voice.hpp"
+#include "wauvio_vocal/yune-v1/pitch.hpp"
+#include "wauvio_vocal/yune-v1/synth.hpp"
+#include "wauvio_vocal/yune-v1/singer.hpp"
