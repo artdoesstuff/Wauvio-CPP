@@ -1,0 +1,15 @@
+#pragma once
+
+#include "wauvio.hpp"
+#include "wauvio_ext.hpp"
+#include "wauvio_vocal/yune-v2/japanese.hpp"
+#include "wauvio_vocal/yune-v2/voice.hpp"
+#include "wauvio_vocal/yune-v2/pitch.hpp"
+#include "wauvio_vocal/yune-v2/expr.hpp"
+#include "wauvio_vocal/yune-v2/persona.hpp"
+#include "wauvio_vocal/yune-v2/voices/voices.hpp"
+#include "wauvio_vocal/yune-v2/synth.hpp"
+#include "wauvio_vocal/yune-v2/events.hpp"
+#include "wauvio_vocal/yune-v2/expression.hpp"
+#include "wauvio_vocal/yune-v2/mic.hpp"
+#include "wauvio_vocal/yune-v2/singer.hpp"

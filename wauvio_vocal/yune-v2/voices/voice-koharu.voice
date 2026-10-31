@@ -1,0 +1,180 @@
+# Wauvio voice profile. Every value is explicit; edit and load with load_profile().
+voice koharu
+display Koharu (小春)
+language ja
+notes Warm, punchy, expressive: full midrange, crisp consonants, slightly husky, energetic; grounded and chesty.
+natural_amount 0.7
+
+# model
+model_name Koharu: warm, punchy Japanese female
+range 50 86 38 94
+vowel a 862 1436 2940 151 146 213 1 0.85 0
+vowel i 323 2765 3430 106 168 224 1 0.45 0
+vowel u 363 1407 2695 112 140 202 1 0.45 0
+vowel e 549 2377 3136 123 151 213 1 0.75 0
+vowel o 559 951 2744 123 134 202 1 0.75 0
+model f4 4200
+model f5 5400
+model f6 7000
+model b4 280
+model b5 340
+model b6 520
+model singer_formant_hz 2950
+model singer_formant_bw 650
+model rd_base 0.55
+model aspiration 0.026
+model tilt_hz_min 2300
+model tilt_hz_max 9500
+model vib_depth_st 0.26
+model vib_rate_hz 6
+model vib_delay 0.22
+model vib_fade 0.28
+model synthetic 0.45
+tune out_scale 0.66
+tune asp_gain 3.2
+tune fric_gain 0.5
+tune upper_gain 1.8
+tune sing_gain 2.4
+tune air_gain 0.08
+tune pre_gain 1
+tune f23_gain 30
+
+# default style (the character's Normal look)
+style brightness 0.7
+style breathiness 0.18
+style tension 0.52
+style softness 0.35
+style power 0.53
+style resonance 0.5
+style femininity 0.58
+style vibrato_depth 0.24375
+style vibrato_rate 6.3157897
+style vibrato_delay 0.25666666
+style vibrato_fade -1
+style portamento 0.075
+style pitch_response 0.68
+style overshoot 0.32999998
+style scoop 0.46999997
+style exit_fall 0.12
+style drift 0
+style micro 0.1
+style consonant_strength 0.69
+style consonant_duration 0.92
+style vowel_clarity 0.65
+style legato 0.45000002
+style attack_sharpness 0.68
+style release 0.43
+style volume 1
+style velocity_response 0.65
+style compression 0.3
+style dynamic_timbre 0.62
+style formant_shift 0.6
+style mouth_open 0
+style growl 0.15
+style tremor 0
+style tremor_rate 9
+style fry 0.22
+style air 0.1
+style reg 0.1
+style reg_auto 0
+style glottal_onset 0.06
+style pitch_loud 0
+style pitch_snap 0
+style undershoot 0
+style porta_interval 0
+style exit_fall_min 0.2
+style bidakuon 0
+style n_nasalize 0
+style mumble 0
+style transition_speed 1.15
+style vv_glide 0
+style devoice_max 0.09
+style mora_weighting 0
+style glottal_final 0
+style grit 0
+style natural 0
+style devoicing 1
+
+# lyric parsing
+parse merge_long_vowels 1
+parse cute 0
+
+persona normal
+  brightness 0.7
+  breathiness 0.18
+  tension 0.52
+  softness 0.35
+  power 0.53
+  resonance 0.5
+  femininity 0.58
+  vibrato_depth 0.24375
+  vibrato_rate 6.3157897
+  vibrato_delay 0.25666666
+  vibrato_fade -1
+  portamento 0.075
+  pitch_response 0.68
+  overshoot 0.32999998
+  scoop 0.46999997
+  exit_fall 0.12
+  drift 0
+  micro 0.1
+  consonant_strength 0.69
+  consonant_duration 0.92
+  vowel_clarity 0.65
+  legato 0.45000002
+  attack_sharpness 0.68
+  release 0.43
+  dynamic_timbre 0.62
+  formant_shift 0.6
+  mouth_open 0
+  growl 0.15
+  tremor 0
+  tremor_rate 9
+  fry 0.22
+  air 0.1
+  reg 0.1
+  glottal_onset 0.06
+  undershoot 0
+  porta_interval 0
+  mumble 0
+  grit 0
+
+persona soft
+  brightness 0.37
+  breathiness 0.18
+  tension 0.45000002
+  softness 0.34
+  power 0.43
+  resonance 0.5
+  femininity 0.5
+  vibrato_depth 0.17875
+  vibrato_rate -1
+  vibrato_delay 0.32999998
+  vibrato_fade -1
+  portamento 0.065
+  pitch_response 0.68
+  overshoot 0.28
+  scoop 0.36999997
+  exit_fall 0.22
+  drift 0
+  micro 0.1
+  consonant_strength 0.59000003
+  consonant_duration 0.92
+  vowel_clarity 0.65
+  legato 0.54999995
+  attack_sharpness 0.43
+  release 0.58
+  dynamic_timbre 0.72
+  formant_shift 0
+  mouth_open 0
+  growl 0.03
+  tremor 0
+  tremor_rate 9
+  fry 0.05
+  air 0.15
+  reg 0.06
+  glottal_onset 0.06
+  undershoot 0
+  porta_interval 0
+  mumble 0
+  grit 0
