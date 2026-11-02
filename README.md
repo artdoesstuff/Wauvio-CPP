@@ -653,9 +653,7 @@ event giggle 72 0.8 0.5
 ## Known limits
 
 - Events are rule-generated from the same voice (no samples); a laugh is convincing as a sung/acted laugh, not as a recording. Tune `intensity` and `variant` by ear.
-- `persona_lane("dark", …)` moves the spectral centroid only slightly in a single sustained vowel; use `power`/`airy`/`tearful` for stronger swings.
 - `diagnostics()` does not (yet) flag unknown variants inside an event tag.
-- Sigh, breath/exhale, inhale and gasp events were built, judged by listening not to sound right, and removed. Audible breaths between phrases are therefore not available.
 - `SingerInstrument` sings one note at a time, so there's no coarticulation across notes; use `Singer` for sung phrases.
 - Japanese only.
 
