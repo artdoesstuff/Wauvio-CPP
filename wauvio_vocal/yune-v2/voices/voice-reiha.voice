@@ -1,0 +1,180 @@
+# Wauvio voice profile. Every value is explicit; edit and load with load_profile().
+voice reiha
+display Reiha (玲羽)
+language ja
+notes Cool, crystalline, airy: delicate, precise, slightly breathy, clear highs; detached and fragile rather than warm.
+natural_amount 0.5
+
+# model
+model_name Reiha: cool, crystalline Japanese female
+range 55 91 43 98
+vowel a 906 1539 3150 115 110 162 1 0.85 0
+vowel i 340 2964 3675 81 128 170 1 0.45 0
+vowel u 381 1508 2888 85 106 153 1 0.45 0
+vowel e 577 2548 3360 94 115 162 1 0.75 0
+vowel o 587 1019 2940 94 102 153 1 0.75 0
+model f4 4500
+model f5 5800
+model f6 7400
+model b4 240
+model b5 300
+model b6 460
+model singer_formant_hz 3300
+model singer_formant_bw 650
+model rd_base 1.1
+model aspiration 0.032
+model tilt_hz_min 2800
+model tilt_hz_max 12000
+model vib_depth_st 0.2
+model vib_rate_hz 5.9
+model vib_delay 0.4
+model vib_fade 0.45
+model synthetic 0.8
+tune out_scale 0.65
+tune asp_gain 3
+tune fric_gain 0.3
+tune upper_gain 2.2
+tune sing_gain 1.3
+tune air_gain 0.14
+tune pre_gain 2
+tune f23_gain 30
+
+# default style (the character's Normal look)
+style brightness 0.812
+style breathiness 0.292
+style tension 0.30799997
+style softness 0.435
+style power 0.114999995
+style resonance 0.675
+style femininity 0.57199997
+style vibrato_depth 0.18875001
+style vibrato_rate 6.179474
+style vibrato_delay 0.46
+style vibrato_fade -1
+style portamento 0.097
+style pitch_response 0.45
+style overshoot 0.16499999
+style scoop 0.33499998
+style exit_fall 0.3
+style drift 0
+style micro 0.1
+style consonant_strength 0.40499997
+style consonant_duration 1
+style vowel_clarity 0.65
+style legato 0.71000004
+style attack_sharpness 0.35
+style release 0.665
+style volume 1
+style velocity_response 0.65
+style compression 0.3
+style dynamic_timbre 0.45
+style formant_shift 0.54
+style mouth_open 0
+style growl 0
+style tremor 0
+style tremor_rate 9
+style fry 0
+style air 0.31
+style reg 0.21
+style reg_auto 0
+style glottal_onset 0
+style pitch_loud 0
+style pitch_snap 0
+style undershoot 0
+style porta_interval 0
+style exit_fall_min 0.2
+style bidakuon 0
+style n_nasalize 0
+style mumble 0
+style transition_speed 1
+style vv_glide 0
+style devoice_max 0.11
+style mora_weighting 0
+style glottal_final 0
+style grit 0
+style natural 0
+style devoicing 1
+
+# lyric parsing
+parse merge_long_vowels 1
+parse cute 0
+
+persona normal
+  brightness 0.812
+  breathiness 0.292
+  tension 0.30799997
+  softness 0.435
+  power 0.114999995
+  resonance 0.675
+  femininity 0.57199997
+  vibrato_depth 0.18875001
+  vibrato_rate 6.179474
+  vibrato_delay 0.46
+  vibrato_fade -1
+  portamento 0.097
+  pitch_response 0.45
+  overshoot 0.16499999
+  scoop 0.33499998
+  exit_fall 0.3
+  drift 0
+  micro 0.1
+  consonant_strength 0.40499997
+  consonant_duration 1
+  vowel_clarity 0.65
+  legato 0.71000004
+  attack_sharpness 0.35
+  release 0.665
+  dynamic_timbre 0.45
+  formant_shift 0.54
+  mouth_open 0
+  growl 0
+  tremor 0
+  tremor_rate 9
+  fry 0
+  air 0.31
+  reg 0.21
+  glottal_onset 0
+  undershoot 0
+  porta_interval 0
+  mumble 0
+  grit 0
+
+persona soft
+  brightness 0.515
+  breathiness 0.292
+  tension 0.24499999
+  softness 0.426
+  power 0.025000006
+  resonance 0.675
+  femininity 0.5
+  vibrato_depth 0.14375001
+  vibrato_rate -1
+  vibrato_delay 0.58
+  vibrato_fade -1
+  portamento 0.088
+  pitch_response 0.45
+  overshoot 0.12
+  scoop 0.24499999
+  exit_fall 0.39000002
+  drift 0
+  micro 0.1
+  consonant_strength 0.315
+  consonant_duration 1
+  vowel_clarity 0.65
+  legato 0.79999995
+  attack_sharpness 0.125
+  release 0.79999995
+  dynamic_timbre 0.54
+  formant_shift 0
+  mouth_open 0
+  growl 0
+  tremor 0
+  tremor_rate 9
+  fry 0
+  air 0.35500002
+  reg 0.174
+  glottal_onset 0
+  undershoot 0
+  porta_interval 0
+  mumble 0
+  grit 0

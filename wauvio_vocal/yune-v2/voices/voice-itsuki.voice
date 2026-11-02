@@ -1,0 +1,180 @@
+# Wauvio voice profile. Every value is explicit; edit and load with load_profile().
+voice itsuki
+display Itsuki (樹)
+language ja
+notes Deep, resonant, smooth male voice: rounded vowels, controlled vibrato, grainy when pushed; dark and restrained.
+natural_amount 0.5
+
+# model
+model_name Itsuki: deep, resonant Japanese male
+range 41 67 36 76
+vowel a 730 1184 2580 124 120 175 1 0.85 0
+vowel i 274 2280 3010 87 138 184 1 0.45 0
+vowel u 307 1160 2365 92 115 166 1 0.45 0
+vowel e 465 1960 2752 101 124 175 1 0.75 0
+vowel o 473 784 2408 101 110 166 1 0.75 0
+model f4 3600
+model f5 4600
+model f6 5900
+model b4 230
+model b5 290
+model b6 430
+model singer_formant_hz 2750
+model singer_formant_bw 520
+model rd_base 0.95
+model aspiration 0.016
+model tilt_hz_min 1900
+model tilt_hz_max 8000
+model vib_depth_st 0.24
+model vib_rate_hz 5.3
+model vib_delay 0.4
+model vib_fade 0.45
+model synthetic 0.5
+tune out_scale 0.7
+tune asp_gain 2.6
+tune fric_gain 0.3
+tune upper_gain 1.4
+tune sing_gain 1.8
+tune air_gain 0.06
+tune pre_gain 1
+tune f23_gain 26
+
+# default style (the character's Normal look)
+style brightness 0.45
+style breathiness 0.144
+style tension 0.38599998
+style softness 0.4
+style power 0.43
+style resonance 0.56
+style femininity 0.5
+style vibrato_depth 0.228
+style vibrato_rate 5.523158
+style vibrato_delay 0.45333335
+style vibrato_fade -1
+style portamento 0.094000004
+style pitch_response 0.45
+style overshoot 0.14
+style scoop 0.33999997
+style exit_fall 0.25
+style drift 0
+style micro 0.08
+style consonant_strength 0.40999997
+style consonant_duration 1.05
+style vowel_clarity 0.5
+style legato 0.73
+style attack_sharpness 0.4
+style release 0.64000005
+style volume 1
+style velocity_response 0.65
+style compression 0.3
+style dynamic_timbre 0.6
+style formant_shift 0
+style mouth_open 0
+style growl 0
+style tremor 0
+style tremor_rate 9
+style fry 0
+style air 0.080000006
+style reg 0.080000006
+style reg_auto 0
+style glottal_onset 0
+style pitch_loud 0
+style pitch_snap 0
+style undershoot 0
+style porta_interval 0
+style exit_fall_min 0.2
+style bidakuon 0
+style n_nasalize 0
+style mumble 0.08
+style transition_speed 1
+style vv_glide 0
+style devoice_max 0.11
+style mora_weighting 0
+style glottal_final 0
+style grit 0.55
+style natural 0
+style devoicing 1
+
+# lyric parsing
+parse merge_long_vowels 1
+parse cute 0
+
+persona normal
+  brightness 0.45
+  breathiness 0.144
+  tension 0.38599998
+  softness 0.4
+  power 0.43
+  resonance 0.56
+  femininity 0.5
+  vibrato_depth 0.228
+  vibrato_rate 5.523158
+  vibrato_delay 0.45333335
+  vibrato_fade -1
+  portamento 0.094000004
+  pitch_response 0.45
+  overshoot 0.14
+  scoop 0.33999997
+  exit_fall 0.25
+  drift 0
+  micro 0.08
+  consonant_strength 0.40999997
+  consonant_duration 1.05
+  vowel_clarity 0.5
+  legato 0.73
+  attack_sharpness 0.4
+  release 0.64000005
+  dynamic_timbre 0.6
+  formant_shift 0
+  mouth_open 0
+  growl 0
+  tremor 0
+  tremor_rate 9
+  fry 0
+  air 0.080000006
+  reg 0.080000006
+  glottal_onset 0
+  undershoot 0
+  porta_interval 0
+  mumble 0.08
+  grit 0.55
+
+persona soft
+  brightness 0.24999999
+  breathiness 0.144
+  tension 0.32999998
+  softness 0.39200002
+  power 0.35000002
+  resonance 0.56
+  femininity 0.5
+  vibrato_depth 0.17999999
+  vibrato_rate -1
+  vibrato_delay 0.55999994
+  vibrato_fade -1
+  portamento 0.086
+  pitch_response 0.45
+  overshoot 0.1
+  scoop 0.26
+  exit_fall 0.33
+  drift 0
+  micro 0.08
+  consonant_strength 0.32999998
+  consonant_duration 1.05
+  vowel_clarity 0.5
+  legato 0.80999994
+  attack_sharpness 0.2
+  release 0.76
+  dynamic_timbre 0.68000007
+  formant_shift 0
+  mouth_open 0
+  growl 0
+  tremor 0
+  tremor_rate 9
+  fry 0
+  air 0.120000005
+  reg 0.048
+  glottal_onset 0
+  undershoot 0
+  porta_interval 0
+  mumble 0.08
+  grit 0.55
