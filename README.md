@@ -659,8 +659,6 @@ event giggle 72 0.8 0.5
 - `SingerInstrument` sings one note at a time, so there's no coarticulation across notes; use `Singer` for sung phrases.
 - Japanese only.
 
-`wauvio_vocal/yune-v2/V2_PROPOSALS.md` is the original design document (identity vs. expression, personas, registers, events, phoneme control, and so on). It's kept as rationale; sentences in it are the original *proposals*, and the section above is the source of truth for what is implemented.
-
 ## Some extra notes
 
 - Nothing lower in the stack knows or cares about anything higher up.
