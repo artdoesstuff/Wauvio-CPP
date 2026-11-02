@@ -577,7 +577,7 @@ Score files start with `voice <id|file.voice>`.
 
 | Voice | Character | Range (comfortable) |
 |---|---|---|
-| `yune` | bright, clear female (default) | E3-E6 |
+| `yune` 夢音 | bright, clear female (default) | E3-E6 |
 | `reiha` 玲羽 | cool, crystalline, airy female; delicate, detached | G3-G6 |
 | `koharu` 小春 | warm, punchy, expressive female; chesty, crisp, slightly husky | D3-D6 |
 | `itsuki` 樹 | deep, resonant, smooth male; rounded vowels, grainy when pushed (`Style::grit`) | F2-G4 |
