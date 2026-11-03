@@ -485,8 +485,6 @@ A Japanese singing-voice synthesizer built from Wauvio's own DSP: a glottal-sour
 | Controls | `Style` (voice/pitch/articulation/dynamics) | everything in V1, plus personas, phonation, events, phoneme input, ornaments, natural-imperfection, speech, mic model |
 | Status | frozen reference | current |
 
-V2 is built so that **every new control defaults to "off": the default render is bit-identical to V1** (verified sample-exact against golden renders; the one documented exception is the ヴぁ fix, recorded in `tests/golden/CHANGES.md` in the test suite).
-
 ## Building
 
 Header-only, C++17. From the repo root:
@@ -577,7 +575,7 @@ Score files start with `voice <id|file.voice>`.
 
 | Voice | Character | Range (comfortable) |
 |---|---|---|
-| `yune` | bright, clear female (default) | E3-E6 |
+| `yune` 夢音 | bright, clear female (default) | E3-E6 |
 | `reiha` 玲羽 | cool, crystalline, airy female; delicate, detached | G3-G6 |
 | `koharu` 小春 | warm, punchy, expressive female; chesty, crisp, slightly husky | D3-D6 |
 | `itsuki` 樹 | deep, resonant, smooth male; rounded vowels, grainy when pushed (`Style::grit`) | F2-G4 |
@@ -592,8 +590,7 @@ The engine (`synth.hpp`, `pitch.hpp`, `expr.hpp`, `events.hpp`, ...) is voice-ag
 2. Set the **identity** (what makes it that singer): `vowel` rows (F1/F2/F3, bandwidths), `f4..f6`, `singer_formant_hz`, `rd_base`, `tilt_hz_*`, `aspiration`, `synthetic`, vibrato defaults, `range` (comfortable and hard, MIDI). Rules of thumb: a larger tract (male) lowers all formants by about 15-20% and lowers the singer's formant to ~2.8 kHz; `range` must follow the voice's real compass; keep a/i/u/e/o in their order along F1/F2 so lyrics stay intelligible.
 3. Set the default **look** (`style` lines) and write its **personas** as absolute looks. Personas are bounded variations; the identity-envelope check must report every one "within envelope". Every voice has exactly two personas: `normal` (its default look) and `soft`. See `voices/voice-reiha.hpp` for the pattern.
 4. If using C++, add the header to `voices/voices.hpp` (`builtin_voices()` gets one line). A `.voice` file needs no registration: `make_voice("path/to/file.voice", p)`.
-5. Run the checks (`test_voices` runs for every registered voice: round trip, range sanity, no NaN, levels).
-6. `voice_tool demo <id> out.wav` and listen: same phrase, default look then `soft`.
+5. `voice_tool demo <id> out.wav` and listen: same phrase, default look then `soft`.
 
 ## Command-line tools (V2)
 
@@ -653,13 +650,9 @@ event giggle 72 0.8 0.5
 ## Known limits
 
 - Events are rule-generated from the same voice (no samples); a laugh is convincing as a sung/acted laugh, not as a recording. Tune `intensity` and `variant` by ear.
-- `persona_lane("dark", …)` moves the spectral centroid only slightly in a single sustained vowel; use `power`/`airy`/`tearful` for stronger swings.
 - `diagnostics()` does not (yet) flag unknown variants inside an event tag.
-- Sigh, breath/exhale, inhale and gasp events were built, judged by listening not to sound right, and removed. Audible breaths between phrases are therefore not available.
 - `SingerInstrument` sings one note at a time, so there's no coarticulation across notes; use `Singer` for sung phrases.
 - Japanese only.
-
-`wauvio_vocal/yune-v2/V2_PROPOSALS.md` is the original design document (identity vs. expression, personas, registers, events, phoneme control, and so on). It's kept as rationale; sentences in it are the original *proposals*, and the section above is the source of truth for what is implemented.
 
 ## Some extra notes
 
