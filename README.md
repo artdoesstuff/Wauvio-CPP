@@ -485,8 +485,6 @@ A Japanese singing-voice synthesizer built from Wauvio's own DSP: a glottal-sour
 | Controls | `Style` (voice/pitch/articulation/dynamics) | everything in V1, plus personas, phonation, events, phoneme input, ornaments, natural-imperfection, speech, mic model |
 | Status | frozen reference | current |
 
-V2 is built so that **every new control defaults to "off": the default render is bit-identical to V1** (verified sample-exact against golden renders; the one documented exception is the ヴぁ fix, recorded in `tests/golden/CHANGES.md` in the test suite).
-
 ## Building
 
 Header-only, C++17. From the repo root:
@@ -592,8 +590,7 @@ The engine (`synth.hpp`, `pitch.hpp`, `expr.hpp`, `events.hpp`, ...) is voice-ag
 2. Set the **identity** (what makes it that singer): `vowel` rows (F1/F2/F3, bandwidths), `f4..f6`, `singer_formant_hz`, `rd_base`, `tilt_hz_*`, `aspiration`, `synthetic`, vibrato defaults, `range` (comfortable and hard, MIDI). Rules of thumb: a larger tract (male) lowers all formants by about 15-20% and lowers the singer's formant to ~2.8 kHz; `range` must follow the voice's real compass; keep a/i/u/e/o in their order along F1/F2 so lyrics stay intelligible.
 3. Set the default **look** (`style` lines) and write its **personas** as absolute looks. Personas are bounded variations; the identity-envelope check must report every one "within envelope". Every voice has exactly two personas: `normal` (its default look) and `soft`. See `voices/voice-reiha.hpp` for the pattern.
 4. If using C++, add the header to `voices/voices.hpp` (`builtin_voices()` gets one line). A `.voice` file needs no registration: `make_voice("path/to/file.voice", p)`.
-5. Run the checks (`test_voices` runs for every registered voice: round trip, range sanity, no NaN, levels).
-6. `voice_tool demo <id> out.wav` and listen: same phrase, default look then `soft`.
+5. `voice_tool demo <id> out.wav` and listen: same phrase, default look then `soft`.
 
 ## Command-line tools (V2)
 
