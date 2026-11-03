@@ -1,9 +1,9 @@
 #pragma once
 
 #include "synth.hpp"
-#include "../wauvio_midi/core/midi_types.hpp"
-#include "../wauvio_midi/core/midi_parser.hpp"
-#include "../wauvio_midi/core/tempo_map.hpp"
+#include "../../wauvio_midi/core/midi_types.hpp"
+#include "../../wauvio_midi/core/midi_parser.hpp"
+#include "../../wauvio_midi/core/tempo_map.hpp"
 
 #include <map>
 #include <string>

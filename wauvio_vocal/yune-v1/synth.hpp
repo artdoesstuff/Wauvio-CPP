@@ -1,7 +1,7 @@
 #pragma once
 
 #include "pitch.hpp"
-#include "../wauvio_ext/core/core.hpp"   // audio::Articulation
+#include "../../wauvio_ext/core/core.hpp"   // audio::Articulation
 
 #include <array>
 #include <memory>

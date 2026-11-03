@@ -1,7 +1,7 @@
 #pragma once
 
 #include "japanese.hpp"
-#include "../wauvio.hpp"
+#include "../../wauvio.hpp"
 
 #include <algorithm>
 #include <cmath>
