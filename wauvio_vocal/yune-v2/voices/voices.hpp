@@ -2,7 +2,7 @@
 // Registry of the built-in voices. To add a voice: write voices/voice-<id>.hpp (copy voice-template.md's checklist),
 // include it here and add one line to builtin_voices().
 #include "voice-yune.hpp"
-#include "voice-yune_old.hpp"
+#include "voice-yune-old.hpp"
 #include "voice-reiha.hpp"
 #include "voice-koharu.hpp"
 #include "voice-itsuki.hpp"
