@@ -31,8 +31,6 @@ wauvio_sf2/
 wauvio_fx/
 wauvio_sfx/
 wauvio_vocal/
-tests/                  (test suites and run.sh scripts: tests/wauvio_fx/, tests/wauvio_sfx/)
-examples/               (compilable examples: examples/wauvio_sfx/)
 ```
 Yeah, that's it. Examples and demos will be accessible [here](https://github.com/artdoesstuff-ex/Wauvio-Graveyard), but as it stands, only the framework itself (and officially supported extensions) will remain here. However, if the examples/demos are too overwhelming at a glance, you can start writing it yourself almost immediately (it's like 3 lines; see below).
 
