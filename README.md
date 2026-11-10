@@ -65,7 +65,7 @@ wauvio_sfx/
   tools/           wauvio_sfx_tool.cpp (list / info / render / catalog)
 wauvio_vocal/
   yune-v1/         original single-voice singer (+ tools/sing_score.cpp)
-  yune-v2/         current engine, voices/, tools/, V2_PROPOSALS.md (design rationale)
+  yune-v2/         current engine, voices/, tools/
 ```
 
 ## Requirements
