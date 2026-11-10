@@ -1485,10 +1485,6 @@ event giggle 72 0.8 0.5
 
 **V1's `sing_score`** (`wauvio_vocal/yune-v1/tools/sing_score.cpp`) is the smaller original: `tempo`, `rest`, `style`, and `note MIDI TICKS LYRIC [VEL] [vib=… porta=… novib stac whisper hum]`.
 
-## Diagnostics and tests
-
-`s.diagnostics()` returns warnings about the score as built (it does not yet flag unknown *variants* inside an event tag). The V2 design was verified by a test suite (not part of this repository snapshot): a golden regression sample-exact against V1, an identity envelope per persona and voice, and ~145 objective measurements (F0, spectra, cepstral formants, level envelopes) for the expression/event/phoneme/shape/mic/persona controls, plus clean runs under `-Wall -Wextra` and ASan/UBSan. Those prove the controls do what they claim and that the default is unchanged. **They are not listening tests**: final tuning of how natural a persona or event sounds needs ears.
-
 ## Known limits
 
 - Events are rule-generated from the same voice (no samples); a laugh is convincing as a sung/acted laugh, not as a recording. Tune `intensity` and `variant` by ear.
