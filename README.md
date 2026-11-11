@@ -630,10 +630,6 @@ fx::write_wav(out, "song.wav");                       // writes the level exactl
 - **Saturator/Oversampler latency** is exact and integer (2x: 48, 4x: 72, 8x: 84 samples) and is compensated by `Chain`; the saturator keeps its dry path aligned for the `mix` control.
 - `Limiter` latency is the lookahead plus 7 samples when `true_peak` is on.
 
-## Tests
-
-`tests/wauvio_fx/run.sh [compiler flags]` compiles every header on its own (with `-Wall -Wextra -Werror`), then runs two suites: `test_fx.cpp` (321 checks on the core library) and `test_fx_ext.cpp` (13 checks on the `Arrangement` and MIDI adapters). They measure known values rather than just "it runs": gain-computer curves, attack constants, limiter ceilings, EQ response against `response_db`, oversampler latency and passband, aliasing reduction, RT60 of the reverb against `decay_s` (at three sample rates), FFT convolution against direct convolution, the EBU loudness reference, mastering targets and true-peak ceilings, and for every effect: determinism, one block vs two blocks, silence in/silence out, finite output on noise/DC/huge impulses, and `reset()`. As with the vocal tests, they prove the controls do what they claim; **they are not listening tests.**
-
 # Wauvio SFX (`wauvio_sfx`)
 
 Procedurally synthesised sound-effect presets and reusable effect recipes for Wauvio. 190 presets in 12 categories: risers, impacts, glitches, textures, bass effects, ornaments, vocal-like textures, rhythmic effects, synthetic percussion, experimental sounds, tonal motion, and reverses and tails. Everything is generated from oscillators, noise, filters and other processing at render time; there are no recorded samples.
@@ -665,7 +661,7 @@ Find what is available with the command-line tool (`wauvio_sfx_tool list`, `info
 ### Installation and requirements
 
 - C++17, nothing else. No external libraries and no linking; the library depends only on `wauvio.hpp`.
-- Copy `wauvio_sfx.hpp` and the `wauvio_sfx/` folder next to `wauvio.hpp`, then `#include "wauvio_sfx.hpp"`. `tests/` and `examples/` are optional.
+- Copy `wauvio_sfx.hpp` and the `wauvio_sfx/` folder next to `wauvio.hpp`, then `#include "wauvio_sfx.hpp"`. The `examples/` folder is optional.
 - No threads are used. The command-line tool uses `<filesystem>` (GCC 9 or newer needs no extra flag; GCC 8 needs `-lstdc++fs`).
 - Everything lives in `wauvio::sfx`. The core library is not modified.
 
@@ -680,7 +676,6 @@ wauvio_sfx/
   presets/              registry (Preset, Registry, Effect), preset_helpers, builtin, and the 12 catalog files
   layers/               layered (Layered)
   tools/                wauvio_sfx_tool.cpp
-tests/wauvio_sfx/       test_sfx.cpp, run.sh
 examples/wauvio_sfx/    01 .. 08
 ```
 
@@ -892,7 +887,7 @@ mine.add(p);                                   // validates id, metadata, "durat
 sfx::Effect e(*mine.find("my_whoosh"));
 ```
 
-To add a preset to the built-in catalog, add a `d("Name", Behavior, "description", {"tags"}, {"parameters"}, build)` entry in the matching category file in `wauvio_sfx/presets/`. The id is derived from the name. Presets should stay distinct in structure or parameterisation: the test suite rejects near-duplicates (see Tests). Use `BuildCtx::rng(tag)` for any randomness, never a global generator.
+To add a preset to the built-in catalogue, add a `d("Name", Behaviour, "description", {"tags"}, {"parameters"}, build)` entry in the matching category file in `wauvio_sfx/presets/`. The id is derived from the name. Presets should stay distinct in structure or parameterisation. Use `BuildCtx::rng(tag)` for any randomness, never a global generator.
 
 ### Command-line tool
 
@@ -943,23 +938,7 @@ There is no automatic integration with `Arrangement` instruments or MIDI: effect
 
 ### Performance
 
-Rendering is offline and not real-time safe: it allocates freely and some processors (spectral, granular, modal) are not cheap. Pre-render effects and keep the `Rendered` buffers. On the development machine (`-O2`) the 16 risers, about 50 seconds of audio, render and write as WAV in about 2 seconds; the whole catalog (about 600 seconds of audio, 190 WAV files) takes about 25 seconds. Memory is bounded by `max_seconds` and the layer limits; a layer with `width` above 0 is rendered twice.
-
-### Tests
-
-`tests/wauvio_sfx/run.sh [compiler flags]` compiles every header on its own with `-Wall -Wextra -Werror`, runs `test_sfx`, compiles and runs all examples, and renders one category through the command-line tool and checks its manifest. `SFX_FAST=1` tests every fourth preset (useful under sanitizers).
-
-`test_sfx` checks, among other things:
-
-- the catalog: 190 unique, well-formed ids, the right number of presets per category, complete metadata, valid defaults, unique default seeds;
-- every preset: correct length, sample rate and channels, finite samples, peak at the target, no clipping, no significant DC, not silent, bit-identical on a second render, different with another seed, unaffected by rendering other effects first, mono rendering, the minimum duration, and tail handling;
-- reverse processing: the metadata matches what the recipe does, a reverse processor mirrors the audio sample for sample, and reversed presets are louder at the end;
-- behaviour: risers rise and falls fall in spectral centroid, impacts decay, textures hold a steady level, builds build, the `pitch`, `chord`, `scale`, `brightness` and `width` parameters change what they claim, gating speed follows tempo, durations in beats follow tempo;
-- layering: length, gain, offsets in seconds and beats, pan, pitch, seeds, determinism, error handling;
-- input validation: bad ids, parameters, settings, recipes, trajectories;
-- distinctness: no two presets have near-identical feature vectors (levels over time, spectral centroid over time, flatness, crest factor, stereo correlation, duration) or near-identical waveforms.
-
-These are objective measurements. They show the controls do what they claim and that nothing is broken. They cannot say whether a preset sounds good: tuning by ear is still needed.
+Rendering is offline and not real-time safe: it allocates freely and some processors (spectral, granular, modal) are not cheap. Pre-render effects and keep the `Rendered` buffers. On the development machine (`-O2`) the 16 risers, about 50 seconds of audio, render and write as WAV in about 2 seconds; the whole catalogue (about 600 seconds of audio, 190 WAV files) takes about 25 seconds. Memory is bounded by `max_seconds` and the layer limits; a layer with `width` above 0 is rendered twice.
 
 ### Known limitations
 
