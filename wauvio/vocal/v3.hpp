@@ -1,0 +1,17 @@
+#pragma once
+
+#include "../../wauvio.hpp"
+#include "../ext/core/core.hpp"
+#include "../midi/core.hpp"
+#include "yune-v3/japanese.hpp"
+#include "yune-v3/voice.hpp"
+#include "yune-v3/pitch.hpp"
+#include "yune-v3/expr.hpp"
+#include "yune-v3/persona.hpp"
+#include "yune-v3/voices/voices.hpp"
+#include "yune-v3/synth.hpp"
+#include "yune-v3/events.hpp"
+#include "yune-v3/expression.hpp"
+#include "yune-v3/mic.hpp"
+#include "yune-v3/singer.hpp"
+#include "yune-v3/ensemble.hpp"
