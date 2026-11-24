@@ -25,6 +25,16 @@
     X(brass, BaroqueTrombone, BrassInstrument) \
     X(brass, Serpent, BrassInstrument) \
     X(brass, Ophicleide, BrassInstrument) \
+    X(brass, MutedTrumpet, BrassInstrument) \
+    X(brass, HarmonMuteTrumpet, BrassInstrument) \
+    X(brass, MutedTrombone, BrassInstrument) \
+    X(brass, Bugle, BrassInstrument) \
+    X(brass, Mellophone, BrassInstrument) \
+    X(brass, Cimbasso, BrassInstrument) \
+    X(brass, Cornett, BrassInstrument) \
+    X(brass, PostHorn, BrassInstrument) \
+    X(brass, TenorHorn, BrassInstrument) \
+    X(brass, FanfareTrumpets, BrassInstrument) \
     X(experimental, MusicalSaw, ExperimentalInstrument) \
     X(experimental, Theremin, ExperimentalInstrument) \
     X(experimental, OndesMartenot, ExperimentalInstrument) \
@@ -80,6 +90,19 @@
     X(guitars, Sarod, GuitarInstrument) \
     X(guitars, Santur, MalletInstrument) \
     X(guitars, Kantele, GuitarInstrument) \
+    X(guitars, PedalSteelGuitar, GuitarInstrument) \
+    X(guitars, LapSteelGuitar, GuitarInstrument) \
+    X(guitars, JazzGuitar, GuitarInstrument) \
+    X(guitars, BaritoneGuitar, GuitarInstrument) \
+    X(guitars, AcousticBassGuitar, GuitarInstrument) \
+    X(guitars, BassUkulele, GuitarInstrument) \
+    X(guitars, Cavaquinho, GuitarInstrument) \
+    X(guitars, TresCubano, GuitarInstrument) \
+    X(guitars, Tiple, GuitarInstrument) \
+    X(guitars, Vihuela, GuitarInstrument) \
+    X(guitars, Domra, GuitarInstrument) \
+    X(guitars, Gusli, GuitarInstrument) \
+    X(guitars, ElectricSitar, GuitarInstrument) \
     X(keyboards, AcousticGrandPiano, KeyboardInstrument) \
     X(keyboards, UprightPiano, KeyboardInstrument) \
     X(keyboards, ElectricPiano, KeyboardInstrument) \
@@ -109,6 +132,16 @@
     X(keyboards, ReedOrgan, KeyboardInstrument) \
     X(keyboards, CPElectricPiano, KeyboardInstrument) \
     X(keyboards, SoftPedalPiano, KeyboardInstrument) \
+    X(keyboards, Clavichord, KeyboardInstrument) \
+    X(keyboards, Virginal, KeyboardInstrument) \
+    X(keyboards, Fortepiano, KeyboardInstrument) \
+    X(keyboards, Pianet, KeyboardInstrument) \
+    X(keyboards, FMElectricPiano, KeyboardInstrument) \
+    X(keyboards, FarfisaOrgan, KeyboardInstrument) \
+    X(keyboards, VoxContinental, KeyboardInstrument) \
+    X(keyboards, Melodica, KeyboardInstrument) \
+    X(keyboards, RegalOrgan, KeyboardInstrument) \
+    X(keyboards, PositiveOrgan, KeyboardInstrument) \
     X(percussion, JazzKit, DrumKit) \
     X(percussion, RockKit, DrumKit) \
     X(percussion, StudioKit, DrumKit) \
@@ -178,6 +211,28 @@
     X(percussion, Triangle, PercussionInstrument) \
     X(percussion, Cabasa, PercussionInstrument) \
     X(percussion, Guiro, PercussionInstrument) \
+    X(percussion, Saron, MalletInstrument) \
+    X(percussion, Peking, MalletInstrument) \
+    X(percussion, Demung, MalletInstrument) \
+    X(percussion, Slentem, MalletInstrument) \
+    X(percussion, Gender, MalletInstrument) \
+    X(percussion, Bonang, MalletInstrument) \
+    X(percussion, Kenong, MalletInstrument) \
+    X(percussion, Kempul, MalletInstrument) \
+    X(percussion, GongAgeng, MalletInstrument) \
+    X(percussion, ChurchBell, MalletInstrument) \
+    X(percussion, Carillon, MalletInstrument) \
+    X(percussion, SingingBowl, MalletInstrument) \
+    X(percussion, Daf, PercussionInstrument) \
+    X(percussion, Bodhran, PercussionInstrument) \
+    X(percussion, Tumba, PercussionInstrument) \
+    X(percussion, Dhol, PercussionInstrument) \
+    X(percussion, Dholak, PercussionInstrument) \
+    X(percussion, Mridangam, PercussionInstrument) \
+    X(percussion, Ghatam, PercussionInstrument) \
+    X(percussion, Kanjira, PercussionInstrument) \
+    X(percussion, SlitDrum, PercussionInstrument) \
+    X(percussion, SleighBells, PercussionInstrument) \
     X(percussion, Crotales, MalletInstrument) \
     X(percussion, Glockenspiel, MalletInstrument) \
     X(percussion, SoftGlockenspiel, MalletInstrument) \
@@ -216,6 +271,21 @@
     X(strings, TremoloStrings, BowedStringInstrument) \
     X(strings, PizzicatoStrings, BowedStringInstrument) \
     X(strings, SpiccatoStrings, BowedStringInstrument) \
+    X(strings, FolkFiddle, BowedStringInstrument) \
+    X(strings, ViolaDAmore, BowedStringInstrument) \
+    X(strings, Violone, BowedStringInstrument) \
+    X(strings, Kemenche, BowedStringInstrument) \
+    X(strings, Sarangi, BowedStringInstrument) \
+    X(strings, Rebab, BowedStringInstrument) \
+    X(strings, MorinKhuur, BowedStringInstrument) \
+    X(strings, Octobass, BowedStringInstrument) \
+    X(strings, Rebec, BowedStringInstrument) \
+    X(strings, BowedPsaltery, BowedStringInstrument) \
+    X(strings, ViolinSection, BowedStringInstrument) \
+    X(strings, ViolaSection, BowedStringInstrument) \
+    X(strings, CelloSection, BowedStringInstrument) \
+    X(strings, DoubleBassSection, BowedStringInstrument) \
+    X(strings, MutedStrings, BowedStringInstrument) \
     X(synthesized, SynthLead, SynthInstrument) \
     X(synthesized, SynthPad, SynthInstrument) \
     X(synthesized, SynthBass, SynthInstrument) \
@@ -231,6 +301,19 @@
     X(synthesized, ArpeggioSynth, SynthInstrument) \
     X(synthesized, AtmosphericSynth, SynthInstrument) \
     X(synthesized, Drone, SynthInstrument) \
+    X(synthesized, SupersawLead, SynthInstrument) \
+    X(synthesized, SawLead, SynthInstrument) \
+    X(synthesized, SquareLead, SynthInstrument) \
+    X(synthesized, SineLead, SynthInstrument) \
+    X(synthesized, SyncLead, SynthInstrument) \
+    X(synthesized, AcidBass, SynthInstrument) \
+    X(synthesized, SubBass, SynthInstrument) \
+    X(synthesized, ReeseBass, SynthInstrument) \
+    X(synthesized, WarmPad, SynthInstrument) \
+    X(synthesized, GlassPad, SynthInstrument) \
+    X(synthesized, SweepPad, SynthInstrument) \
+    X(synthesized, PolySynth, SynthInstrument) \
+    X(synthesized, SynthStab, SynthInstrument) \
     X(vocals, Choir, VocalInstrument) \
     X(vocals, MaleChoir, VocalInstrument) \
     X(vocals, FemaleChoir, VocalInstrument) \
@@ -285,6 +368,20 @@
     X(woodwinds, Harmonica, WoodwindInstrument) \
     X(woodwinds, IrishWhistle, WoodwindInstrument) \
     X(woodwinds, LowWhistle, WoodwindInstrument) \
+    X(woodwinds, Fife, WoodwindInstrument) \
+    X(woodwinds, Quena, WoodwindInstrument) \
+    X(woodwinds, Kaval, WoodwindInstrument) \
+    X(woodwinds, BassetHorn, WoodwindInstrument) \
+    X(woodwinds, AltoClarinet, WoodwindInstrument) \
+    X(woodwinds, ClarinetInA, WoodwindInstrument) \
+    X(woodwinds, OboeDAmore, WoodwindInstrument) \
+    X(woodwinds, SopraninoSaxophone, SaxophoneInstrument) \
+    X(woodwinds, Shawm, WoodwindInstrument) \
+    X(woodwinds, Crumhorn, WoodwindInstrument) \
+    X(woodwinds, Dulcian, WoodwindInstrument) \
+    X(woodwinds, Chalumeau, WoodwindInstrument) \
+    X(woodwinds, Kazoo, WoodwindInstrument) \
+    X(woodwinds, Gemshorn, WoodwindInstrument) \
     X(world, Erhu, BowedStringInstrument) \
     X(world, Guzheng, GuitarInstrument) \
     X(world, Sitar, GuitarInstrument) \
@@ -320,4 +417,23 @@
     X(world, UilleannPipes, WorldInstrument) \
     X(world, HurdyGurdy, WorldInstrument) \
     X(world, Concertina, KeyboardInstrument) \
-    X(world, Bandoneon, KeyboardInstrument)
+    X(world, Bandoneon, KeyboardInstrument) \
+    X(world, Saz, GuitarInstrument) \
+    X(world, Qanun, GuitarInstrument) \
+    X(world, Cimbalom, GuitarInstrument) \
+    X(world, Yangqin, GuitarInstrument) \
+    X(world, Ruan, GuitarInstrument) \
+    X(world, Liuqin, GuitarInstrument) \
+    X(world, Kora, GuitarInstrument) \
+    X(world, Ngoni, GuitarInstrument) \
+    X(world, Veena, GuitarInstrument) \
+    X(world, Tanpura, GuitarInstrument) \
+    X(world, Tar, GuitarInstrument) \
+    X(world, Setar, GuitarInstrument) \
+    X(world, Dutar, GuitarInstrument) \
+    X(world, Hichiriki, WorldInstrument) \
+    X(world, Ryuteki, WorldInstrument) \
+    X(world, Sho, WorldInstrument) \
+    X(world, Nadaswaram, WorldInstrument) \
+    X(world, Pungi, WorldInstrument) \
+    X(world, ShrutiBox, WorldInstrument)
