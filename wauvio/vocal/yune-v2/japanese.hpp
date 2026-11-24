@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "kanji.hpp"
+
 namespace wauvio {
     namespace vocal {
         namespace v2 {
@@ -232,6 +234,11 @@ namespace wauvio {
                 bool merge_long_vowels = true;
                 // V2: "cute speech" (baby-talk style) softening: s/z/t/d/n/r palatalise (さ -> しゃ-like).
                 bool cute = false;
+                // Kanji in a lyric are converted to hiragana first (see kanji.hpp): ruby 漢字《かんじ》, then the dictionary.
+                // Not stored in .wvc banks. Off = kanji are ignored like any other unknown symbol.
+                bool kanji = true;
+                const KanjiDictionary* kanji_dictionary = nullptr;     // null = the built-in list
+                std::vector<std::string>* kanji_notes = nullptr;       // optional sink for "no reading" / "read piece by piece"
             };
 
             // Kana (hiragana or katakana) -> morae. Whitespace, '|', ',' and '/' are ignored.
@@ -471,6 +478,10 @@ namespace wauvio {
             // Parse a lyric string: UTF-8 kana first; if it is plain ASCII, treat as romaji.
             // V2 syntax: `{k a n a}` phoneme mode, and `さ[0.7]ん[0.3]` relative time weights per segment.
             inline std::vector<Mora> parse_lyric(const std::string& text, const ParseOptions& opt = {}) {
+                if (opt.kanji && needs_kanji_pass(text)) {
+                    ParseOptions o2 = opt; o2.kanji = false;
+                    return parse_lyric(kanji_to_kana(text, opt.kanji_dictionary ? *opt.kanji_dictionary : KanjiDictionary::builtin(), opt.kanji_notes), o2);
+                }
                 std::vector<Mora> out;
                 const size_t a = text.find_first_not_of(" \t");
                 const size_t b = text.rfind('}');

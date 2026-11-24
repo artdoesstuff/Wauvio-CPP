@@ -65,6 +65,42 @@ int main() {
         auto bu = parse_kana("ぶ");
         CHECK(surface(bu[0]).surf == Surf::B, "ぶ is still [b]");
     }
+    // ---- kanji lyrics ----
+    {
+        auto reads = [](const std::string& s, std::vector<std::string>* notes = nullptr) { return kanji_to_kana(s, KanjiDictionary::builtin(), notes); };
+        CHECK(reads("さくら") == "さくら", "kana without kanji is returned untouched");
+        CHECK(reads("夢") == "ゆめ" && reads("空") == "そら", "single kanji use the dictionary");
+        CHECK(reads("今日") == "きょう" && reads("明日") == "あした", "compound entries beat the single kanji (今日, 明日)");
+        CHECK(reads("思い出") == "おもいで" && reads("思う") == "おもう", "stem + okurigana: 思い出 (word) and 思う (stem)");
+        CHECK(reads("食べる") != "たべる", "食 is not in the list, so 食べる is not guessed");
+        CHECK(reads("漢字《かんじ》が好き") == "かんじがすき", "ruby reads 漢字, the dictionary reads 好き");
+        CHECK(reads("今日《こんにち》") == "こんにち", "ruby overrides a dictionary word");
+        CHECK(reads("｜ふりがな《フリガナ》") == "ふりがな", "｜base《ruby》 works on kana too (katakana reading becomes hiragana)");
+        CHECK(reads("人々") == "ひとびと", "人々 is an entry");
+        std::vector<std::string> nt; reads("空鷗", &nt);
+        CHECK(nt.size() == 1 && nt[0].find("鷗") != std::string::npos, "a kanji without a reading is reported");
+        nt.clear(); reads("三人", &nt);
+        CHECK(nt.size() == 1 && nt[0].find("piece by piece") != std::string::npos, "三人 read piece by piece is reported");
+        nt.clear(); reads("夢大会", &nt);
+        CHECK(!nt.empty(), "an unlisted compound (大会) is reported");
+        // through the lyric parser
+        auto k1 = parse_lyric("夢"), k2 = parse_lyric("ゆめ");
+        CHECK(k1.size() == 2 && k1.size() == k2.size() && k1[0].c == k2[0].c && k1[1].v == k2[1].v, "parse_lyric reads 夢 like ゆめ");
+        ParseOptions off; off.kanji = false;
+        CHECK(parse_lyric("夢", off).empty(), "kanji = false ignores kanji like any unknown symbol");
+        auto w = parse_lyric("夢[0.7]さ[0.3]");
+        CHECK(w.size() == 3, "relative-weight brackets still work next to kanji");
+        // dictionary editing and Singer plumbing
+        KanjiDictionary d; std::string e;
+        CHECK(d.load_text("# comment\n  鷗 かもめ\n鯨\tクジラ\n", &e) && d.size() == 2 && *d.find("鯨") == "くじら", "dictionary text loads (tab or space, katakana -> hiragana)");
+        CHECK(!d.load_text("鷗\n", &e) && !e.empty(), "a line without a reading is rejected");
+        Singer s; s.note_sec(60, 0.4, "空鷗");
+        auto dg = s.diagnostics(); bool saw = false; for (auto& m : dg) if (m.find("鷗") != std::string::npos) saw = true;
+        CHECK(saw, "Singer::diagnostics lists the unreadable kanji");
+        s.kanji_dictionary().add("鷗", "かもめ"); Singer s2 = s; s2.clear(); s2.note_sec(60, 0.4, "空鷗");
+        bool clean = true; for (auto& m : s2.diagnostics()) if (m.find("reading") != std::string::npos) clean = false;
+        CHECK(clean && s2.notes().back().morae.size() == 5, "after adding it to the dictionary 空鷗 -> そらかもめ (5 morae)");
+    }
     // ---- profile text round trip ----
     {
         VoiceProfile p; std::string e;

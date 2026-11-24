@@ -25,6 +25,6 @@ namespace wauvio {
                 return v;
             }
 
-        } // namespace v2
+        }
     }
 }

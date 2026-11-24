@@ -18,6 +18,6 @@ namespace wauvio {
                 out = std::move(p); return true;
             }
 
-        } // namespace v3
+        } 
     }
 }
