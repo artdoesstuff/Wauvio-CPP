@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SoundFont (SF2) support · Wauvio Docs</title><meta name="description" content="SoundFont parsing and the SoundFont bank provider.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">SoundFont (wauvio/sf2)</div><h1>SoundFont (SF2) support</h1>
+
+<p><code>wauvio/sf2.hpp</code> (directory <code>wauvio/sf2/</code>, namespace <code>wauvio::sf2</code>) loads SoundFont 2 files and exposes their presets as Wauvio instruments. It includes <code>ext.hpp</code> because it produces <code>music::SampledInstrument</code>s.</p>
+<h2>Loading and using a SoundFont</h2>
+<pre><code>#include "wauvio/sf2.hpp"
+#include "wauvio/midi.hpp"
+using namespace wauvio;
+
+auto sf = std::make_shared&lt;sf2::SoundFont&gt;("GeneralUser.sf2");
+for (auto&amp; p : sf-&gt;list_presets()) { /* p.name, p.bank, p.program */ }
+
+midi::track::LoadOptions opts;
+opts.resolver.set_bank_provider(sf);     // SF2 presets win over built-in GM instruments
+auto music = midi::track::load_midi("song.mid", opts);</code></pre>
+<p><code>SoundFont</code> implements <code>music::IBankProvider</code>, so it plugs directly into the <a href="midi-resolution.html">MIDI instrument resolver</a>.</p>
+<h2>SoundFont class</h2>
+<ul>
+<li><code>SoundFont(path)</code> — parses the file; throws <code>Sf2ParseError</code> (a <code>std::runtime_error</code>) on malformed data or if the file has no sample audio.</li>
+<li><code>name()</code>, <code>list_presets()</code> → <code>PresetInfo {name, bank, program}</code>.</li>
+<li><code>has_preset(bank_msb, bank_lsb, program)</code> / <code>create_instrument(...)</code> — lookup by <strong>bank MSB and program</strong>; the LSB argument is ignored. Returns <code>nullptr</code> if missing.</li>
+<li><code>has_percussion_preset(...)</code> / <code>create_percussion_instrument(...)</code> — the bank and note arguments are ignored: the first preset found in bank 128 (then bank 120) is used as the whole kit, built once and cached; zones inside it are selected by note.</li>
+<li><code>create_instrument_by_name(preset_name)</code> — exact preset-name match.</li>
+</ul>
+<p>Presets become a <code>SampledInstrument</code> whose zones come from the preset/instrument zone hierarchy, using global-zone defaults and key/velocity ranges. All presets share one converted stereo sample buffer (<code>shared_audio</code>), so many instruments cost little extra memory. Audio is read as 16-bit samples.</p>
+<h2>Parsing layers</h2><table><thead><tr><th>Header</th><th>Contents</th></tr></thead><tbody><tr><td><code>sf2/core/riff_reader.hpp</code></td><td>Little-endian <code>ByteReader</code> (<code>u8</code>, <code>u16le</code>, <code>u32le</code>, <code>s16le</code>, <code>s8</code>, <code>fourcc</code>, <code>fixed_string</code>), <code>RiffChunk</code>, <code>Sf2ParseError</code>, <code>read_whole_file</code></td></tr><tr><td><code>sf2/core/sf2_types.hpp</code></td><td><code>Generator</code> enum (SoundFont generator operators such as <code>InitialFilterFc</code>, <code>VolEnv</code> stages, <code>KeyRange</code>, <code>VelRange</code>, <code>SampleModes</code>, <code>OverridingRootKey</code>), <code>GenAmount</code>, list entries, <code>PresetHeader</code>, <code>InstHeader</code>, <code>SampleHeader</code>, and the <code>Hydra</code> structure holding all <code>pdta</code> tables</td></tr><tr><td><code>sf2/core/sf2_parser.hpp</code></td><td><code>RawSoundFont</code> and <code>parse_sf2_file(path)</code> (INFO, sdta and pdta chunks)</td></tr><tr><td><code>sf2/sf2_instrument.hpp</code></td><td><code>SoundFont</code> and instrument construction helpers</td></tr></tbody></table><h2>Full API listing</h2><section class="file" id="wauvio-sf2-core-riff-reader-hpp"><h3><code>wauvio/sf2/core/riff_reader.hpp</code></h3>
+<h4 id="wauvio-sf2-core-riff-reader-hpp-wauvio-sf2-sf2parseerror"><span class="ns">wauvio::sf2::</span>class Sf2ParseError</h4>
+<pre><code>class Sf2ParseError : public std::runtime_error
+public:
+    explicit Sf2ParseError(const std::string&amp; what) : std::runtime_error(what) {}</code></pre>
+<h4 id="wauvio-sf2-core-riff-reader-hpp-wauvio-sf2-bytereader"><span class="ns">wauvio::sf2::</span>class ByteReader</h4>
+<pre><code>class ByteReader
+public:
+    ByteReader(const unsigned char* data, size_t size) : data_(data), size_(size) {}
+    size_t position() const noexcept { return pos_; }
+    size_t remaining() const noexcept { return pos_ &lt; size_ ? size_ - pos_ : 0; }
+    bool eof() const noexcept { return pos_ &gt;= size_; }
+    void require(size_t n) const
+    uint8_t u8() { require(1); return data_[pos_++]; }
+    uint16_t u16le()
+    uint32_t u32le()
+    int16_t s16le() { return static_cast&lt;int16_t&gt;(u16le()); }
+    int8_t s8() { return static_cast&lt;int8_t&gt;(u8()); }
+    std::string fourcc()
+    std::string fixed_string(size_t len)
+    void skip(size_t n) { require(n); pos_ += n; }
+    void seek(size_t absolute)
+    const unsigned char* ptr() const noexcept { return data_ + pos_; }
+    const unsigned char* base() const noexcept { return data_; }
+    size_t size() const noexcept { return size_; }</code></pre>
+<h4 id="wauvio-sf2-core-riff-reader-hpp-wauvio-sf2-riffchunk"><span class="ns">wauvio::sf2::</span>struct RiffChunk</h4>
+<pre><code>struct RiffChunk
+    std::string id;
+    size_t data_offset = 0;
+    uint32_t data_size = 0;
+inline std::vector&lt;unsigned char&gt; read_whole_file(const std::string&amp; path)</code></pre>
+</section>
+<section class="file" id="wauvio-sf2-core-sf2-types-hpp"><h3><code>wauvio/sf2/core/sf2_types.hpp</code></h3>
+<h4 id="wauvio-sf2-core-sf2-types-hpp-wauvio-sf2-generator"><span class="ns">wauvio::sf2::</span>enum class Generator</h4>
+<pre><code>enum class Generator : uint16_t
+    StartAddrsOffset = 0,
+    EndAddrsOffset = 1,
+    StartloopAddrsOffset = 2,
+    EndloopAddrsOffset = 3,
+    StartAddrsCoarseOffset = 4,
+    ModLfoToPitch = 5,
+    VibLfoToPitch = 6,
+    ModEnvToPitch = 7,
+    InitialFilterFc = 8,
+    InitialFilterQ = 9,
+    ModLfoToFilterFc = 10,
+    ModEnvToFilterFc = 11,
+    EndAddrsCoarseOffset = 12,
+    ModLfoToVolume = 13,
+    ChorusEffectsSend = 15,
+    ReverbEffectsSend = 16,
+    Pan = 17,
+    DelayModLFO = 21,
+    FreqModLFO = 22,
+    DelayVibLFO = 23,
+    FreqVibLFO = 24,
+    DelayModEnv = 25,
+    AttackModEnv = 26,
+    HoldModEnv = 27,
+    DecayModEnv = 28,
+    SustainModEnv = 29,
+    ReleaseModEnv = 30,
+    KeynumToModEnvHold = 31,
+    KeynumToModEnvDecay = 32,
+    DelayVolEnv = 33,
+    AttackVolEnv = 34,
+    HoldVolEnv = 35,
+    DecayVolEnv = 36,
+    SustainVolEnv = 37,
+    ReleaseVolEnv = 38,
+    KeynumToVolEnvHold = 39,
+    KeynumToVolEnvDecay = 40,
+    Instrument = 41,
+    KeyRange = 43,
+    VelRange = 44,
+    StartloopAddrsCoarseOffset = 45,
+    Keynum = 46,
+    Velocity = 47,
+    InitialAttenuation = 48,
+    EndloopAddrsCoarseOffset = 50,
+    CoarseTune = 51,
+    FineTune = 52,
+    SampleID = 53,
+    SampleModes = 54,
+    ScaleTuning = 56,
+    ExclusiveClass = 57,
+    OverridingRootKey = 58,
+    EndOper = 60</code></pre>
+<h4 id="wauvio-sf2-core-sf2-types-hpp-wauvio-sf2-genamount"><span class="ns">wauvio::sf2::</span>union GenAmount</h4>
+<pre><code>union GenAmount
+    int16_t sh_amount;
+    uint16_t w_amount;
+    struct { uint8_t lo; uint8_t hi; } ranges;</code></pre>
+<h4 id="wauvio-sf2-core-sf2-types-hpp-wauvio-sf2-genlistentry"><span class="ns">wauvio::sf2::</span>struct GenListEntry</h4>
+<pre><code>struct GenListEntry
+    Generator oper;
+    GenAmount amount;</code></pre>
+<h4 id="wauvio-sf2-core-sf2-types-hpp-wauvio-sf2-modlistentry"><span class="ns">wauvio::sf2::</span>struct ModListEntry</h4>
+<pre><code>struct ModListEntry
+    uint16_t src_oper = 0;
+    uint16_t dest_oper = 0;
+    int16_t amount = 0;
+    uint16_t amt_src_oper = 0;
+    uint16_t trans_oper = 0;</code></pre>
+<h4 id="wauvio-sf2-core-sf2-types-hpp-wauvio-sf2-bagentry"><span class="ns">wauvio::sf2::</span>struct BagEntry</h4>
+<pre><code>struct BagEntry
+    uint16_t gen_ndx = 0;
+    uint16_t mod_ndx = 0;</code></pre>
+<h4 id="wauvio-sf2-core-sf2-types-hpp-wauvio-sf2-presetheader"><span class="ns">wauvio::sf2::</span>struct PresetHeader</h4>
+<pre><code>struct PresetHeader
+    std::string name;
+    uint16_t preset = 0;
+    uint16_t bank = 0;
+    uint16_t bag_ndx = 0;</code></pre>
+<h4 id="wauvio-sf2-core-sf2-types-hpp-wauvio-sf2-instheader"><span class="ns">wauvio::sf2::</span>struct InstHeader</h4>
+<pre><code>struct InstHeader
+    std::string name;
+    uint16_t bag_ndx = 0;</code></pre>
+<h4 id="wauvio-sf2-core-sf2-types-hpp-wauvio-sf2-sampleheader"><span class="ns">wauvio::sf2::</span>struct SampleHeader</h4>
+<pre><code>struct SampleHeader
+    std::string name;
+    uint32_t start = 0;
+    uint32_t end = 0;
+    uint32_t loop_start = 0;
+    uint32_t loop_end = 0;
+    uint32_t sample_rate = 44100;
+    uint8_t original_pitch = 60;
+    int8_t pitch_correction = 0;
+    uint16_t sample_link = 0;
+    uint16_t sample_type = 1;</code></pre>
+<h4 id="wauvio-sf2-core-sf2-types-hpp-wauvio-sf2-hydra"><span class="ns">wauvio::sf2::</span>struct Hydra</h4>
+<pre><code>struct Hydra
+    std::vector&lt;PresetHeader&gt; phdr;
+    std::vector&lt;BagEntry&gt; pbag;
+    std::vector&lt;ModListEntry&gt; pmod;
+    std::vector&lt;GenListEntry&gt; pgen;
+    std::vector&lt;InstHeader&gt; inst;
+    std::vector&lt;BagEntry&gt; ibag;
+    std::vector&lt;ModListEntry&gt; imod;
+    std::vector&lt;GenListEntry&gt; igen;
+    std::vector&lt;SampleHeader&gt; shdr;</code></pre>
+</section>
+<section class="file" id="wauvio-sf2-core-sf2-parser-hpp"><h3><code>wauvio/sf2/core/sf2_parser.hpp</code></h3>
+<h4 id="wauvio-sf2-core-sf2-parser-hpp-wauvio-sf2-rawsoundfont"><span class="ns">wauvio::sf2::</span>struct RawSoundFont</h4>
+<pre><code>struct RawSoundFont
+    std::string name;
+    std::shared_ptr&lt;std::vector&lt;float&gt;&gt; sample_data;
+    uint32_t sample_data_frames = 0;
+    Hydra hydra;
+    inline void parse_info(ByteReader&amp; r, size_t end, RawSoundFont&amp; out)
+    inline void parse_sdta(ByteReader&amp; r, size_t end, RawSoundFont&amp; out)
+    inline void parse_pdta(ByteReader&amp; r, size_t end, RawSoundFont&amp; out)
+inline RawSoundFont parse_sf2_file(const std::string&amp; path)</code></pre>
+</section>
+<section class="file" id="wauvio-sf2-sf2-instrument-hpp"><h3><code>wauvio/sf2/sf2_instrument.hpp</code></h3>
+<h4 id="wauvio-sf2-sf2-instrument-hpp-wauvio-sf2-instr-detail-free-functions-constants-and-aliases"><span class="ns">wauvio::sf2::instr_detail::</span>Free functions, constants and aliases</h4>
+<pre><code>inline std::vector&lt;GenListEntry&gt; bag_slice(const std::vector&lt;BagEntry&gt;&amp; bag,
+                                            const std::vector&lt;GenListEntry&gt;&amp; gen_pool, size_t bag_idx)
+
+inline bool has_gen(const std::vector&lt;GenListEntry&gt;&amp; gens, Generator g)
+inline int gen_or(const std::vector&lt;GenListEntry&gt;&amp; local, const std::vector&lt;GenListEntry&gt;&amp; global_zone,
+                   bool has_global, Generator g, int def)
+
+inline void key_vel_range(const std::vector&lt;GenListEntry&gt;&amp; local, const std::vector&lt;GenListEntry&gt;&amp; global_zone,
+                           bool has_global, int&amp; key_lo, int&amp; key_hi, int&amp; vel_lo, int&amp; vel_hi)
+
+inline double timecents_to_seconds(int tc)</code></pre>
+<h4 id="wauvio-sf2-sf2-instrument-hpp-wauvio-sf2-soundfont"><span class="ns">wauvio::sf2::</span>class SoundFont</h4>
+<pre><code>class SoundFont : public wauvio::music::IBankProvider
+public:
+    explicit SoundFont(const std::string&amp; path)
+    const std::string&amp; name() const noexcept { return raw_.name; }
+    struct PresetInfo { std::string name; int bank; int program; };
+    std::vector&lt;PresetInfo&gt; list_presets() const
+    bool has_preset(int bank_msb, int /*bank_lsb*/, int program) const override
+    wauvio::music::InstrumentPtr create_instrument(int bank_msb, int /*bank_lsb*/, int program) const override
+    bool has_percussion_preset(int /*bank_msb*/, int /*bank_lsb*/, int /*gm_note*/) const override
+    wauvio::music::InstrumentPtr create_percussion_instrument(int /*bank_msb*/, int /*bank_lsb*/, int /*gm_note*/) const override
+    wauvio::music::InstrumentPtr create_instrument_by_name(const std::string&amp; preset_name) const</code></pre>
+</section>
+<div class="pager"><a href="midi-genre.html"><small>Previous</small>MIDI genre system</a><a class="r" href="sfx.html"><small>Next</small>SFX engine overview</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

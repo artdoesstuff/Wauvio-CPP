@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Core types — notes, instruments, arrangements · Wauvio Docs</title><meta name="description" content="Notes, dynamics, articulations, Instrument, Track, Arrangement.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Music layer (wauvio/ext)</div><h1>Core types — notes, instruments, arrangements</h1>
+
+<p>Header <code>wauvio/ext/core/core.hpp</code>, namespace <code>wauvio::music</code>.</p>
+<h2>Vocabulary types</h2>
+<table><thead><tr><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>Dynamics</code></td><td><code>ppp pp p mp mf f ff fff</code>. <code>dynamics_to_velocity()</code> / <code>velocity_to_dynamics()</code> convert to and from a 0–1 velocity.</td></tr><tr><td><code>Articulation</code></td><td>Sustain, Legato, Staccato, Marcato, Accent, Soft, Hard, Pizzicato, Tremolo, PalmMute, Harmonic, Muted, Fall, Doit, FlutterTongue, Rimshot, Spiccato, SulPonticello, ColLegno, ShortStab, Whisper, Breath, Humming. <code>to_string()</code> gives a name.</td></tr><tr><td><code>TimeSignature</code>, <code>Tempo</code></td><td><code>beats_per_bar</code>/<code>beat_unit</code>; <code>bpm</code> with <code>beat_seconds()</code> and <code>beats_to_seconds()</code>.</td></tr><tr><td><code>Note</code></td><td>MIDI note (<code>REST_NOTE = -1</code> is a rest), <code>duration</code> in seconds, <code>dynamics</code>, <code>articulation</code>, <code>pan</code>, <code>expression</code>, pitch-bend (<code>pitch_bend_semitones</code>, <code>pitch_bend_curve</code> of time/value pairs, <code>bend_at(t)</code>), glide (<code>glide_from_midi</code>, <code>glide_time</code>), <code>mod_wheel</code>, <code>aftertouch</code>. Use <code>rest(duration)</code> to make a rest.</td></tr><tr><td><code>Chord</code></td><td>A list of MIDI notes sharing duration, dynamics and articulation.</td></tr><tr><td><code>Melody</code></td><td><code>std::vector&lt;Note&gt;</code>.</td></tr><tr><td><code>ModSource / ModTarget / ModRoute</code></td><td>Modulation routing records (Velocity, ModWheel, Aftertouch, Expression, KeyPosition, LFO1/2, Envelope1 → Pitch, FilterCutoff, Volume, VibratoDepth, TremoloDepth, Pan) with an <code>amount</code>. Used in <code>TimbreRecipe::modulation</code>.</td></tr><tr><td><code>scale::*</code></td><td><code>build(root, steps, octaves)</code> plus <code>major, natural_minor, harmonic_minor, major_pentatonic, minor_pentatonic, blues, chromatic, dorian, mixolydian</code>; each returns MIDI numbers.</td></tr><tr><td><code>PlayedNote</code></td><td>A rendered stereo note with its sample rate; <code>to_mono()</code>, <code>duration_seconds()</code>.</td></tr></tbody></table>
+<h2>Instrument (abstract)</h2>
+<p>Subclasses implement <code>StereoBuffer render_note(const Note&amp;, int sample_rate)</code> and may override <code>supported_articulations()</code> (<code>supports(a)</code> queries it). Common members: <code>name</code>, <code>gain</code>, <code>pan</code>, and an optional per-instrument effect chain. Convenience: <code>play(midi, duration, dyn, art)</code>, <code>play(Note)</code>, <code>play_chord(Chord)</code>.</p>
+<p>The chain is enabled by chainable setters and applied after the note is rendered, in this fixed order: <strong>distortion (soft clip) → EQ → chorus → delay → reverb</strong>, each channel processed independently using copies of the stored effect objects:</p>
+<table><thead><tr><th>Setter</th><th>Defaults</th></tr></thead><tbody>
+<tr><td><code>reverb(room_size, wet, damping)</code></td><td>0.6, 0.3, 0.5</td></tr>
+<tr><td><code>chorus(rate_hz, depth_ms, wet)</code></td><td>0.5, 1.5, 0.4</td></tr>
+<tr><td><code>delay(time_ms, feedback, wet)</code></td><td>250, 0.35, 0.3</td></tr>
+<tr><td><code>eq(ParametricEQ)</code></td><td>—</td></tr>
+<tr><td><code>distortion(drive)</code></td><td>2.0</td></tr></tbody></table>
+<p><code>InstrumentPtr</code> is <code>std::shared_ptr&lt;Instrument&gt;</code>. <code>IBankProvider</code> is an abstract interface for preset sources (used by the SF2 loader and MIDI resolver): <code>has_preset</code>/<code>create_instrument</code> by bank MSB/LSB/program and <code>has_percussion_preset</code>/<code>create_percussion_instrument</code> by GM note.</p>
+<h2>Track and Arrangement</h2>
+<p><code>Track</code> references an instrument (non-owning) and holds notes and chords in order: <code>add(Note)</code>, <code>add(Melody)</code>, <code>add_chord(Chord)</code>, <code>rest(d)</code>, <code>total_duration()</code>, <code>render()</code>, plus read accessors (<code>entry_count</code>, <code>entry_note</code>, <code>entry_chord</code>, <code>entry_is_chord</code>, <code>entry_onsets</code>).</p>
+<p><code>Arrangement</code> owns tracks with start offsets and gains: <code>tempo</code>, <code>time_signature</code>, <code>add(instrument, melody, start_time, track_gain)</code> (returns the new <code>Track&amp;</code>), <code>add_track(track, start, gain)</code>, chainable master options <code>limiter(threshold = 0.9)</code> and <code>master_reverb(room, wet)</code>, introspection (<code>track_count</code>, <code>track_at</code>, <code>start_time_at</code>, <code>gain_at</code>, <code>has_limiter</code>, …) and <code>render()</code> returning a stereo buffer. Note durations are in seconds; <code>Tempo</code> is provided as a helper rather than being applied automatically to <code>Note::duration</code>.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-ext-core-core-hpp"><h3><code>wauvio/ext/core/core.hpp</code></h3>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-dynamics"><span class="ns">wauvio::music::</span>enum class Dynamics</h4>
+<pre><code>enum class Dynamics { ppp, pp, p, mp, mf, f, ff, fff };
+inline double dynamics_to_velocity(Dynamics d) noexcept
+inline Dynamics velocity_to_dynamics(double v) noexcept</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-articulation"><span class="ns">wauvio::music::</span>enum class Articulation</h4>
+<pre><code>enum class Articulation
+    Sustain,
+    Legato,
+    Staccato,
+    Marcato,
+    Accent,
+    Soft,
+    Hard,
+    Pizzicato,
+    Tremolo,
+    PalmMute,
+    Harmonic,
+    Muted,
+    Fall,
+    Doit,
+    FlutterTongue,
+    Rimshot,
+    Spiccato,
+    SulPonticello,
+    ColLegno,
+    ShortStab,
+    Whisper,
+    Breath,
+    Humming
+inline const char* to_string(Articulation a) noexcept</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-timesignature"><span class="ns">wauvio::music::</span>struct TimeSignature</h4>
+<pre><code>struct TimeSignature
+    int beats_per_bar = 4;
+    int beat_unit     = 4;
+    TimeSignature() = default;
+    TimeSignature(int bpb, int bu) : beats_per_bar(bpb), beat_unit(bu) {}</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-tempo"><span class="ns">wauvio::music::</span>struct Tempo</h4>
+<pre><code>struct Tempo
+    double bpm = 120.0;
+    Tempo() = default;
+    explicit Tempo(double b) : bpm(b) {}
+    double beat_seconds() const noexcept { return 60.0 / bpm; }
+    double beats_to_seconds(double beats) const noexcept { return beats * beat_seconds(); }
+constexpr int REST_NOTE = -1;</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-note"><span class="ns">wauvio::music::</span>struct Note</h4>
+<pre><code>struct Note
+    int          midi_note   = 60;
+    double       duration    = 0.5;
+    Dynamics     dynamics    = Dynamics::mf;
+    Articulation articulation = Articulation::Sustain;
+    double       pan         = 0.0;
+    double       expression          = 1.0;
+    double       pitch_bend_semitones = 0.0;
+    int          glide_from_midi     = -1;
+    double       glide_time          = 0.08;
+    std::vector&lt;std::pair&lt;double,double&gt;&gt; pitch_bend_curve;
+    double       mod_wheel   = 0.0;
+    double       aftertouch  = 0.0;
+    Note() = default;
+    Note(int midi, double dur, Dynamics dyn = Dynamics::mf,
+         Articulation art = Articulation::Sustain, double p = 0.0)
+        : midi_note(midi), duration(dur), dynamics(dyn), articulation(art), pan(p) {}
+    bool is_rest() const noexcept { return midi_note &lt; 0; }
+    double bend_at(double t) const
+inline Note rest(double duration) { return Note(REST_NOTE, duration); }</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-modsource"><span class="ns">wauvio::music::</span>enum class ModSource</h4>
+<pre><code>enum class ModSource
+    Velocity,
+    ModWheel,
+    Aftertouch,
+    Expression,
+    KeyPosition,
+    LFO1,
+    LFO2,
+    Envelope1</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-modtarget"><span class="ns">wauvio::music::</span>enum class ModTarget</h4>
+<pre><code>enum class ModTarget
+    Pitch,
+    FilterCutoff,
+    Volume,
+    VibratoDepth,
+    TremoloDepth,
+    Pan</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-modroute"><span class="ns">wauvio::music::</span>struct ModRoute</h4>
+<pre><code>struct ModRoute
+    ModSource source;
+    ModTarget target;
+    double    amount = 0.0;</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-chord"><span class="ns">wauvio::music::</span>struct Chord</h4>
+<pre><code>struct Chord
+    std::vector&lt;int&gt; midi_notes;
+    double           duration    = 0.5;
+    Dynamics         dynamics    = Dynamics::mf;
+    Articulation     articulation = Articulation::Sustain;
+    Chord() = default;
+    Chord(std::vector&lt;int&gt; notes, double dur, Dynamics dyn = Dynamics::mf,
+          Articulation art = Articulation::Sustain)
+        : midi_notes(std::move(notes)), duration(dur), dynamics(dyn), articulation(art) {}
+using Melody = std::vector&lt;Note&gt;;
+    inline std::vector&lt;int&gt; build(int root, const std::vector&lt;int&gt;&amp; steps, int octaves = 1)
+    inline std::vector&lt;int&gt; major(int root, int octaves = 1)          { return build(root, {2,2,1,2,2,2,1}, octaves); }
+    inline std::vector&lt;int&gt; natural_minor(int root, int octaves = 1)  { return build(root, {2,1,2,2,1,2,2}, octaves); }
+    inline std::vector&lt;int&gt; harmonic_minor(int root, int octaves = 1) { return build(root, {2,1,2,2,1,3,1}, octaves); }
+    inline std::vector&lt;int&gt; major_pentatonic(int root, int octaves=1) { return build(root, {2,2,3,2,3}, octaves); }
+    inline std::vector&lt;int&gt; minor_pentatonic(int root, int octaves=1) { return build(root, {3,2,2,3,2}, octaves); }
+    inline std::vector&lt;int&gt; blues(int root, int octaves = 1)          { return build(root, {3,2,1,1,3,2}, octaves); }
+    inline std::vector&lt;int&gt; chromatic(int root, int octaves = 1)      { return build(root, {1,1,1,1,1,1,1,1,1,1,1,1}, octaves); }
+    inline std::vector&lt;int&gt; dorian(int root, int octaves = 1)         { return build(root, {2,1,2,2,2,1,2}, octaves); }
+    inline std::vector&lt;int&gt; mixolydian(int root, int octaves = 1)     { return build(root, {2,2,1,2,2,1,2}, octaves); }</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-playednote"><span class="ns">wauvio::music::</span>struct PlayedNote</h4>
+<pre><code>struct PlayedNote
+    StereoBuffer audio;
+    int          sample_rate = 44100;
+    Buffer to_mono() const { return audio.to_mono(); }
+    double duration_seconds() const</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-instrument"><span class="ns">wauvio::music::</span>class Instrument</h4>
+<pre><code>class Instrument
+public:
+    std::string name;
+    float       gain = 1.0f;
+    float       pan  = 0.0f;
+    bool     reverb_on     = false;  wauvio::fx::basic::Reverb           reverb_fx;
+    bool     chorus_on     = false;  wauvio::fx::basic::Chorus           chorus_fx;
+    bool     delay_on      = false;  wauvio::fx::basic::DelayLine        delay_fx;
+    bool     eq_on         = false;  wauvio::filter::ParametricEQ     eq_fx;
+    bool     distortion_on = false;  float            distortion_drive = 2.0f;
+    virtual ~Instrument() = default;
+    virtual StereoBuffer render_note(const Note&amp; note, int sample_rate = 0) const = 0;
+    virtual std::vector&lt;Articulation&gt; supported_articulations() const
+    bool supports(Articulation a) const
+    PlayedNote play(int midi_note, double duration,
+                     Dynamics dyn = Dynamics::mf,
+                     Articulation art = Articulation::Sustain,
+                     int sample_rate = 0) const
+
+    PlayedNote play(const Note&amp; note, int sample_rate = 0) const
+    PlayedNote play_chord(const Chord&amp; chord, int sample_rate = 0) const
+    Instrument&amp; reverb(float room_size = 0.6f, float wet = 0.3f, float damping = 0.5f)
+    Instrument&amp; chorus(double rate_hz = 0.5, double depth_ms = 1.5, float wet = 0.4f)
+    Instrument&amp; delay(double time_ms = 250.0, float feedback = 0.35f, float wet = 0.3f)
+    Instrument&amp; eq(wauvio::filter::ParametricEQ e) { eq_fx = e; eq_on = true; return *this; }
+    Instrument&amp; distortion(float drive = 2.0f) { distortion_drive = drive; distortion_on = true; return *this; }
+using InstrumentPtr = std::shared_ptr&lt;Instrument&gt;;</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-ibankprovider"><span class="ns">wauvio::music::</span>class IBankProvider</h4>
+<pre><code>class IBankProvider
+public:
+    virtual ~IBankProvider() = default;
+    virtual bool has_preset(int bank_msb, int bank_lsb, int program) const = 0;
+    virtual InstrumentPtr create_instrument(int bank_msb, int bank_lsb, int program) const = 0;
+    virtual bool has_percussion_preset(int bank_msb, int bank_lsb, int gm_note) const = 0;
+    virtual InstrumentPtr create_percussion_instrument(int bank_msb, int bank_lsb, int gm_note) const = 0;</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-track"><span class="ns">wauvio::music::</span>class Track</h4>
+<pre><code>class Track
+public:
+    std::string name;
+    Track() = default;
+    explicit Track(const Instrument&amp; instr) : instrument_(&amp;instr) {}
+    Track&amp; add(const Note&amp; n)      { entries_.push_back({n, false}); return *this; }
+    Track&amp; add(const Melody&amp; mel)  { for (auto&amp; n : mel) entries_.push_back({n, false}); return *this; }
+    Track&amp; add_chord(const Chord&amp; c) { entries_.push_back({Note(REST_NOTE, c.duration), true, c}); return *this; }
+    Track&amp; rest(double duration)   { entries_.push_back({wauvio::music::rest(duration), false}); return *this; }
+    double total_duration() const
+    StereoBuffer render(int sample_rate = 0) const
+    const Instrument* instrument() const { return instrument_; }
+    size_t entry_count() const noexcept { return entries_.size(); }
+    bool entry_is_chord(size_t i) const { return entries_.at(i).is_chord; }
+    const Note&amp; entry_note(size_t i) const { return entries_.at(i).note; }
+    const Chord&amp; entry_chord(size_t i) const { return entries_.at(i).chord; }
+    std::vector&lt;double&gt; entry_onsets() const</code></pre>
+<h4 id="wauvio-ext-core-core-hpp-wauvio-music-arrangement"><span class="ns">wauvio::music::</span>class Arrangement</h4>
+<pre><code>class Arrangement
+public:
+    Tempo          tempo;
+    TimeSignature  time_signature;
+    Track&amp; add(const Instrument&amp; instr, const Melody&amp; melody,
+               double start_time = 0.0, float track_gain = 1.0f)
+
+    void add_track(const Track&amp; t, double start_time = 0.0, float track_gain = 1.0f)
+    Arrangement&amp; limiter(float threshold = 0.9f) { limiter_on_ = true; limiter_threshold_ = threshold; return *this; }
+    Arrangement&amp; master_reverb(float room = 0.5f, float wet = 0.2f)
+    size_t track_count() const noexcept { return tracks_.size(); }
+    const Track&amp; track_at(size_t i) const { return *tracks_.at(i); }
+    double start_time_at(size_t i) const { return placements_.at(i).start_time; }
+    float gain_at(size_t i) const { return placements_.at(i).gain; }
+    bool has_limiter() const noexcept { return limiter_on_; }
+    float limiter_threshold() const noexcept { return limiter_threshold_; }
+    bool has_master_reverb() const noexcept { return master_reverb_on_; }
+    const wauvio::fx::basic::Reverb&amp; master_reverb_settings() const noexcept { return master_reverb_; }
+    StereoBuffer render(int sample_rate = 0) const</code></pre>
+</section>
+<div class="pager"><a href="ext.html"><small>Previous</small>Music layer overview</a><a class="r" href="ext-modeling.html"><small>Next</small>Modeled instruments</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

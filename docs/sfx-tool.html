@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>wauvio_sfx_tool (command line) · Wauvio Docs</title><meta name="description" content="Command-line tool reference.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">SFX engine (wauvio/sfx)</div><h1>wauvio_sfx_tool (command line)</h1>
+
+<p>Source: <code>wauvio/sfx/tools/wauvio_sfx_tool.cpp</code>. Build with:</p>
+<pre><code>g++ -std=c++17 -O2 -I&lt;repo root&gt; wauvio/sfx/tools/wauvio_sfx_tool.cpp -o wauvio_sfx_tool</code></pre>
+<h2>Commands</h2><table><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody><tr><td><code>list [--category C] [--search TEXT]</code></td><td>List presets</td></tr><tr><td><code>categories</code></td><td>List categories with counts</td></tr><tr><td><code>search TEXT</code></td><td>Search ids, names, tags and descriptions</td></tr><tr><td><code>info ID</code></td><td>Description, parameters and defaults of one preset</td></tr><tr><td><code>render ID</code></td><td>Render one preset</td></tr><tr><td><code>render-category CAT</code></td><td>Render every preset of a category</td></tr><tr><td><code>render-all</code></td><td>Render the whole catalog</td></tr><tr><td><code>catalog</code></td><td>Print the catalog as Markdown</td></tr><tr><td><code>help</code>, <code>--help</code>, <code>-h</code></td><td>Print usage</td></tr></tbody></table><h2>Options</h2><table><thead><tr><th>Option</th><th>Meaning</th></tr></thead><tbody><tr><td><code>--out DIR</code></td><td>Output directory (default <code>sfx_out</code>)</td></tr><tr><td><code>--seed N</code></td><td>Seed (≥ 0)</td></tr><tr><td><code>--sr HZ</code></td><td>Sample rate</td></tr><tr><td><code>--mono</code></td><td>Mono output</td></tr><tr><td><code>--peak DB</code></td><td>Normalisation peak</td></tr><tr><td><code>--duration SEC</code> | <code>--beats N</code></td><td>Length in seconds or beats</td></tr><tr><td><code>--tempo BPM</code></td><td>Tempo</td></tr><tr><td><code>--set NAME=VALUE</code></td><td>Set any parameter (repeatable)</td></tr><tr><td><code>--intensity</code>, <code>--brightness</code>, <code>--pitch</code>, <code>--tail</code>, <code>--width</code></td><td>Shortcuts for common parameters</td></tr></tbody></table>
+<p>Rendering writes <code>DIR/&lt;category&gt;/&lt;id&gt;.wav</code> and <code>DIR/manifest.json</code>. Exit status: 0 success, 1 if any render failed, 2 usage error.</p>
+<div class="pager"><a href="sfx-params.html"><small>Previous</small>Parameter dictionary</a><a class="r" href="sfx-examples.html"><small>Next</small>Examples</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

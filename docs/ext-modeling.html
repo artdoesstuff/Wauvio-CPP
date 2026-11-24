@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modeled instruments · Wauvio Docs</title><meta name="description" content="TimbreRecipe, instrument families, DrumKit.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Music layer (wauvio/ext)</div><h1>Modeled instruments</h1>
+
+<p>Header <code>wauvio/ext/core/model_instruments.hpp</code>. Modeled instruments synthesise sound from a <code>TimbreRecipe</code> rather than from samples. <code>ModeledInstrument</code> derives from <code>SampledInstrument</code> (see <a href="ext-sampling.html">Sampling</a>), so any modeled instrument can also load sample zones, which then take priority over the recipe.</p>
+<h2>TimbreRecipe</h2><table><thead><tr><th>Group</th><th>Fields (defaults)</th></tr></thead><tbody><tr><td>Oscillators</td><td><code>osc1_shape</code> BL_Sawtooth, <code>osc2_shape</code> Sine, <code>osc2_ratio</code> 2.0, <code>osc_mix</code> 0.35, <code>detune_cents</code> 4</td></tr><tr><td>FM</td><td><code>use_fm</code> false, <code>fm_ratio</code> 2, <code>fm_index</code> 2</td></tr><tr><td>Noise</td><td><code>noise_mix</code>, <code>noise_attack_burst</code>, <code>pink_noise</code> true</td></tr><tr><td>Envelope</td><td><code>envelope</code> (DAHDSR 0 / 0.015 / 0 / 0.12 / 0.72 / 0.18), <code>percussive</code></td></tr><tr><td>Filter</td><td><code>filter_cutoff</code> 5000, <code>filter_q</code> 0.8, <code>filter_env</code>, <code>filter_env_amount</code></td></tr><tr><td>Pitch</td><td><code>vibrato_rate_hz</code> 5.2, <code>vibrato_depth_cents</code>, <code>vibrato_delay_sec</code> 0.18, <code>pitch_attack_cents</code>, <code>pitch_attack_time</code> 0.035, <code>fixed_pitch_hz</code> (−1 = follow note), <code>pitch_instability</code></td></tr><tr><td>Formants</td><td>Two resonant peaks: <code>formantN_hz</code>, <code>formantN_gain_db</code>, <code>formantN_q</code></td></tr><tr><td>Output</td><td><code>stereo_width</code> 0.18, <code>gain</code> 0.9</td></tr><tr><td>Articulation maps</td><td><code>art_decay_scale</code>, <code>art_noise_boost</code>, <code>art_pitch_shift</code>, <code>art_filter_scale</code> (<code>std::map&lt;Articulation,double&gt;</code>)</td></tr><tr><td>Modulation</td><td><code>modulation</code>: list of <code>ModRoute</code></td></tr></tbody></table>
+<p><code>render_timbre(recipe, note, sample_rate)</code> renders one note from a recipe. A concrete instrument is usually just a constructor that tweaks <code>recipe</code> fields, e.g. <code>Trumpet</code> sets <code>filter_cutoff = 6800</code>, <code>formant1_hz = 1400</code>, <code>pitch_attack_cents = 45</code>. You can edit <code>instrument.recipe</code> at runtime to derive variants.</p>
+<h2>Family base classes</h2><table><thead><tr><th>Class</th><th>Used for</th></tr></thead><tbody><tr><td><code>ModeledInstrument</code></td><td>Root; owns <code>recipe</code></td></tr><tr><td><code>KeyboardInstrument</code></td><td>Pianos, organs, harpsichord, accordions</td></tr><tr><td><code>BowedStringInstrument</code></td><td>Violin family, ensembles, bowed folk strings</td></tr><tr><td><code>PluckedStringInstrument</code> → <code>GuitarInstrument</code></td><td>Guitars, basses, lutes, plucked world strings</td></tr><tr><td><code>WoodwindInstrument</code> → <code>SaxophoneInstrument</code></td><td>Flutes, reeds, whistles, saxophones</td></tr><tr><td><code>BrassInstrument</code></td><td>Trumpets, horns, trombones, tubas</td></tr><tr><td><code>MalletInstrument</code></td><td>Tuned percussion, hammered strings</td></tr><tr><td><code>PercussionInstrument</code></td><td>Drums and unpitched percussion; adds <code>hit(dyn, duration, art)</code></td></tr><tr><td><code>WorldInstrument</code></td><td>Drones, pipes, hurdy-gurdy</td></tr><tr><td><code>VocalInstrument</code></td><td>Choir/vowel-style vocal timbres (not the Yune singer engines)</td></tr><tr><td><code>SynthInstrument</code></td><td>Synth leads, pads, basses</td></tr><tr><td><code>ExperimentalInstrument</code></td><td>Theremin, bowed metal, tape and granular timbres</td></tr></tbody></table>
+<h2>DrumKit</h2>
+<p>Maps MIDI note numbers to instruments: <code>map(note, instr)</code>, <code>has</code>, <code>get</code>, <code>mapped_notes</code>; <code>play(note, dyn, duration)</code> renders a hit; <code>render_pattern(hits, total_duration, dyn)</code> takes <code>(time_seconds, midi_note)</code> pairs. Concrete kits: see the <a href="ext-instruments.html#kits">catalog</a>.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-ext-core-model-instruments-hpp"><h3><code>wauvio/ext/core/model_instruments.hpp</code></h3>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-timbrerecipe"><span class="ns">wauvio::music::</span>struct TimbreRecipe</h4>
+<pre><code>struct TimbreRecipe
+    wauvio::osc::WaveShape osc1_shape   = wauvio::osc::WaveShape::BL_Sawtooth;
+    wauvio::osc::WaveShape osc2_shape   = wauvio::osc::WaveShape::Sine;
+    double    osc2_ratio   = 2.0;
+    double    osc_mix      = 0.35;
+    double    detune_cents = 4.0;
+    bool      use_fm       = false;
+    double    fm_ratio     = 2.0;
+    double    fm_index     = 2.0;
+    double noise_mix   = 0.0;
+    double noise_attack_burst = 0.0;
+    bool   pink_noise  = true;
+    wauvio::env::DAHDSR envelope { 0.0, 0.015, 0.0, 0.12, 0.72, 0.18 };
+    bool   percussive = false;
+    double filter_cutoff     = 5000.0;
+    double filter_q          = 0.8;
+    bool   filter_env        = true;
+    double filter_env_amount = 0.0;
+    double vibrato_rate_hz     = 5.2;
+    double vibrato_depth_cents = 0.0;
+    double vibrato_delay_sec   = 0.18;
+    double pitch_attack_cents  = 0.0;
+    double pitch_attack_time   = 0.035;
+    double fixed_pitch_hz      = -1.0;
+    double pitch_instability   = 0.0;
+    double formant1_hz = 0.0, formant1_gain_db = 0.0, formant1_q = 3.0;
+    double formant2_hz = 0.0, formant2_gain_db = 0.0, formant2_q = 3.0;
+    double stereo_width = 0.18;
+    double gain          = 0.9;
+    std::map&lt;Articulation, double&gt; art_decay_scale;
+    std::map&lt;Articulation, double&gt; art_noise_boost;
+    std::map&lt;Articulation, double&gt; art_pitch_shift;
+    std::map&lt;Articulation, double&gt; art_filter_scale;
+    std::vector&lt;ModRoute&gt; modulation;
+inline StereoBuffer render_timbre(const TimbreRecipe&amp; r, const Note&amp; note, int sample_rate)</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-modeledinstrument"><span class="ns">wauvio::music::</span>class ModeledInstrument</h4>
+<pre><code>class ModeledInstrument : public SampledInstrument
+public:
+    TimbreRecipe recipe;
+    explicit ModeledInstrument(std::string instrument_name = "")</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-keyboardinstrument"><span class="ns">wauvio::music::</span>class KeyboardInstrument</h4>
+<pre><code>class KeyboardInstrument : public ModeledInstrument
+public:
+    explicit KeyboardInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-bowedstringinstrument"><span class="ns">wauvio::music::</span>class BowedStringInstrument</h4>
+<pre><code>class BowedStringInstrument : public ModeledInstrument
+public:
+    explicit BowedStringInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-pluckedstringinstrument"><span class="ns">wauvio::music::</span>class PluckedStringInstrument</h4>
+<pre><code>class PluckedStringInstrument : public ModeledInstrument
+public:
+    explicit PluckedStringInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-woodwindinstrument"><span class="ns">wauvio::music::</span>class WoodwindInstrument</h4>
+<pre><code>class WoodwindInstrument : public ModeledInstrument
+public:
+    explicit WoodwindInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-brassinstrument"><span class="ns">wauvio::music::</span>class BrassInstrument</h4>
+<pre><code>class BrassInstrument : public ModeledInstrument
+public:
+    explicit BrassInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-saxophoneinstrument"><span class="ns">wauvio::music::</span>class SaxophoneInstrument</h4>
+<pre><code>class SaxophoneInstrument : public WoodwindInstrument
+public:
+    explicit SaxophoneInstrument(std::string n) : WoodwindInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-malletinstrument"><span class="ns">wauvio::music::</span>class MalletInstrument</h4>
+<pre><code>class MalletInstrument : public ModeledInstrument
+public:
+    explicit MalletInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-worldinstrument"><span class="ns">wauvio::music::</span>class WorldInstrument</h4>
+<pre><code>class WorldInstrument : public ModeledInstrument
+public:
+    explicit WorldInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-percussioninstrument"><span class="ns">wauvio::music::</span>class PercussionInstrument</h4>
+<pre><code>class PercussionInstrument : public ModeledInstrument
+public:
+    explicit PercussionInstrument(std::string n) : ModeledInstrument(std::move(n))
+    PlayedNote hit(Dynamics dyn = Dynamics::mf, double duration = 0.4,
+                Articulation art = Articulation::Sustain, int sample_rate = 0) const
+</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-vocalinstrument"><span class="ns">wauvio::music::</span>class VocalInstrument</h4>
+<pre><code>class VocalInstrument : public ModeledInstrument
+public:
+    explicit VocalInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-synthinstrument"><span class="ns">wauvio::music::</span>class SynthInstrument</h4>
+<pre><code>class SynthInstrument : public ModeledInstrument
+public:
+    explicit SynthInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-guitarinstrument"><span class="ns">wauvio::music::</span>class GuitarInstrument</h4>
+<pre><code>class GuitarInstrument : public PluckedStringInstrument
+public:
+    explicit GuitarInstrument(std::string n) : PluckedStringInstrument(std::move(n)) {}</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-experimentalinstrument"><span class="ns">wauvio::music::</span>class ExperimentalInstrument</h4>
+<pre><code>class ExperimentalInstrument : public ModeledInstrument
+public:
+    explicit ExperimentalInstrument(std::string n) : ModeledInstrument(std::move(n))</code></pre>
+<h4 id="wauvio-ext-core-model-instruments-hpp-wauvio-music-drumkit"><span class="ns">wauvio::music::</span>class DrumKit</h4>
+<pre><code>class DrumKit
+public:
+    std::string name;
+    explicit DrumKit(std::string kit_name) : name(std::move(kit_name)) {}
+    virtual ~DrumKit() = default;
+    void map(int midi_note, std::shared_ptr&lt;Instrument&gt; instr)
+    bool has(int midi_note) const { return mapping_.find(midi_note) != mapping_.end(); }
+    std::shared_ptr&lt;Instrument&gt; get(int midi_note) const
+    std::vector&lt;int&gt; mapped_notes() const
+    PlayedNote play(int midi_note, Dynamics dyn = Dynamics::mf, double duration = 0.4,
+                    int sample_rate = 0) const
+
+    StereoBuffer render_pattern(const std::vector&lt;std::pair&lt;double,int&gt;&gt;&amp; hits,
+                                double total_duration, Dynamics dyn = Dynamics::mf,
+                                int sample_rate = 0) const
+</code></pre>
+</section>
+<div class="pager"><a href="ext-core.html"><small>Previous</small>Core types — notes, instruments, arrangements</a><a class="r" href="ext-sampling.html"><small>Next</small>Sampling</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

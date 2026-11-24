@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>common.hpp — buffers, config, panning · Wauvio Docs</title><meta name="description" content="Buffers, Config, constants and panning helpers.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>common.hpp — buffers, config, panning</h1>
+
+<p>Namespace <code>wauvio</code>. Defines the engine-wide constants, the global configuration and the audio buffer types all other modules exchange.</p>
+<h2>Constants</h2>
+<p><code>TWO_PI</code> and <code>PI</code> (<code>double</code>). The header also selects the platform by defining <code>WAUVIO_WINDOWS</code> (when <code>_WIN32</code> is set; it includes <code>windows.h</code> and <code>mmsystem.h</code> with <code>WIN32_LEAN_AND_MEAN</code>) or <code>WAUVIO_LINUX</code>.</p>
+<h2>Global configuration</h2>
+<p><code>Config</code> holds <code>sample_rate = 44100</code>, <code>channels = 1</code>, <code>bits = 16</code>. <code>global_config()</code> returns a reference to a function-local static instance, so changing <code>global_config().sample_rate</code> changes the default used by every function whose <code>sample_rate</code> argument is <code>0</code>.</p>
+<h2>Buffers</h2>
+<ul>
+<li><code>Buffer</code> = <code>std::vector&lt;float&gt;</code> (mono).</li>
+<li><code>StereoBuffer</code> holds two equal-length buffers <code>L</code> and <code>R</code>. Methods: <code>size()</code>, <code>empty()</code>, <code>resize(n, val)</code> (reassigns both channels), <code>to_mono()</code> (average of L and R), <code>interleave()</code> (LRLR… for WAV output).</li>
+<li><code>make_buffer(seconds, sr)</code> / <code>make_stereo(seconds, sr)</code> allocate silent buffers of <code>seconds × sample_rate</code> samples.</li>
+</ul>
+<h2>Helper behaviour</h2><table><thead><tr><th>Function</th><th>Behaviour</th></tr></thead><tbody><tr><td><code>mix_into(dst, src, gain)</code></td><td>Adds <code>src × gain</code> into <code>dst</code> over the shorter of the two lengths (mono and stereo overloads). Does not grow <code>dst</code>.</td></tr><tr><td><code>apply_gain</code></td><td>Multiplies every sample in place.</td></tr><tr><td><code>clamp_buffer</code></td><td>Hard-limits samples to [-1, 1].</td></tr><tr><td><code>normalize(buf, target=0.9)</code></td><td>Scales so the peak (across both channels for stereo) equals <code>target</code>; does nothing if the peak is below 1e-7.</td></tr><tr><td><code>fade_in / fade_out</code></td><td>Linear ramp over <code>fade_seconds</code> (capped to buffer length).</td></tr><tr><td><code>to_pcm16</code></td><td>Clamps and converts floats to <code>int16_t</code> (×32767).</td></tr><tr><td><code>pan_mono(mono, pan, sr)</code></td><td>Constant-power pan; <code>pan</code> ∈ [-1, 1]. Angle = (pan+1)·π/4, left gain = cos, right gain = sin.</td></tr><tr><td><code>haas_widen(mono, delay_ms=12)</code></td><td>L = original, R = delayed copy (Haas effect).</td></tr><tr><td><code>mix_panned(dst, src, pan, gain)</code></td><td>Constant-power pan a mono source into a stereo bus.</td></tr><tr><td><code>mix_stereo(dst, src, gain)</code></td><td>Adds a stereo source into a stereo bus.</td></tr></tbody></table><h2>Full API listing</h2><section class="file" id="wauvio-core-common-hpp"><h3><code>wauvio/core/common.hpp</code></h3>
+<p class="muted">This header declares no public types or functions (it is an umbrella / include-only header).</p>
+</section>
+<div class="pager"><a href="core.html"><small>Previous</small>Core overview</a><a class="r" href="core-osc.html"><small>Next</small>osc.hpp — oscillators and noise</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

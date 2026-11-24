@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Presets, Effect and Layered · Wauvio Docs</title><meta name="description" content="Preset registry, Effect and Layered composition.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">SFX engine (wauvio/sfx)</div><h1>Presets, Effect and Layered</h1>
+
+<h2>Preset and Registry</h2>
+<p><code>Preset</code>: <code>id</code>, <code>name</code>, <code>description</code>, <code>category</code>, <code>behavior</code> (<code>OneShot</code>, <code>Evolving</code>, <code>Sustained</code>), <code>tags</code>, <code>params</code> (<code>ParamSpec</code> list), <code>default_seed</code>, <code>reversed</code>, and a <code>build</code> function <code>void(Recipe&amp;, const BuildCtx&amp;)</code>. <code>find_param(name)</code>, <code>default_duration()</code>, <code>default_tail()</code>.</p>
+<p><code>Registry</code>: <code>add(Preset)</code>, <code>all()</code>, <code>size()</code>, <code>find(id)</code>, <code>by_category(c)</code>, <code>search(text)</code> (ids, names, tags, descriptions). <code>builtin_registry()</code> returns the shared catalog. Free functions: <code>all_presets()</code>, <code>find(id)</code>, <code>presets_in(category)</code>, <code>search(text)</code>, <code>make(id)</code>. <code>Category</code> = Risers, Impacts, Glitch, Textures, Bass, EarCandy, Vocal, Rhythmic, Percussion, Experimental, Tonal, Reverses, with <code>all_categories()</code>, <code>category_id()</code>, <code>category_name()</code>, <code>parse_category()</code>.</p>
+<h2>BuildCtx — what a preset sees</h2>
+<p>Passed to <code>build</code>: the resolved <code>params</code>, <code>duration</code>, <code>bpm</code>, <code>seed</code>, plus helpers <code>p(name)</code>, <code>beats(b)</code> (beats → seconds), <code>beat_hz(beats_per_cycle)</code>, <code>rng(tag)</code>, <code>lerp01(name, a, b)</code>, static <code>lg(t, a, b)</code> (log interpolation), <code>evenly(n, a, b)</code>, <code>scattered(n, tag, a, b)</code>, <code>chord_notes()</code>, <code>scale_walk(n, from, stride)</code>.</p>
+<h2>Effect — the tunable handle</h2>
+<p><code>Effect e = sfx::make("id");</code> copies a preset's parameters.</p><table><thead><tr><th>Method</th><th>Meaning</th></tr></thead><tbody><tr><td><code>set(name, value)</code></td><td>Validated against the parameter range; throws <code>sfx::Error</code> for unknown names or out-of-range values. Setting <code>duration</code> cancels beat-based duration</td></tr><tr><td><code>get</code>, <code>has</code>, <code>params()</code></td><td>Inspect parameters</td></tr><tr><td><code>seed(s)</code> / <code>seed()</code></td><td>Seed for all randomness (default: the preset’s <code>default_seed</code>)</td></tr><tr><td><code>tempo(bpm)</code> / <code>tempo()</code></td><td>20–400 BPM, default 120</td></tr><tr><td><code>duration_beats(b)</code></td><td>Duration in beats at the effect tempo; <code>duration()</code> reports seconds</td></tr><tr><td><code>recipe()</code>, <code>render(settings)</code></td><td>Build the <code>Recipe</code>, or render it directly</td></tr></tbody></table>
+<h2>Layered — composites</h2>
+<p><code>Layered</code> mixes several sources of audio: <code>tempo(bpm)</code>, <code>seed(s)</code>, <code>add(preset_id | Effect | Rendered, LayerOpts)</code>, <code>size()</code>, <code>render(settings)</code>. Each layer’s randomness uses its explicit seed or one derived from the composite seed and layer index.</p>
+<h3>LayerOpts (chainable)</h3><table><thead><tr><th>Method</th><th>Field</th><th>Meaning</th></tr></thead><tbody><tr><td><code>gain(db)</code></td><td><code>gain_db</code></td><td>Relative level. Effect layers render at 0 dBFS peak first; rendered audio is used as-is</td></tr><tr><td><code>at(sec)</code>, <code>at_beats(b)</code></td><td><code>offset</code>, <code>offset_beats</code></td><td>Start time; beats override seconds using the composite tempo</td></tr><tr><td><code>dur(sec)</code></td><td><code>duration</code></td><td>Sets the layer effect’s <code>duration</code> parameter</td></tr><tr><td><code>transpose(semis)</code></td><td><code>pitch</code></td><td>Presets with a <code>pitch</code> parameter are re-pitched through it (clamped); others and audio are resampled, which also changes length</td></tr><tr><td><code>place(pan)</code></td><td><code>pan</code></td><td>−1 … +1, equal power</td></tr><tr><td><code>with_seed(s)</code></td><td><code>seed</code></td><td>Layer-specific seed</td></tr><tr><td><code>flip()</code></td><td><code>reverse</code></td><td>Reverse this layer</td></tr><tr><td><code>set(name, value)</code></td><td><code>params</code></td><td>Parameter override for the layer effect</td></tr></tbody></table><h2>Defining your own presets</h2><p>Copy the built-in registry (<code>sfx::Registry mine = sfx::builtin_registry();</code>), fill a <code>Preset</code> (use <code>params_from({"duration=2", "brightness=0.6"})</code> to pull specs from the <a href="sfx-params.html">dictionary</a>), set <code>build</code>, and <code>mine.add(p)</code>. See <a href="sfx-examples.html">example 07</a>. Built-in presets are defined with the <code>Def</code> helper in the category files under <code>wauvio/sfx/presets/</code>.</p><h2>Full API listing</h2><section class="file" id="wauvio-sfx-presets-registry-hpp"><h3><code>wauvio/sfx/presets/registry.hpp</code></h3>
+<h4 id="wauvio-sfx-presets-registry-hpp-wauvio-sfx-category"><span class="ns">wauvio::sfx::</span>enum class Category</h4>
+<pre><code>enum class Category { Risers, Impacts, Glitch, Textures, Bass, EarCandy, Vocal, Rhythmic, Percussion, Experimental, Tonal, Reverses };
+inline const std::vector&lt;Category&gt;&amp; all_categories()
+inline const char* category_id(Category c)
+inline const char* category_name(Category c)
+inline bool parse_category(std::string_view text, Category&amp; out)</code></pre>
+<h4 id="wauvio-sfx-presets-registry-hpp-wauvio-sfx-behavior"><span class="ns">wauvio::sfx::</span>enum class Behavior</h4>
+<pre><code>enum class Behavior { OneShot, Evolving, Sustained };
+inline const char* behavior_name(Behavior b) { return b == Behavior::OneShot ? "one-shot" : b == Behavior::Evolving ? "evolving" : "sustained"; }
+inline std::string make_id(const std::string&amp; name)</code></pre>
+<h4 id="wauvio-sfx-presets-registry-hpp-wauvio-sfx-buildctx"><span class="ns">wauvio::sfx::</span>struct BuildCtx</h4>
+<pre><code>struct BuildCtx
+    const ParamSet&amp; params; double duration; double bpm; uint64_t seed;
+    double p(const char* name) const { return params.get(name); }
+    double beats(double b) const { return b * 60.0 / bpm; }
+    double beat_hz(double beats_per_cycle) const { return bpm / 60.0 / beats_per_cycle; }
+    Rng rng(uint64_t tag) const { return Rng(mix_seed(seed, tag)); }
+    double lerp01(const char* name, double a, double b) const { return a + (b - a) * p(name); }
+    static double lg(double t, double a, double b) { return a * std::pow(b / a, clampd(t, 0.0, 1.0)); }
+    std::vector&lt;double&gt; evenly(int n, double a = 0.0, double b = 1.0) const { std::vector&lt;double&gt; t; for (int i = 0; i &lt; n; ++i) t.push_back(n == 1 ? a : a + (b - a) * i / n); return t; }
+    std::vector&lt;double&gt; scattered(int n, uint64_t tag, double a = 0.0, double b = 1.0) const { Rng r = rng(tag); std::vector&lt;double&gt; t; for (int i = 0; i &lt; n; ++i) t.push_back(r.range(a, b)); std::sort(t.begin(), t.end()); return t; }
+    std::vector&lt;double&gt; chord_notes() const { return chord_intervals(static_cast&lt;int&gt;(p("chord"))); }
+    std::vector&lt;double&gt; scale_walk(int n, int from = 0, int stride = 1) const
+using BuildFn = std::function&lt;void(Recipe&amp;, const BuildCtx&amp;)&gt;;</code></pre>
+<h4 id="wauvio-sfx-presets-registry-hpp-wauvio-sfx-preset"><span class="ns">wauvio::sfx::</span>struct Preset</h4>
+<pre><code>struct Preset
+    std::string id;
+    std::string name;
+    std::string description;
+    Category category = Category::Risers;
+    Behavior behavior = Behavior::OneShot;
+    std::vector&lt;std::string&gt; tags;
+    std::vector&lt;ParamSpec&gt; params;
+    uint64_t default_seed = 1;
+    bool reversed = false;
+    BuildFn build;
+    const ParamSpec* find_param(const std::string&amp; n) const { for (auto&amp; p : params) if (p.name == n) return &amp;p; return nullptr; }
+    double default_duration() const { const ParamSpec* d = find_param("duration"); return d ? d-&gt;def : 0.0; }
+    double default_tail() const { const ParamSpec* d = find_param("tail"); return d ? d-&gt;def : 0.0; }
+inline std::vector&lt;ParamSpec&gt; params_from(std::initializer_list&lt;const char*&gt; items)</code></pre>
+<h4 id="wauvio-sfx-presets-registry-hpp-wauvio-sfx-registry"><span class="ns">wauvio::sfx::</span>class Registry</h4>
+<pre><code>class Registry
+public:
+    void add(Preset p)
+    const std::vector&lt;Preset&gt;&amp; all() const noexcept { return presets_; }
+    size_t size() const noexcept { return presets_.size(); }
+    const Preset* find(std::string_view id) const { for (auto&amp; p : presets_) if (p.id == id) return &amp;p; return nullptr; }
+    std::vector&lt;const Preset*&gt; by_category(Category c) const { std::vector&lt;const Preset*&gt; v; for (auto&amp; p : presets_) if (p.category == c) v.push_back(&amp;p); return v; }
+    std::vector&lt;const Preset*&gt; search(std::string_view text) const
+const Registry&amp; builtin_registry();</code></pre>
+<h4 id="wauvio-sfx-presets-registry-hpp-wauvio-sfx-effect"><span class="ns">wauvio::sfx::</span>class Effect</h4>
+<pre><code>class Effect
+public:
+    explicit Effect(const Preset&amp; p) : preset_(p), params_(p.params), seed_(p.default_seed) {}
+    Effect&amp; set(const std::string&amp; name, double value) { if (name == "duration") beats_ = 0.0; params_.set(name, value); return *this; }
+    double get(const std::string&amp; name) const { return params_.get(name); }
+    bool   has(const std::string&amp; name) const { return params_.has(name); }
+    Effect&amp; seed(uint64_t s) { seed_ = s; return *this; }
+    uint64_t seed() const noexcept { return seed_; }
+    Effect&amp; tempo(double bpm) { if (!(bpm &gt;= 20.0 &amp;&amp; bpm &lt;= 400.0)) throw Error("tempo must be within 20..400 bpm"); bpm_ = bpm; return *this; }
+    double tempo() const noexcept { return bpm_; }
+    Effect&amp; duration_beats(double beats) { if (!(beats &gt; 0.0) || !std::isfinite(beats)) throw Error("duration_beats must be positive"); beats_ = beats; return *this; }
+    double duration() const { return beats_ &gt; 0.0 ? beats_ * 60.0 / bpm_ : params_.get("duration"); }
+    const Preset&amp; preset() const noexcept { return preset_; }
+    const ParamSet&amp; params() const noexcept { return params_; }
+    Recipe recipe() const
+    Rendered render(const RenderSettings&amp; st = RenderSettings()) const
+inline Effect make(std::string_view id)
+inline Effect make(const Preset&amp; p) { return Effect(p); }
+inline const std::vector&lt;Preset&gt;&amp; all_presets() { return builtin_registry().all(); }
+inline const Preset* find(std::string_view id) { return builtin_registry().find(id); }
+inline std::vector&lt;const Preset*&gt; presets_in(Category c) { return builtin_registry().by_category(c); }
+inline std::vector&lt;const Preset*&gt; search(std::string_view text) { return builtin_registry().search(text); }</code></pre>
+<h4 id="wauvio-sfx-presets-registry-hpp-wauvio-sfx-def"><span class="ns">wauvio::sfx::</span>struct Def</h4>
+<pre><code>struct Def
+    Registry&amp; reg; Category cat;
+    void operator()(const char* name, Behavior b, const char* desc, std::initializer_list&lt;const char*&gt; tags, std::initializer_list&lt;const char*&gt; params, BuildFn fn, bool reversed = false) const</code></pre>
+</section>
+<section class="file" id="wauvio-sfx-layers-layered-hpp"><h3><code>wauvio/sfx/layers/layered.hpp</code></h3>
+<h4 id="wauvio-sfx-layers-layered-hpp-wauvio-sfx-layeropts"><span class="ns">wauvio::sfx::</span>struct LayerOpts</h4>
+<pre><code>/// Per-layer controls of a Layered composite.
+struct LayerOpts
+    double gain_db = 0.0;                 ///&lt; relative level. Effect layers are first rendered at a peak of 0 dBFS; rendered audio is used as it is
+    double offset = 0.0;                  ///&lt; start time in seconds
+    double offset_beats = -1.0;           ///&lt; if &gt;= 0: start time in beats (overrides offset; uses the Layered tempo)
+    double duration = -1.0;               ///&lt; if &gt; 0: sets the layer effect's "duration" parameter (seconds)
+    double pitch = 0.0;                   ///&lt; semitones. Presets with a "pitch" parameter are re-pitched through it (clamped to its range);
+    ///&lt; others (and rendered audio) are resampled, which also changes their length.
+    double pan = 0.0;                     ///&lt; -1 left .. +1 right (equal power)
+    bool   has_seed = false; uint64_t seed = 0;   ///&lt; layer-specific seed; otherwise derived from the composite seed and the layer index
+    bool   reverse = false;               ///&lt; reverse this layer (offline)
+    std::vector&lt;std::pair&lt;std::string, double&gt;&gt; params;   ///&lt; parameter overrides applied to the layer effect
+    LayerOpts&amp; gain(double db) { gain_db = db; return *this; }
+    LayerOpts&amp; at(double sec) { offset = sec; return *this; }
+    LayerOpts&amp; at_beats(double b) { offset_beats = b; return *this; }
+    LayerOpts&amp; dur(double sec) { duration = sec; return *this; }
+    LayerOpts&amp; transpose(double semis) { pitch = semis; return *this; }
+    LayerOpts&amp; place(double p) { pan = p; return *this; }
+    LayerOpts&amp; with_seed(uint64_t s) { has_seed = true; seed = s; return *this; }
+    LayerOpts&amp; flip() { reverse = true; return *this; }
+    LayerOpts&amp; set(const std::string&amp; n, double v) { params.emplace_back(n, v); return *this; }
+    /// Cubic-interpolated resampling by `ratio` (&gt; 1 = higher pitch and shorter).
+    inline Buffer resample(const Buffer&amp; in, double ratio)</code></pre>
+<h4 id="wauvio-sfx-layers-layered-hpp-wauvio-sfx-layered"><span class="ns">wauvio::sfx::</span>class Layered</h4>
+<pre><code>class Layered
+public:
+    Layered&amp; tempo(double bpm) { if (!(bpm &gt;= 20.0 &amp;&amp; bpm &lt;= 400.0)) throw Error("tempo must be within 20..400 bpm"); bpm_ = bpm; return *this; }
+    Layered&amp; seed(uint64_t s) { seed_ = s; return *this; }
+    size_t size() const noexcept { return layers_.size(); }
+    /// Add a built-in preset by id.
+    Layered&amp; add(std::string_view preset_id, const LayerOpts&amp; o = LayerOpts()) { return add(make(preset_id), o); }
+    /// Add a configured Effect (its own parameters, seed and tempo-independent settings are kept; per-layer options are applied on top).
+    Layered&amp; add(const Effect&amp; e, const LayerOpts&amp; o = LayerOpts()) { check(o); Item it; it.effect = std::make_shared&lt;Effect&gt;(e); it.opts = o; layers_.push_back(std::move(it)); return *this; }
+    /// Add audio you already rendered (it must have the sample rate you will render the composite at).
+    Layered&amp; add(const Rendered&amp; audio, const LayerOpts&amp; o = LayerOpts()) { check(o); Item it; it.audio = std::make_shared&lt;Rendered&gt;(audio); it.opts = o; layers_.push_back(std::move(it)); return *this; }
+    /// Render and mix all layers, then normalise the composite according to `st`. Each layer's randomness comes from its own seed:
+    /// the explicit LayerOpts seed if given, otherwise a seed derived from the composite seed and the layer's position.
+    Rendered render(const RenderSettings&amp; st = RenderSettings()) const</code></pre>
+</section>
+<section class="file" id="wauvio-sfx-presets-builtin-hpp"><h3><code>wauvio/sfx/presets/builtin.hpp</code></h3>
+<h4 id="wauvio-sfx-presets-builtin-hpp-wauvio-sfx-free-functions-constants-and-aliases"><span class="ns">wauvio::sfx::</span>Free functions, constants and aliases</h4>
+<pre><code>inline void register_builtin_presets(Registry&amp; R)
+inline const Registry&amp; builtin_registry()</code></pre>
+</section>
+<section class="file" id="wauvio-sfx-presets-preset-helpers-hpp"><h3><code>wauvio/sfx/presets/preset_helpers.hpp</code></h3>
+<h4 id="wauvio-sfx-presets-preset-helpers-hpp-wauvio-sfx-presets-free-functions-constants-and-aliases"><span class="ns">wauvio::sfx::presets::</span>Free functions, constants and aliases</h4>
+<pre><code>using Rc = Recipe&amp;;
+using Cc = const BuildCtx&amp;;
+inline Behavior OneShot() { return Behavior::OneShot; }
+inline Behavior Evolving() { return Behavior::Evolving; }
+inline Behavior Sustained() { return Behavior::Sustained; }</code></pre>
+</section>
+<div class="pager"><a href="sfx-engine.html"><small>Previous</small>Render engine</a><a class="r" href="sfx-params.html"><small>Next</small>Parameter dictionary</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

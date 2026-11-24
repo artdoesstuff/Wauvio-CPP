@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>fx_basic.hpp — basic effects · Wauvio Docs</title><meta name="description" content="Distortion, delay, reverb, chorus, flanger, phaser and sidechain.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>fx_basic.hpp — basic effects</h1>
+
+<p>Namespace <code>wauvio::fx::basic</code>. Small mono effects bundled with the core. All stateful effects follow the pattern: set public parameters → call <code>init(sample_rate)</code> (allocates delay memory) → <code>tick(x)</code> or <code>process(buffer)</code>; <code>reset()</code> clears memory. Always call <code>init()</code> after changing time-based parameters.</p><table><thead><tr><th>Effect</th><th>Parameters (defaults)</th><th>Notes</th></tr></thead><tbody><tr><td><code>distortion::soft_clip / hard_clip / waveshaper</code></td><td>drive 2.0 / threshold 0.5 / knee 0.7</td><td>Free functions plus <code>apply_*</code> buffer versions.</td></tr><tr><td><code>DelayLine</code></td><td><code>time_ms</code> 250, <code>feedback</code> 0.4, <code>wet</code> 0.5, <code>dry</code> 1.0</td><td>Feedback delay; compute <code>time_ms</code> from tempo for sync.</td></tr><tr><td><code>Reverb</code></td><td><code>room_size</code> 0.8, <code>damping</code> 0.5, <code>wet</code> 0.3, <code>dry</code> 1.0</td><td>Schroeder: 4 parallel combs into 2 series all-passes.</td></tr><tr><td><code>Chorus</code></td><td><code>rate_hz</code> 0.5, <code>depth_ms</code> 1.5, <code>delay_ms</code> 8, <code>wet</code> 0.5</td><td>LFO-modulated delay.</td></tr><tr><td><code>Flanger</code></td><td><code>rate_hz</code> 0.25, <code>depth_ms</code> 2, <code>delay_ms</code> 3, <code>feedback</code> 0.5</td><td>Negative feedback gives through-zero character.</td></tr><tr><td><code>Phaser</code></td><td><code>stages</code> 4, <code>rate_hz</code> 0.5, <code>depth</code> 0.9, <code>base_hz</code> 400, <code>range_hz</code> 1600, <code>feedback</code> 0.4</td><td>All-pass chain swept by an LFO.</td></tr><tr><td><code>SidechainCompressor</code></td><td><code>attack_ms</code> 1, <code>release_ms</code> 100, <code>strength</code> 0.9, <code>threshold</code> 0.05</td><td><code>apply(target, trigger)</code>: ducks <em>target</em> using the envelope of <em>trigger</em>; buffers must be equal length. Stereo target overload exists.</td></tr></tbody></table><h2>Full API listing</h2><section class="file" id="wauvio-core-fx-basic-hpp"><h3><code>wauvio/core/fx_basic.hpp</code></h3>
+<h4 id="wauvio-core-fx-basic-hpp-wauvio-fx-basic-free-functions-constants-and-aliases"><span class="ns">wauvio::fx::basic::</span>Free functions, constants and aliases</h4>
+<pre><code>//  §16  DISTORTION
+    /// Soft clip via hyperbolic tangent.  drive &gt; 1 = more distortion.
+    inline float soft_clip(float x, float drive = 2.0f) noexcept
+    /// Hard clip at ±threshold.
+    inline float hard_clip(float x, float threshold = 0.5f) noexcept
+    /// Asymmetric waveshaper: polynomial with tunable knee.
+    ///   knee = 0.0 → linear; knee = 1.0 → maximum curvature
+    inline float waveshaper(float x, float knee = 0.7f) noexcept
+    /// Process a buffer in place with a chosen distortion function.
+    inline void apply_soft_clip(Buffer&amp; buf, float drive = 2.0f)
+    inline void apply_hard_clip(Buffer&amp; buf, float threshold = 0.5f)
+    inline void apply_waveshaper(Buffer&amp; buf, float knee = 0.7f)</code></pre>
+<h4 id="wauvio-core-fx-basic-hpp-wauvio-fx-basic-delayline"><span class="ns">wauvio::fx::basic::</span>class DelayLine</h4>
+<pre><code>//  §17  DELAY LINE
+//  Feedback digital delay.  Supports tempo-synced delays (pass time_ms).
+class DelayLine
+public:
+    double time_ms  = 250.0;  ///&lt; Delay time in milliseconds
+    float  feedback = 0.4f;   ///&lt; Feedback amount [0,1)
+    float  wet      = 0.5f;   ///&lt; Wet level
+    float  dry      = 1.0f;   ///&lt; Dry level
+    void init(int sample_rate = 0)
+    float tick(float x) noexcept
+    void process(Buffer&amp; buf)
+    void reset() noexcept { std::fill(buf_.begin(), buf_.end(), 0.0f); head_ = 0; }</code></pre>
+<h4 id="wauvio-core-fx-basic-hpp-wauvio-fx-basic-reverb"><span class="ns">wauvio::fx::basic::</span>class Reverb</h4>
+<pre><code>//  §18  REVERB  - Schroeder structure
+//  4 parallel feedback comb filters → 2 series allpass filters.
+//  Classic digital reverb suitable for atmospheric tails.
+class Reverb
+public:
+    float room_size = 0.8f;   ///&lt; [0,1] - longer = larger room
+    float damping   = 0.5f;   ///&lt; [0,1] - higher = duller high frequencies
+    float wet       = 0.3f;
+    float dry       = 1.0f;
+    void init(int sample_rate = 0)
+    float tick(float x) noexcept
+    void process(Buffer&amp; buf)
+    void reset() noexcept</code></pre>
+<h4 id="wauvio-core-fx-basic-hpp-wauvio-fx-basic-chorus"><span class="ns">wauvio::fx::basic::</span>class Chorus</h4>
+<pre><code>//  §19  CHORUS
+//  Modulated delay line that creates pitch/timbre widening.
+//  Uses an LFO to vary delay time, detuning copies of the signal slightly.
+class Chorus
+public:
+    double rate_hz    = 0.5;    ///&lt; LFO rate
+    double depth_ms   = 1.5;    ///&lt; Modulation depth in ms
+    double delay_ms   = 8.0;    ///&lt; Centre delay time in ms
+    float  wet        = 0.5f;
+    float  dry        = 1.0f;
+    void init(int sample_rate = 0)
+    float tick(float x) noexcept
+    void process(Buffer&amp; buf)</code></pre>
+<h4 id="wauvio-core-fx-basic-hpp-wauvio-fx-basic-flanger"><span class="ns">wauvio::fx::basic::</span>class Flanger</h4>
+<pre><code>//  §19b  FLANGER
+//  Short modulated delay (0.1–10 ms) mixed with the dry signal, creating
+//  comb-filter notches that sweep with the LFO.  Feedback intensifies the
+//  metallic/jet-plane sweep.
+class Flanger
+public:
+    double rate_hz   = 0.25;   ///&lt; LFO rate
+    double depth_ms  = 2.0;    ///&lt; Modulation depth in ms
+    double delay_ms  = 3.0;    ///&lt; Centre delay time in ms (keep &lt; 10 ms)
+    float  feedback  = 0.5f;   ///&lt; Feedback amount [-1, 1]; negative = through-zero
+    float  wet       = 0.5f;
+    float  dry       = 1.0f;
+    void init(int sample_rate = 0)
+    float tick(float x) noexcept
+    void process(Buffer&amp; buf)
+    void reset() noexcept</code></pre>
+<h4 id="wauvio-core-fx-basic-hpp-wauvio-fx-basic-phaser"><span class="ns">wauvio::fx::basic::</span>class Phaser</h4>
+<pre><code>//  §19c  PHASER
+//  N all-pass stages whose centre frequency is modulated by an LFO.
+//  The phase-shifted signal is mixed with dry, creating notches that sweep
+//  through the spectrum — smoother and more musical than flanging.
+//  Default: 4 stages (classic phaser); 8 stages = richer sweep.
+class Phaser
+public:
+    int    stages   = 4;       ///&lt; Number of all-pass stages (2, 4, 6, 8 …)
+    double rate_hz  = 0.5;     ///&lt; LFO rate
+    double depth    = 0.9;     ///&lt; LFO depth [0, 1]
+    double base_hz  = 400.0;   ///&lt; Lowest sweep frequency
+    double range_hz = 1600.0;  ///&lt; Frequency range of the sweep
+    float  feedback = 0.4f;    ///&lt; Feedback amount [0, 1)
+    float  wet      = 0.5f;
+    float  dry      = 1.0f;
+    void init(int sample_rate = 0)
+    float tick(float x) noexcept
+    void process(Buffer&amp; buf)
+    void reset() noexcept</code></pre>
+<h4 id="wauvio-core-fx-basic-hpp-wauvio-fx-basic-sidechaincompressor"><span class="ns">wauvio::fx::basic::</span>class SidechainCompressor</h4>
+<pre><code>//  §21  SIDECHAIN COMPRESSOR
+//  Ducker: attenuates `target` buffer based on an envelope follower applied
+//  to the `trigger` buffer.  Classic pumping / sidechaining effect.
+class SidechainCompressor
+public:
+    float attack_ms   = 1.0f;    ///&lt; Envelope follower attack  (ms)
+    float release_ms  = 100.0f;  ///&lt; Envelope follower release (ms)
+    float strength    = 0.9f;    ///&lt; Duck depth [0=no effect, 1=full silence]
+    float threshold   = 0.05f;   ///&lt; RMS level above which ducking begins
+    /// Apply sidechain ducking: modulate `target` using envelope of `trigger`.
+    /// Both buffers must have the same length.
+    void apply(Buffer&amp; target, const Buffer&amp; trigger, int sample_rate = 0) const
+    /// Stereo version - applies same gain reduction to both channels.
+    void apply(StereoBuffer&amp; target, const Buffer&amp; trigger, int sample_rate = 0) const</code></pre>
+</section>
+<div class="pager"><a href="core-synth.html"><small>Previous</small>synth.hpp — FM and polyphony</a><a class="r" href="core-theory.html"><small>Next</small>theory.hpp — notes and frequencies</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

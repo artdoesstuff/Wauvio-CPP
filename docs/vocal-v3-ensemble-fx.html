@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>v3 — Ensemble, FX chain and mic · Wauvio Docs</title><meta name="description" content="Ensemble, vocal FX chain and mic model.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v3 — Ensemble, FX chain and mic</h1>
+
+<h2>Ensemble</h2>
+<p>Header <code>ensemble.hpp</code>. Several <code>Singer</code>s rendered together and mixed to stereo — harmonies, doubled leads, small choirs, duets. Every part is an independent monophonic singer, so each keeps its own coarticulation, pitch tracker and voice. Parts are mixed with constant-power panning; <strong>no normalisation is applied</strong> by <code>render_stereo()</code> (<code>save()</code> normalises to a 0.9 peak).</p>
+<pre><code>Singer lead; /* … add notes … */
+Ensemble e;
+e.add(lead, "lead");                                   // centre
+e.add_double(lead, 2);                                 // two other takes, detuned and spread
+e.add_harmony(lead, +4, "third", -0.4f, 0.6f);         // a third above, left, quieter
+e.add_harmony(lead, -5, "low", 0.4f, 0.6f, &amp;profile);  // a fourth below, sung by another voice
+StereoBuffer mix = e.render_stereo();</code></pre><table><thead><tr><th>Method</th><th>Meaning</th></tr></thead><tbody><tr><td><code>add(singer, name, pan, gain, delay_s)</code></td><td>Copy of a singer as a part; returns <code>Part&amp;</code> (<code>singer</code>, <code>name</code>, <code>pan</code>, <code>gain</code>, <code>delay</code>, <code>mute</code>)</td></tr><tr><td><code>add_voice(profile, name, pan, gain)</code></td><td>Empty part with its own voice to fill</td></tr><tr><td><code>add_harmony(lead, semitones, name, pan, gain = 0.7, voice*, delay_s)</code></td><td>Same notes shifted; optionally another voice</td></tr><tr><td><code>add_double(lead, copies = 2, spread = 0.7, detune_cents = 6, gain = 0.55, max_delay_s = 0.012, first_take = 11)</code></td><td>Double-tracking with per-copy timing/pitch imperfection, detune, entry delay and stereo spread</td></tr><tr><td><code>size()</code>, <code>operator[]</code>, <code>clear()</code>, <code>render_stereo()</code>, <code>save()</code></td><td>Access and output</td></tr></tbody></table>
+<h2>Vocal FX chain</h2>
+<p>Header <code>vocal_fx.hpp</code>, included by <code>vocal/v3_fx.hpp</code> (kept separate so the engine itself does not depend on <a href="fx.html">wauvio::fx</a>). <code>make_vocal_chain(preset, bpm)</code> builds an <code>fx::Chain</code>: EQ → compressor → (delay) → reverb → limiter. Presets from <code>vocal_chain_presets()</code>: <code>natural</code> (transparent polish, a little room), <code>pop</code> (tighter, brighter, dotted-eighth slap, bigger reverb; delay syncs when <code>bpm &gt; 0</code>), <code>intimate</code> (close, warm, nearly dry), <code>hall</code> (gentle compression, long hall). Unknown names throw <code>std::invalid_argument</code>. <code>process_vocal(dry, preset, mic*, sr, bpm)</code> runs optional mic model plus chain from a mono render to finished stereo; overloads accept a <code>StereoBuffer</code> such as an ensemble mix.</p>
+<h2>MicModel</h2>
+<p>Header <code>mic.hpp</code>. An optional recording stage; <code>Singer::render</code> never calls it, so apply it to the rendered buffer with <code>apply_mic(buffer, sr, model)</code>. Fields (0–1): <code>proximity</code> (low-shelf warmth, up to +5 dB below ≈200 Hz), <code>air</code> (high shelf above ≈9 kHz, up to +4 dB), <code>de_ess</code> (dynamic cut of 5–9 kHz when sibilants spike), <code>mouth_noise</code> (tiny deterministic clicks in quiet passages), <code>seed</code>.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-vocal-yune-v3-ensemble-hpp"><h3><code>wauvio/vocal/yune-v3/ensemble.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-ensemble-hpp-wauvio-vocal-v3-ensemble"><span class="ns">wauvio::vocal::v3::</span>class Ensemble</h4>
+<pre><code>/// V3: several Singers rendered together and mixed to stereo: harmonies, doubled leads, small choirs, duets.
+///
+///   Singer lead; ... add notes ...
+///   Ensemble e;
+///   e.add(lead, "lead");                                  // centre
+///   e.add_double(lead, 2);                                // two other takes, detuned and spread left/right
+///   e.add_harmony(lead, +4, "third", -0.4f, 0.6f);        // a third above, a little left, quieter
+///   e.add_harmony(lead, -5, "low",   0.4f, 0.6f, &amp;voice_itsuki());   // a fourth below, sung by another voice
+///   StereoBuffer mix = e.render_stereo();
+///
+/// Every part is an independent monophonic Singer, so each keeps its own coarticulation, pitch tracker and
+/// voice. Parts are mixed with constant-power panning; no normalisation is applied (use normalize or a chain).
+class Ensemble
+public:
+    struct Part
+        Singer singer;
+        std::string name;
+        float  pan   = 0.f;     // -1 left .. +1 right
+        float  gain  = 1.f;
+        double delay = 0.0;     // seconds of silence added in front of this part
+        bool   mute  = false;
+    /// Adds a copy of `s` as a part and returns it (set .pan/.gain/.delay or edit .singer afterwards).
+    Part&amp; add(const Singer&amp; s, const std::string&amp; name = "", float pan = 0.f, float gain = 1.f, double delay_s = 0.0)
+    /// Adds an empty part with its own voice for you to fill in (`ensemble[i].singer.note(...)`).
+    Part&amp; add_voice(const VoiceProfile&amp; p, const std::string&amp; name = "", float pan = 0.f, float gain = 1.f)
+    /// Same notes, shifted by `semitones`. Pass a profile to have another voice sing it.
+    Part&amp; add_harmony(const Singer&amp; lead, int semitones, const std::string&amp; name = "", float pan = 0.f, float gain = 0.7f,
+                      const VoiceProfile* voice = nullptr, double delay_s = 0.0)
+    /// Double-tracking: `copies` extra takes of the same notes, each with its own timing/pitch imperfection,
+    /// a few cents of detune and a small entry delay, spread across the stereo field.
+    /// spread: 0..1 how far left/right the copies go; detune_cents: largest detune; gain: level of each copy.
+    Ensemble&amp; add_double(const Singer&amp; lead, int copies = 2, float spread = 0.7f, double detune_cents = 6.0,
+                         float gain = 0.55f, double max_delay_s = 0.012, uint32_t first_take = 11)
+    size_t size() const noexcept { return parts_.size(); }
+    Part&amp; operator[](size_t i) { return parts_.at(i); }
+    const Part&amp; operator[](size_t i) const { return parts_.at(i); }
+    void clear() { parts_.clear(); }
+    /// Renders every part and mixes them (parts are rendered independently, so this is deterministic).
+    StereoBuffer render_stereo(int sample_rate = 0) const
+    /// Renders, normalises to 0.9 peak and writes a stereo WAV.
+    void save(const std::string&amp; path, int sample_rate = 0) const</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v3-vocal-fx-hpp"><h3><code>wauvio/vocal/yune-v3/vocal_fx.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-vocal-fx-hpp-free-functions-constants-and-aliases">Free functions, constants and aliases</h4>
+<pre><code>// Optional: a ready-made vocal effect chain built from wauvio::fx. Include wauvio/vocal/v3_fx.hpp (which pulls in this
+// header, wauvio/fx.hpp and the V3 vocal engine). Kept separate so the vocal engine itself does not depend on wauvio::fx.
+            inline std::vector&lt;std::string&gt; vocal_chain_presets() { return { "natural", "pop", "intimate", "hall" }; }
+            /// V3: EQ -&gt; compressor -&gt; (delay) -&gt; reverb -&gt; limiter, voiced for a sung lead.
+            ///   natural  : transparent polish, a little room
+            ///   pop      : tighter and brighter, dotted-eighth slap, bigger reverb
+            ///   intimate : close, warm, nearly dry
+            ///   hall     : gentle compression, long hall
+            /// bpm &gt; 0 syncs the delay (pop) to the song tempo. Unknown preset names throw std::invalid_argument.
+            inline fx::Chain make_vocal_chain(const std::string&amp; preset = "natural", double bpm = 0.0)
+            /// One call: (optional mic model) -&gt; chain, from a mono voice render to a finished stereo signal.
+            inline StereoBuffer process_vocal(Buffer dry, const std::string&amp; preset = "natural", const MicModel* mic = nullptr,
+                                              int sample_rate = 0, double bpm = 0.0)
+
+            /// Same for an already-stereo signal (for example Ensemble::render_stereo()).
+            inline StereoBuffer process_vocal(StereoBuffer s, const std::string&amp; preset = "natural", int sample_rate = 0, double bpm = 0.0)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v3-mic-hpp"><h3><code>wauvio/vocal/yune-v3/mic.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-mic-hpp-wauvio-vocal-v3-micmodel"><span class="ns">wauvio::vocal::v3::</span>struct MicModel</h4>
+<pre><code>// Optional "recording" stage: proximity warmth, de-esser, air band, mouth/lip noise.
+// Not part of the voice (Singer::render never calls it); apply to the rendered Buffer.
+            struct MicModel
+                float proximity   = 0.f;   // 0..1: low-shelf warmth (+0..5 dB below ~200 Hz), as when singing close
+                float air         = 0.f;   // 0..1: high shelf above ~9 kHz (+0..4 dB)
+                float de_ess      = 0.f;   // 0..1: dynamic cut of 5-9 kHz when sibilants spike
+                float mouth_noise = 0.f;   // 0..1: tiny deterministic lip/tongue clicks in quiet passages
+                uint32_t seed = 7;
+                struct Bq { double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
+                    double run(double x) { const double y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; } };
+                inline Bq shelf(bool high, double fc, double gain_db, double sr) {          // RBJ shelf, S = 1
+                inline Bq bandpass(double fc, double Q, double sr)
+            inline void apply_mic(Buffer&amp; b, int sr, const MicModel&amp; m)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-v3-fx-hpp"><h3><code>wauvio/vocal/v3_fx.hpp</code></h3>
+<p class="muted">This header declares no public types or functions (it is an umbrella / include-only header).</p>
+</section>
+<div class="pager"><a href="vocal-v3-synthesis.html"><small>Previous</small>v3 — Synthesis pipeline</a><a class="r" href="vocal-tools.html"><small>Next</small>Vocal tools</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

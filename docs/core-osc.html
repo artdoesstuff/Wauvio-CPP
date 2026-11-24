@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>osc.hpp — oscillators and noise · Wauvio Docs</title><meta name="description" content="Oscillators, waveforms, supersaw, wavetable and noise.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>osc.hpp — oscillators and noise</h1>
+
+<p>Namespace <code>wauvio::osc</code>. Waveform generators, from stateless functions up to a wavetable oscillator.</p>
+<h2>Waveform functions</h2>
+<p><code>osc::wave</code> provides naive waveforms (<code>sine</code>, <code>square</code>, <code>triangle</code>, <code>sawtooth</code>, <code>pulse(p, duty)</code>) of a phase in [0, 2π). <code>osc::wave_bl</code> provides band-limited versions using PolyBLEP: <code>polyblep(t, dt)</code>, <code>sawtooth(phase, dt)</code>, <code>square</code>, <code>pulse</code>, and <code>triangle(phase, dt, prev)</code> which needs one float of caller-owned state. Here <code>dt = frequency / sample_rate</code>.</p>
+<h2>WaveShape</h2>
+<p><code>Sine, Square, Triangle, Sawtooth, Pulse, BL_Square, BL_Triangle, BL_Sawtooth, BL_Pulse</code>. The <code>BL_</code> variants use PolyBLEP and are preferable for high notes.</p>
+<h2>Oscillator</h2>
+<p>A phase-accumulating oscillator. Public fields: <code>shape</code>, <code>frequency</code>, <code>amplitude</code>, <code>phase_offset</code>, <code>duty</code> (for pulse shapes) and <code>hard_sync</code>.</p>
+<ul>
+<li><code>tick(sample_rate)</code> advances one sample.</li>
+<li><code>render(seconds, sample_rate)</code> produces a mono buffer.</li>
+<li><strong>Portamento:</strong> <code>glide_to(target, seconds)</code> ramps the frequency during subsequent ticks; <code>is_gliding()</code> and <code>cancel_glide()</code> manage it.</li>
+<li><strong>Hard sync:</strong> the caller invokes <code>sync_reset()</code> on the slave when the master wraps.</li>
+<li><code>reset()</code>, <code>phase()</code>, <code>set_phase()</code> expose the phase accumulator.</li>
+</ul>
+<h2>Supersaw</h2>
+<p>Renders <code>voices</code> (default 7) detuned sawtooth waves. Fields: <code>frequency</code>, <code>detune_cents</code> (12), <code>amplitude</code>, <code>mix_center</code> (0.7). <code>render()</code> gives mono; <code>render_stereo()</code> spreads voices across the stereo field.</p>
+<h2>WavetableOscillator</h2>
+<p>A 2048-sample table (<code>TABLE_SIZE</code>) with linear-interpolated reads; initialised to a sine. Fill it with <code>load_wave(shape, ref_freq, ref_sr)</code>, <code>load_sine()</code>, <code>load_custom(fn)</code> (a functor of phase 0–2π) or write <code>table</code> directly. <code>tick(frequency, sample_rate)</code> and <code>tick(frequency, amplitude, sample_rate)</code> advance a normalised phase; <code>render(frequency, amplitude, seconds)</code> fills a buffer. BL tables are precomputed at the reference frequency, so aliasing reduction is approximate.</p>
+<h2>NoiseGenerator</h2>
+<p>Seeded (<code>mt19937</code>, default seed 42). <code>tick_white()</code>, <code>tick_pink()</code> (Paul Kellet's filter), <code>tick()</code> (alias for white), <code>seed(s)</code>, <code>render(seconds)</code>, <code>render_pink(seconds)</code>. Fixed seeds make output deterministic.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-core-osc-hpp"><h3><code>wauvio/core/osc.hpp</code></h3>
+<h4 id="wauvio-core-osc-hpp-wauvio-osc-free-functions-constants-and-aliases"><span class="ns">wauvio::osc::</span>Free functions, constants and aliases</h4>
+<pre><code>//  §4  WAVEFORM PRIMITIVES  (stateless, phase in [0,2π))
+    inline float sine    (double p) noexcept { return static_cast&lt;float&gt;(std::sin(p)); }
+    inline float square  (double p) noexcept { return (std::fmod(p,TWO_PI) &lt; PI) ? 1.f : -1.f; }
+    inline float triangle(double p) noexcept
+    inline float sawtooth(double p) noexcept
+    inline float pulse(double p, double duty = 0.5) noexcept
+//  §4b  POLYBLEP BAND-LIMITED WAVEFORMS
+//  PolyBLEP (Polynomial Band-Limited Step) correction reduces aliasing at
+//  discontinuities in square, sawtooth, and triangle waves.  Drop-in
+//  replacements for the naive wave:: functions; phase in [0, 2π).
+    /// PolyBLEP residual: smooths a unit step at normalised phase t ∈ [0,1).
+    /// dt = phase_increment / TWO_PI  (one sample's worth of normalised phase)
+    inline double polyblep(double t, double dt) noexcept
+    /// Band-limited sawtooth.  dt = freq / sample_rate.
+    inline float sawtooth(double phase, double dt) noexcept
+    /// Band-limited square.  dt = freq / sample_rate.
+    inline float square(double phase, double dt) noexcept
+    /// Band-limited triangle (integrated square, naturally alias-free below Nyquist).
+    /// Requires one sample of state; pass `prev` by reference.
+    inline float triangle(double phase, double dt, float&amp; prev) noexcept
+    /// Band-limited pulse with variable duty cycle.  dt = freq / sample_rate.
+    inline float pulse(double phase, double dt, double duty = 0.5) noexcept</code></pre>
+<h4 id="wauvio-core-osc-hpp-wauvio-osc-waveshape"><span class="ns">wauvio::osc::</span>enum class WaveShape</h4>
+<pre><code>//  §5  WAVESHAPE ENUM
+enum class WaveShape { Sine, Square, Triangle, Sawtooth, Pulse,
+                       BL_Square, BL_Triangle, BL_Sawtooth, BL_Pulse };</code></pre>
+<h4 id="wauvio-core-osc-hpp-wauvio-osc-oscillator"><span class="ns">wauvio::osc::</span>class Oscillator</h4>
+<pre><code>//  §6  OSCILLATOR
+//  Phase-accumulating oscillator with hard-sync and portamento support.
+//  Hard sync: when sync_source phase resets, this oscillator resets too.
+//  Portamento: call glide_to(target, seconds) and tick() handles the ramp.
+class Oscillator
+public:
+    WaveShape shape        = WaveShape::Sine;
+    double    frequency    = 440.0;
+    double    amplitude    = 1.0;
+    double    phase_offset = 0.0;
+    double    duty         = 0.5;
+    bool      hard_sync    = false;   ///&lt; If true, caller must call sync_reset() at slave reset
+    Oscillator() = default;
+    explicit Oscillator(WaveShape s, double f = 440.0, double a = 1.0)
+        : shape(s), frequency(f), amplitude(a) {}
+    float tick(int sample_rate) noexcept
+    /// Begin a smooth frequency glide to `target_freq` over `seconds`.
+    /// Call before the first tick() of a new note.
+    void glide_to(double target_freq, double seconds, int sample_rate = 0)
+    /// Cancel any in-progress glide and snap to current frequency.
+    void cancel_glide() noexcept { glide_samples_left_ = 0; }
+    bool is_gliding() const noexcept { return glide_samples_left_ &gt; 0; }
+    /// Hard sync: reset phase when master crosses zero upward.
+    void sync_reset() noexcept { phase_ = 0.0; }
+    void   reset()             noexcept { phase_ = 0.0; }
+    double phase()       const noexcept { return phase_; }
+    void   set_phase(double p) noexcept { phase_ = p; }
+    Buffer render(double seconds, int sample_rate = 0)</code></pre>
+<h4 id="wauvio-core-osc-hpp-wauvio-osc-supersaw"><span class="ns">wauvio::osc::</span>class Supersaw</h4>
+<pre><code>//  §7  SUPERSAW HELPER
+//  Renders N detuned sawtooth oscillators into a mono buffer.
+//  Classic JP-8000 supersaw: 7 voices, center at 0 Hz detune, outer voices
+//  spread symmetrically up to ±detune_cents cents.
+class Supersaw
+public:
+    int    voices       = 7;      ///&lt; Number of oscillator voices
+    double frequency    = 440.0;
+    double detune_cents = 12.0;   ///&lt; Total spread in cents (split across voices)
+    double amplitude    = 1.0;
+    double mix_center   = 0.7;    ///&lt; Gain of centre voice relative to side voices
+    /// Render `seconds` of supersaw audio (mono).
+    Buffer render(double seconds, int sample_rate = 0) const
+    /// Render into a stereo buffer with panning spread across voices.
+    StereoBuffer render_stereo(double seconds, int sample_rate = 0) const</code></pre>
+<h4 id="wauvio-core-osc-hpp-wauvio-osc-wavetableoscillator"><span class="ns">wauvio::osc::</span>class WavetableOscillator</h4>
+<pre><code>//  §7b  WAVETABLE OSCILLATOR
+//  Lookup-table oscillator with linear interpolation.  The table can be any
+//  arbitrary waveform — fill it from the wave:: helpers, load from disk, or
+//  compute your own.  Linear-interpolated reads give good quality; combine
+//  with PolyBLEP (wave_bl::) tables for alias-free output.
+//
+//  Usage:
+//    WavetableOscillator osc;
+//    osc.load_wave(WaveShape::Sawtooth);   // or fill osc.table manually
+//    float s = osc.tick(440.0, sample_rate);
+class WavetableOscillator
+public:
+    static constexpr size_t TABLE_SIZE = 2048;
+    std::array&lt;float, TABLE_SIZE&gt; table{};
+    WavetableOscillator() { load_sine(); }
+    /// Fill the table with a standard WaveShape.
+    /// BL_ variants are pre-computed at a reference frequency of 440 Hz with
+    /// dt = 440/44100 — good alias reduction for most musical use.
+    void load_wave(WaveShape shape, double ref_freq = 440.0, int ref_sr = 44100)
+    void load_sine() { load_wave(WaveShape::Sine); }
+    /// Fill table from an arbitrary functor: float fn(double phase_0_to_2pi).
+    template&lt;typename Fn&gt;
+    void load_custom(Fn&amp;&amp; fn)
+    /// Advance phase and return the next sample (linearly interpolated).
+    float tick(double frequency, int sample_rate) noexcept
+    float tick(double frequency, double amplitude, int sample_rate) noexcept
+    void  reset()              noexcept { phase_ = 0.0; }
+    double phase()       const noexcept { return phase_; }
+    void   set_phase(double p) noexcept { phase_ = std::fmod(p, 1.0); }
+    Buffer render(double frequency, double amplitude,
+                  double seconds, int sample_rate = 0)</code></pre>
+<h4 id="wauvio-core-osc-hpp-wauvio-osc-noisegenerator"><span class="ns">wauvio::osc::</span>class NoiseGenerator</h4>
+<pre><code>//  §8  NOISE GENERATOR
+class NoiseGenerator
+public:
+    explicit NoiseGenerator(uint32_t seed = 42u)
+        : rng_(seed), dist_(-1.0f, 1.0f) {}
+    /// White noise sample in [-1, 1].
+    float tick_white() { return dist_(rng_); }
+    /// Pink noise sample (Paul Kellet's refined method, 1/f spectrum).
+    /// Amplitude is approximately normalised to [-1, 1].
+    float tick_pink()
+    /// Convenience alias: tick() returns white noise (preserves prior behaviour).
+    float tick() { return tick_white(); }
+    void seed(uint32_t s)
+    Buffer render(double seconds, int sample_rate = 0)
+    Buffer render_pink(double seconds, int sample_rate = 0)</code></pre>
+</section>
+<div class="pager"><a href="core-common.html"><small>Previous</small>common.hpp — buffers, config, panning</a><a class="r" href="core-env.html"><small>Next</small>env.hpp — envelopes</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

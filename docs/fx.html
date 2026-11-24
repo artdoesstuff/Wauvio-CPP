@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FX suite overview · Wauvio Docs</title><meta name="description" content="FX suite overview.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>FX suite overview</h1>
+
+<p>The FX suite (<code>wauvio/fx.hpp</code>, directory <code>wauvio/fx/</code>) is the full effects, mixing and mastering layer. It is separate from the small <code>wauvio::fx::basic</code> effects in the core. Everything is in namespace <code>wauvio::fx</code>.</p>
+<h2>Entry points</h2><table><thead><tr><th>Header</th><th>Includes</th><th>Use when</th></tr></thead><tbody><tr><td><code>wauvio/fx.hpp</code></td><td>core + all FX (common, Effect/Chain, EQ, dynamics, saturation, modulation, delay, stereo, FX I/O, reverb, loudness, master, mixer)</td><td>Processing buffers; no music layer needed</td></tr><tr><td><code>wauvio/fx/ext.hpp</code></td><td><code>ext.hpp</code> + <code>fx.hpp</code> + <code>mixer/from_arrangement.hpp</code></td><td>Mixing a <code>music::Arrangement</code></td></tr><tr><td><code>wauvio/fx/midi.hpp</code></td><td><code>ext.hpp</code> + <code>midi.hpp</code> + <code>fx.hpp</code> + <code>from_arrangement.hpp</code> + <code>from_midi.hpp</code></td><td>Mixing a MIDI file</td></tr></tbody></table>
+<h2>Architecture</h2>
+<ul>
+<li>Every processor derives from <a href="fx-core.html"><code>Effect</code></a>. Parameters are public fields re-read on each <code>process()</code> call.</li>
+<li>Effects are ordered in a <a href="fx-core.html"><code>Chain</code></a>, which handles latency compensation and tail extension automatically.</li>
+<li>A <a href="fx-mixer.html"><code>Mixer</code></a> combines sources, insert chains, buses, sends, sidechain ducking, a master chain and optional loudness mastering.</li>
+<li><a href="fx-mastering.html">Mastering</a> measures ITU-R BS.1770 loudness and drives a buffer to a LUFS target with a true-peak ceiling.</li>
+</ul>
+<h2>Pages</h2>
+<ul><li><a href="fx-core.html">Effect base, Chain and DSP utilities</a></li><li><a href="fx-eq-dynamics.html">EQ and dynamics</a></li><li><a href="fx-saturation.html">Saturation and bitcrushing</a></li><li><a href="fx-modulation-delay-stereo.html">Modulation, delay and stereo</a></li><li><a href="fx-reverb.html">Reverb</a></li><li><a href="fx-mastering.html">Loudness and mastering</a></li><li><a href="fx-mixer.html">Mixer and bridges</a></li></ul>
+<h2>Example</h2>
+<pre><code>#include "wauvio/fx/ext.hpp"        // fx.hpp + music layer + fx::write_wav
+using namespace wauvio;
+
+StereoBuffer mix = /* your audio */;
+fx::Chain chain;
+chain.add&lt;fx::EQ&gt;().highpass(30).peak(3000, 1.5);
+auto&amp; comp = chain.add&lt;fx::Compressor&gt;(); comp.threshold_db = -20; comp.ratio = 3;
+chain.add&lt;fx::FdnReverb&gt;().mix = 0.15;
+chain.process(mix, 44100);                  // latency removed, tail kept
+fx::master(mix, 44100, fx::master_for_genre("house"));
+fx::write_wav(mix, "out.wav");              // level-preserving writer (fx/ext.hpp)</code></pre>
+
+<div class="pager"><a href="ext-instruments.html"><small>Previous</small>Instrument catalog</a><a class="r" href="fx-core.html"><small>Next</small>Effect, Chain and DSP utilities</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

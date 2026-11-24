@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Architecture · Wauvio Docs</title><meta name="description" content="Module map, namespaces, abstractions and pipelines.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Overview</div><h1>Architecture</h1>
+
+<h2>Layers</h2>
+<pre><code>                 ┌─────────────────────────── vocal (v1 / v2 / v3) ──┐
+                 │   uses: core, ext/core (Instrument), midi/core     │
+ core ──────────►│                                                    │
+  │              └────────────────────────────────────────────────────┘
+  ├─► ext (music layer) ──► midi ──► fx/midi
+  │      │                    
+  │      ├────► sf2  (IBankProvider → midi resolver)
+  │      └────► fx/ext (Arrangement → Mixer)
+  ├─► fx (effects, mixer, mastering)
+  └─► sfx (independent; core only)</code></pre>
+<h2>Namespaces</h2><table><thead><tr><th>Namespace</th><th>Location</th><th>Contents</th></tr></thead><tbody><tr><td><code>wauvio</code></td><td>core/common, core/io, ext/core/render, midi</td><td>Config, buffers, WAV I/O, playback, <code>RenderOptions</code>, <code>render()</code></td></tr><tr><td><code>wauvio::osc / env / mod / filter / synth / seq / theory</code></td><td>core</td><td>DSP building blocks and the simple sequencer</td></tr><tr><td><code>wauvio::fx::basic</code></td><td>core/fx_basic</td><td>Small mono effects</td></tr><tr><td><code>wauvio::fx</code></td><td>fx</td><td>Full effects suite, mixer, mastering</td></tr><tr><td><code>wauvio::music</code></td><td>ext</td><td>Notes, <code>Instrument</code>, <code>Track</code>, <code>Arrangement</code>, sampling, genre (<code>music::genre</code>)</td></tr><tr><td><code>wauvio::instruments</code></td><td>ext/instruments</td><td>Concrete instrument classes</td></tr><tr><td><code>wauvio::midi</code>, <code>midi::track</code>, <code>midi::genre</code></td><td>midi</td><td>MIDI file model, loader, resolver, MIDI genre</td></tr><tr><td><code>wauvio::sf2</code></td><td>sf2</td><td>SoundFont parser and bank provider</td></tr><tr><td><code>wauvio::sfx</code></td><td>sfx</td><td>SFX engine</td></tr><tr><td><code>wauvio::vocal::v1 / v2 / v3</code></td><td>vocal</td><td>Singing synthesiser generations</td></tr></tbody></table>
+<h2>Key abstractions</h2><table><thead><tr><th>Abstraction</th><th>Defined in</th><th>Role</th></tr></thead><tbody><tr><td><code>Buffer</code>, <code>StereoBuffer</code></td><td>core/common</td><td>Audio containers exchanged by everything</td></tr><tr><td><code>music::Instrument</code></td><td>ext/core</td><td>Polymorphic note renderer; implemented by modeled, sampled, SF2 and vocal instruments</td></tr><tr><td><code>music::IBankProvider</code></td><td>ext/core</td><td>Preset source (e.g. SoundFont) plugged into the MIDI resolver</td></tr><tr><td><code>music::Arrangement</code> / <code>midi::track::MidiMusic</code></td><td>ext, midi</td><td>Things that render to a <code>StereoBuffer</code>; both bridge into <code>fx::Mixer</code></td></tr><tr><td><code>fx::Effect</code> / <code>fx::Chain</code></td><td>fx/core</td><td>Processor interface and ordered chain with latency/tail handling</td></tr><tr><td><code>fx::Mixer</code></td><td>fx/mixer</td><td>Sources, inserts, buses, sends, sidechain, master, mastering</td></tr><tr><td><code>genre::GenrePreset</code></td><td>ext/genre</td><td>Style rules; wrapped by <code>midi::genre::MidiGenrePreset</code></td></tr><tr><td><code>sfx::Recipe</code> → <code>sfx::Effect</code> → <code>sfx::Layered</code></td><td>sfx</td><td>Effect description, tunable preset handle, composite</td></tr><tr><td><code>vocal::v3::VoiceProfile</code> / <code>Singer</code> / <code>Ensemble</code></td><td>vocal</td><td>Character, performer, group</td></tr></tbody></table>
+<h2>Typical pipelines</h2>
+<ol>
+<li><strong>Score → WAV:</strong> <code>Melody</code> → <code>Arrangement</code> (instruments) → <code>render()</code>.</li>
+<li><strong>MIDI → WAV:</strong> <code>load_midi</code> (resolver, optional SF2) → optional <code>setGenre</code> → <code>render()</code>.</li>
+<li><strong>Produced mix:</strong> <code>mixer_from_arrangement</code>/<code>mixer_from_midi</code> → inserts, buses, sidechain, master chain → <code>set_mastering</code> → <code>render()</code> → <code>fx::write_wav</code>.</li>
+<li><strong>Effects:</strong> <code>sfx::make(id)</code> → <code>set()</code> → <code>render()</code>; compose with <code>Layered</code>.</li>
+<li><strong>Vocals:</strong> <code>Singer</code> notes → <code>render()</code> or <code>Ensemble</code> → <code>process_vocal</code>.</li>
+</ol>
+
+<div class="pager"><a href="getting-started.html"><small>Previous</small>Getting started</a><a class="r" href="core.html"><small>Next</small>Core overview</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

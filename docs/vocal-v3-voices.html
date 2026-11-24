@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>v3 — Voices, personas and voicebanks · Wauvio Docs</title><meta name="description" content="Voice models, profiles, personas and .wvc voicebanks.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v3 — Voices, personas and voicebanks</h1>
+
+<h2>VoiceModel</h2>
+<p>The identity of a voice: <code>name</code>, <code>tune</code> (engine gains), <code>range_low/high</code> (comfortable) and <code>hard_low/high</code> (absolute) as MIDI notes, five <code>VowelTarget</code>s (F1–F3, bandwidths, gain, F0-tracking amounts), fixed upper formants <code>f4–f6</code>/<code>b4–b6</code>, singer’s formant (<code>singer_formant_hz</code>/<code>_bw</code>), glottal source (<code>rd_base</code>, <code>aspiration</code>, <code>tilt_hz_min/max</code>), vibrato defaults, <code>synthetic</code> (0–1: tighter bandwidths, steadier source, brighter uppers), consonant <code>loci[4]</code> (labial, alveolar, palatal, velar; <code>F_locus = slope × F_vowel + intercept</code> for F2 and F3, intercepts scaled by <code>tract_scale()</code>), and nasal parameters (<code>nasal_zero_q</code>, <code>nasal_zero_depth</code>, <code>nasal_pole_hz</code>, <code>nasal_pole_gain</code>, <code>nasal_bw_widen</code>). <code>Tune</code> holds <code>out_scale</code> 0.65, <code>asp_gain</code> 3, <code>fric_gain</code> 0.3, <code>upper_gain</code> 4.4, <code>sing_gain</code> 2.4, <code>air_gain</code> 0.1, <code>pre_gain</code> 1, <code>f23_gain</code> 30. Each singer owns its model, so rendering is thread-safe and voices can be tuned independently.</p>
+<h2>VoiceProfile</h2>
+<p>Everything that makes a character: <code>id</code>, <code>display</code>, <code>language</code>, <code>notes</code>, <code>model</code>, <code>style</code> (the “Normal” look), <code>parse</code> (lyric defaults), <code>personas</code>, <code>natural_amount</code> (recommended <code>Singer::natural()</code> strength).</p>
+<h2>Built-in voices</h2>
+<p>Registered in <code>voices/voices.hpp</code> (<code>builtin_voices()</code>, <code>voice_ids()</code>), each defined in <code>voices/voice-&lt;id&gt;.hpp</code> as <code>voice_&lt;id&gt;()</code>. <code>make_voice(id_or_path, out, err)</code> resolves a built-in id or reads a <code>.wvc</code> path.</p><table><thead><tr><th>Id</th><th>Display</th><th>Character</th><th>Range (comfortable / hard)</th><th>natural</th><th>Personas</th></tr></thead><tbody><tr><td><code>yune</code></td><td>Yune</td><td>Bright, clear Japanese female singing voice; peripheral vowels for clarity, tight resonances.</td><td>52-88 / 40-96</td><td>0.3</td><td>normal, soft</td></tr><tr><td><code>yune-old</code></td><td>Yune</td><td>Bright, clear Japanese female singing voice; peripheral vowels for clarity, tight resonances (synthetic 0.65).</td><td>52-88 / 40-96</td><td>0.3</td><td>airy, cool, dark, giddy, nervous, normal, power, shy, sleepy, soft, sweet, tearful</td></tr><tr><td><code>reiha</code></td><td>Reiha (玲羽)</td><td>Cool, crystalline, airy: delicate, precise, slightly breathy, clear highs; detached and fragile rather than warm.</td><td>55-91 / 43-98</td><td>0.25</td><td>normal, soft</td></tr><tr><td><code>koharu</code></td><td>Koharu (小春)</td><td>Warm, punchy, expressive: full midrange, crisp consonants, slightly husky, energetic; grounded and chesty.</td><td>50-86 / 38-94</td><td>0.35</td><td>normal, soft</td></tr><tr><td><code>itsuki</code></td><td>Itsuki (樹)</td><td>Deep, resonant, smooth male voice: rounded vowels, controlled vibrato, grainy when pushed; dark and restrained.</td><td>41-67 / 36-76</td><td>0.25</td><td>normal, soft</td></tr><tr><td><code>mio</code></td><td>Mio (澪)</td><td>Calm, warm and smooth: a slightly darker, rounder cousin of Yune with a touch more breath, steady slower vibrato and gentle glides; soft consonants, flowing legato.</td><td>51-86 / 40-94</td><td>0.27</td><td>normal, soft</td></tr><tr><td><code>akari</code></td><td>Akari (灯)</td><td>Warm and luminous: a little brighter and more present than Yune with a stronger carrying formant, a livelier vibrato and clean, gently crisp consonants; glowing rather than icy.</td><td>54-89 / 42-96</td><td>0.32</td><td>normal, soft</td></tr></tbody></table>
+<p>Ranges are MIDI notes. <code>yune-old</code> is the previous default voice kept for A/B comparison; the personas column for <code>yune-old</code> shows the older, larger persona set (airy, cool, dark, giddy, nervous, normal, power, shy, sleepy, soft, sweet, tearful) while the current <code>yune</code> ships <code>normal</code> and <code>soft</code>. To add a voice, copy the closest <code>voice-*.hpp</code>, change its model/look/personas, include it in <code>voices.hpp</code> and add a line to <code>builtin_voices()</code>.</p>
+<h2>Personas</h2>
+<p>A persona is a named, absolute “look” for the <em>expressive</em> Style fields (<code>Persona {name, look}</code>). A voice stays itself: its <code>VoiceModel</code> is untouched, persona values stay in a bounded envelope, and <code>volume</code>, velocity response, compression and devoicing are never changed. <code>PersonaLibrary</code> offers <code>add</code>, <code>find</code>, <code>names</code>, <code>load(path)</code>, <code>save(name, path, append)</code>. Text format: a <code>persona NAME</code> line followed by any <code>Style</code> field lines (others stay at the Normal look). Apply with <code>apply_persona(lib, style, name, amount)</code> or <code>apply_persona_blend(lib, style, a, b, t, amount)</code>; <code>blend_expressive()</code> lerps only expressive fields (for vibrato fields where one side is -1 the explicit value wins). <code>persona_morph_lanes()</code> moves a note toward a persona over time using only fields that have a render channel (brightness, breathiness, tension, volume, growl, fry, air, register, formant shift, mouth opening).</p>
+<h2>Voicebank files (<code>.wvc</code>)</h2>
+<p>A voice can be exported to and loaded from a plain-text voicebank (<code>save_profile</code>, <code>load_profile</code>, <code>profile_to_text</code>, <code>profile_from_text</code>; extension <code>VOICEBANK_EXT</code> = <code>.wvc</code>; <code>is_voicebank_path()</code>). Loading starts from a copy of an existing voice so you can override a few values; <strong>unknown keys and malformed lines are errors</strong>, so typos are caught. Shipped banks are in <code>yune-v3/voicebanks/</code>.</p><table><thead><tr><th>Line</th><th>Meaning</th></tr></thead><tbody><tr><td><code>voice ID</code>, <code>display TEXT</code>, <code>language CODE</code>, <code>notes TEXT</code>, <code>natural_amount N</code></td><td>Profile metadata</td></tr><tr><td><code>model_name TEXT</code></td><td>VoiceModel name</td></tr><tr><td><code>range LOW HIGH HARD_LOW HARD_HIGH</code></td><td>Four integers</td></tr><tr><td><code>vowel a|i|u|e|o F1 F2 F3 B1 B2 B3 GAIN F1_TRACK F2_TRACK</code></td><td>One vowel target</td></tr><tr><td><code>model KEY VALUE</code></td><td>VoiceModel float (f4–f6, b4–b6, singer_formant_*, rd_base, aspiration, tilt_*, vib_*, synthetic, nasal_*)</td></tr><tr><td><code>locus PLACE S2 C2 S3 C3</code></td><td>Place = labial, alveolar, palatal, velar</td></tr><tr><td><code>tune KEY VALUE</code></td><td>Engine gain</td></tr><tr><td><code>style KEY VALUE</code></td><td>Default look (<code>devoicing</code> takes 0/1)</td></tr><tr><td><code>parse KEY 0|1</code></td><td><code>merge_long_vowels</code>, <code>cute</code>, <code>particles</code></td></tr><tr><td><code>persona NAME</code> + following field lines</td><td>A persona block</td></tr><tr><td><code>#</code></td><td>Comment</td></tr></tbody></table><p>Inspect or export voices with <a href="vocal-tools.html"><code>voice_tool</code></a>.</p><h2>Full API listing</h2><section class="file" id="wauvio-vocal-yune-v3-persona-hpp"><h3><code>wauvio/vocal/yune-v3/persona.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-persona-hpp-wauvio-vocal-v3-free-functions-constants-and-aliases"><span class="ns">wauvio::vocal::v3::</span>Free functions, constants and aliases</h4>
+<pre><code>// A persona is a named, absolute "look" for the expressive Style fields. A voice stays itself:
+// the identity (VoiceModel: tract proportions, vowel centres, source family) is not touched,
+// and persona values are kept inside a bounded envelope.
+// Blending lerps the expressive fields only; volume, velocity response, compression and
+// devoicing are never changed by a persona.
+inline const std::vector&lt;float Style::*&gt;&amp; expressive_fields()
+// lerp on the expressive fields. Vibrato fields use -1 as "voice default": if only one side
+// is explicit the explicit value wins, so blending never produces a negative depth by accident.
+inline Style blend_expressive(const Style&amp; a, const Style&amp; b, float t)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-persona-hpp-wauvio-vocal-v3-persona"><span class="ns">wauvio::vocal::v3::</span>struct Persona</h4>
+<pre><code>struct Persona
+    std::string name;
+    Style look;     // absolute values for the expressive fields</code></pre>
+<h4 id="wauvio-vocal-yune-v3-persona-hpp-wauvio-vocal-v3-personalibrary"><span class="ns">wauvio::vocal::v3::</span>class PersonaLibrary</h4>
+<pre><code>class PersonaLibrary
+public:
+    PersonaLibrary() = default;     // empty; each voice (voices/voice-*.hpp) supplies its own personas
+    void add(const std::string&amp; name, const Style&amp; look) { map_[name] = Persona{ name, look }; }
+    const Persona* find(const std::string&amp; name) const { auto it = map_.find(name); return it == map_.end() ? nullptr : &amp;it-&gt;second; }
+    std::vector&lt;std::string&gt; names() const { std::vector&lt;std::string&gt; v; for (auto&amp; kv : map_) v.push_back(kv.first); return v; }
+    // Text format (one persona per block):
+    //   persona sweet
+    //   brightness 0.78      # any Style field name, others stay at the Normal look
+    // Returns the number of personas read.
+    size_t load(const std::string&amp; path)
+    bool save(const std::string&amp; name, const std::string&amp; path, bool append = false) const
+// Moves the expressive fields of `s` toward persona `name` by `amount` (0..1). Unknown names
+// are ignored (returns false).
+inline bool apply_persona(const PersonaLibrary&amp; lib, Style&amp; s, const std::string&amp; name, float amount = 1.f)
+// Blend of two personas (t = 0 -&gt; a, 1 -&gt; b), then moved toward by `amount`.
+inline bool apply_persona_blend(const PersonaLibrary&amp; lib, Style&amp; s, const std::string&amp; a, const std::string&amp; b, float t, float amount = 1.f)
+// Lanes that morph a note's current look toward persona `name` over time. `amount` is a
+// curve of 0..1 vs seconds. Only fields that have a render-level channel can move inside a
+// note: brightness, breathiness, tension, volume, growl, fry, air, register, formant shift,
+// mouth opening. Values are converted into the channel's own units.
+inline std::vector&lt;Lane&gt; persona_morph_lanes(const Style&amp; cur, const Persona&amp; p, const Curve&amp; amount, double t_end, double t_begin = 0.0)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v3-voices-profile-hpp"><h3><code>wauvio/vocal/yune-v3/voices/profile.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-voices-profile-hpp-wauvio-vocal-v3-voiceprofile"><span class="ns">wauvio::vocal::v3::</span>struct VoiceProfile</h4>
+<pre><code>// A VoiceProfile is everything that makes one *character* what it is, kept out of the engine:
+//   model     - tract proportions, vowel centres, source family, range, vibrato defaults (VoiceModel)
+//   style     - the character's default look/behaviour (Style; the "Normal" persona)
+//   parse     - lyric parsing defaults
+//   personas  - the bounded variations this character can take (soft, sweet, ...)
+//   natural_amount - recommended Singer::natural() strength
+// Voices live in voices/voice-&lt;id&gt;.hpp (C++, typed). The same voice can be exported/loaded as a text voicebank (.wvc); the .wvc files live in voicebanks/.
+            struct VoiceProfile
+                std::string id = "voice";            // short key: "yune"
+                std::string display = "Voice";       // human name
+                std::string language = "ja";
+                std::string notes;                   // one line of character description
+                VoiceModel model;
+                Style style;                         // the character's default (Normal) look
+                ParseOptions parse;
+                PersonaLibrary personas;
+                float natural_amount = 0.6f;         // default strength for Singer::natural()
+                inline const std::vector&lt;std::string&gt;&amp; style_names()
+                struct MF { const char* name; float VoiceModel::* p; };
+                inline const std::vector&lt;MF&gt;&amp; model_floats()
+                struct TF { const char* name; float Tune::* p; };
+                inline const std::vector&lt;TF&gt;&amp; tune_floats()
+                inline std::string fl(float x) {       // shortest text that reads back as the same float
+                inline const char* VOW = "aiueo";
+                inline const char* PLACES[4] = { "labial", "alveolar", "palatal", "velar" };
+            inline std::string profile_to_text(const VoiceProfile&amp; p)
+            inline bool save_profile(const VoiceProfile&amp; p, const std::string&amp; path)
+            // Parses profile text onto `out` (start from a copy of an existing voice to override a few values).
+            // Returns false and sets *err on a malformed line; unknown keys are an error too, so typos are caught.
+            inline bool profile_from_text(const std::string&amp; text, VoiceProfile&amp; out, std::string* err = nullptr)
+            // Voicebank files use the .wvc extension.
+            inline constexpr const char* VOICEBANK_EXT = ".wvc";
+            inline bool is_voicebank_path(const std::string&amp; s)
+            inline bool load_profile(const std::string&amp; path, VoiceProfile&amp; out, std::string* err = nullptr)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v3-voices-voices-hpp"><h3><code>wauvio/vocal/yune-v3/voices/voices.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-voices-voices-hpp-free-functions-constants-and-aliases">Free functions, constants and aliases</h4>
+<pre><code>// Registry of the built-in voices. To add a voice: write voices/voice-&lt;id&gt;.hpp (copy the closest existing voice and
+// change its model, look and personas), include it here and add one line to builtin_voices().
+            inline const std::vector&lt;std::pair&lt;std::string, std::function&lt;VoiceProfile()&gt;&gt;&gt;&amp; builtin_voices()
+            inline std::vector&lt;std::string&gt; voice_ids() { std::vector&lt;std::string&gt; o; for (auto&amp; kv : builtin_voices()) o.push_back(kv.first); return o; }
+            // "yune" -&gt; built-in voice; anything else is read as a .wvc file path. Returns false (and *err) if neither works.
+            inline bool make_voice(const std::string&amp; id_or_path, VoiceProfile&amp; out, std::string* err = nullptr)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v3-voices-voice-yune-hpp"><h3><code>wauvio/vocal/yune-v3/voices/voice-yune.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-voices-voice-yune-hpp-free-functions-constants-and-aliases">Free functions, constants and aliases</h4>
+<pre><code>// Yune: the default Japanese female voice.
+            inline VoiceProfile voice_yune()</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v3-voices-voice-mio-hpp"><h3><code>wauvio/vocal/yune-v3/voices/voice-mio.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-voices-voice-mio-hpp-free-functions-constants-and-aliases">Free functions, constants and aliases</h4>
+<pre><code>// Mio (澪): a calm, warm relative of Yune
+            inline VoiceProfile voice_mio()</code></pre>
+</section>
+<div class="pager"><a href="vocal-v3-expression.html"><small>Previous</small>v3 — Expression, ornaments and events</a><a class="r" href="vocal-v3-synthesis.html"><small>Next</small>v3 — Synthesis pipeline</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

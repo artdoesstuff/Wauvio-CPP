@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>seq.hpp — notes, tracks, sequencing · Wauvio Docs</title><meta name="description" content="Notes, instruments, tracks, drum sequencer and master bus.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>seq.hpp — notes, tracks, sequencing</h1>
+
+<p>Namespace <code>wauvio::seq</code>. A minimal, monophonic-per-track sequencing layer. (Richer instruments and arrangements are in <a href="ext.html"><code>wauvio::music</code></a>.)</p>
+<h2>Note, Instrument, Track</h2>
+<ul>
+<li><code>Note{frequency, duration, amplitude}</code> (440 Hz, 0.25 s, 0.8).</li>
+<li><code>Instrument</code>: <code>shape</code>, <code>envelope</code> (ADSR 0.01/0.05/0.7/0.08), <code>gain</code>, <code>detune</code> (Hz added to the note), <code>use_lpf</code> + <code>lpf_cutoff</code> (one-pole low-pass), <code>duty</code>. <code>render_note(note)</code> synthesises one note; frequencies below 1 Hz yield silence of the note's duration.</li>
+<li><code>Track</code> holds an <code>Instrument</code> and a note list. Chainable <code>add(f, d, a)</code>, <code>add(Note)</code>, <code>rest(d)</code>; <code>total_duration()</code>; <code>render()</code> places notes back-to-back.</li>
+<li>Helpers <code>render_chord(freqs, duration, instr)</code> and <code>render_arpeggio(freqs, step_dur, cycles, instr)</code>.</li>
+</ul>
+<h2>DrumSequencer</h2>
+<p><code>bpm</code> (120), <code>steps_per_bar</code> (16). Patterns are added with <code>add_pattern(steps, sound, gain)</code> where <code>steps</code> is a <code>vector&lt;bool&gt;</code> and <code>sound</code> is a <code>std::function&lt;Buffer(int sample_rate)&gt;</code> that synthesises one hit. Step length is <code>60 / (bpm · steps_per_bar / 4)</code> seconds. A pattern shorter than <code>steps_per_bar</code> repeats cyclically. Keep <code>steps</code> non-empty. <code>render(num_bars)</code> mixes all patterns into a mono buffer.</p>
+<h2>MasterBus</h2>
+<p>A timeline mixer. <code>schedule(buf, onset_seconds, gain)</code> places a mono or stereo buffer at an absolute time; a movable cursor (<code>advance</code>, <code>set_cursor</code>, <code>cursor</code>, <code>place</code>) supports sequential placement. <code>mix_stereo()</code> sums everything to a stereo buffer (mono slots go to both channels); <code>mix()</code> returns mono; <code>reset()</code> clears. Output length is the end of the latest slot. Constructed with an optional sample rate.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-core-seq-hpp"><h3><code>wauvio/core/seq.hpp</code></h3>
+<h4 id="wauvio-core-seq-hpp-wauvio-seq-note"><span class="ns">wauvio::seq::</span>struct Note</h4>
+<pre><code>//  §25  NOTE / INSTRUMENT / TRACK  (unchanged from v1, stereo-aware)
+struct Note
+    double frequency = 440.0;
+    double duration  = 0.25;
+    double amplitude = 0.8;
+    Note() = default;
+    Note(double f, double d, double a = 0.8) : frequency(f), duration(d), amplitude(a) {}</code></pre>
+<h4 id="wauvio-core-seq-hpp-wauvio-seq-instrument"><span class="ns">wauvio::seq::</span>struct Instrument</h4>
+<pre><code>struct Instrument
+    wauvio::osc::WaveShape shape      = wauvio::osc::WaveShape::Sine;
+    wauvio::env::ADSR      envelope   = {0.01, 0.05, 0.7, 0.08};
+    float     gain       = 1.0f;
+    double    detune     = 0.0;
+    bool      use_lpf    = false;
+    double    lpf_cutoff = 2000.0;
+    double    duty       = 0.5;
+    Buffer render_note(const Note&amp; note, int sample_rate = 0) const</code></pre>
+<h4 id="wauvio-core-seq-hpp-wauvio-seq-track"><span class="ns">wauvio::seq::</span>class Track</h4>
+<pre><code>class Track
+public:
+    Instrument instrument;
+    Track() = default;
+    explicit Track(const Instrument&amp; i) : instrument(i) {}
+    Track&amp; add(double f, double d, double a = 0.8)
+    Track&amp; rest(double d) { notes_.push_back({0.0, d}); return *this; }
+    Track&amp; add(const Note&amp; n) { notes_.push_back(n); return *this; }
+    double total_duration() const
+    Buffer render(int sample_rate = 0) const
+// Helpers
+inline Buffer render_chord(const std::vector&lt;double&gt;&amp; freqs, double duration,
+                            const Instrument&amp; instr, int sample_rate = 0)
+
+inline Buffer render_arpeggio(const std::vector&lt;double&gt;&amp; freqs, double step_dur,
+                               int cycles, const Instrument&amp; instr, int sample_rate = 0)
+</code></pre>
+<h4 id="wauvio-core-seq-hpp-wauvio-seq-drumsequencer"><span class="ns">wauvio::seq::</span>class DrumSequencer</h4>
+<pre><code>//  §26  DRUM SEQUENCER  (unchanged from v1)
+class DrumSequencer
+public:
+    double bpm           = 120.0;
+    int    steps_per_bar = 16;
+    struct Pattern
+        std::vector&lt;bool&gt;          steps;
+        std::function&lt;Buffer(int)&gt; sound;
+        float                      gain = 1.0f;
+    void add_pattern(std::vector&lt;bool&gt; steps,
+                     std::function&lt;Buffer(int)&gt; sound, float gain = 1.0f)
+    { patterns_.push_back({ std::move(steps), std::move(sound), gain }); }
+    void clear_patterns() { patterns_.clear(); }
+    Buffer render(int num_bars = 1, int sample_rate = 0) const</code></pre>
+<h4 id="wauvio-core-seq-hpp-wauvio-seq-masterbus"><span class="ns">wauvio::seq::</span>class MasterBus</h4>
+<pre><code>//  §27  MASTER BUS  (now handles both mono Buffer and StereoBuffer)
+class MasterBus
+public:
+    int sample_rate;
+    explicit MasterBus(int sr = 0)
+        : sample_rate(sr &gt; 0 ? sr : global_config().sample_rate) {}
+    void schedule(Buffer buf, double onset, float gain = 1.0f)
+    void schedule(StereoBuffer buf, double onset, float gain = 1.0f)
+    void advance(double s) { cursor_ += s; }
+    double cursor() const noexcept { return cursor_; }
+    void set_cursor(double t) { cursor_ = t; }
+    void place(Buffer buf, float gain = 1.0f)
+    void place(StereoBuffer buf, float gain = 1.0f)
+    /// Mix all scheduled content into a stereo output.
+    StereoBuffer mix_stereo() const
+    /// Mix all scheduled content into a mono output.
+    Buffer mix() const
+    void reset() { mono_slots_.clear(); stereo_slots_.clear(); cursor_ = 0.0; }</code></pre>
+</section>
+<div class="pager"><a href="core-theory.html"><small>Previous</small>theory.hpp — notes and frequencies</a><a class="r" href="core-io.html"><small>Next</small>io.hpp — WAV export and playback</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

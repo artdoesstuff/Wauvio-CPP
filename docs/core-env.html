@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>env.hpp — envelopes · Wauvio Docs</title><meta name="description" content="ADSR, DAHDSR and loopable envelopes.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>env.hpp — envelopes</h1>
+
+<p>Namespace <code>wauvio::env</code>.</p>
+<h2>ADSR</h2>
+<p>Fields <code>attack</code> (0.01 s), <code>decay</code> (0.05 s), <code>sustain</code> (0.7, a level), <code>release</code> (0.1 s). Constructor <code>ADSR(a, d, s, r)</code>.</p>
+<ul>
+<li><code>apply(buf, total_seconds, note_off = -1, sample_rate)</code> multiplies a buffer by the envelope. If <code>note_off &lt; 0</code> the release begins at <code>total_seconds − release</code>; after the release the buffer is silenced.</li>
+<li><code>tick(State&amp;, sample_rate)</code> is the stateful per-sample form used by voices. <code>State</code> carries the phase (<code>ATTACK, DECAY, SUSTAIN, RELEASE, DONE</code>) and value; <code>note_off_trigger()</code> starts the release.</li>
+</ul>
+<h2>DAHDSR</h2>
+<p>Adds <code>pre_delay</code> (silence before attack) and <code>hold</code> (time at peak). Constructor order: <code>(pre_delay, attack, hold, decay, sustain, release)</code>. Offline <code>apply()</code> only; no stateful tick.</p>
+<h2>LoopableEnvelope</h2>
+<p>Attack→decay cycle that repeats while <code>loop</code> is true, behaving as a shaped slow LFO; with <code>loop = false</code> it settles at <code>sustain</code>. Stateful <code>tick(State&amp;, sample_rate)</code> only.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-core-env-hpp"><h3><code>wauvio/core/env.hpp</code></h3>
+<h4 id="wauvio-core-env-hpp-wauvio-env-adsr"><span class="ns">wauvio::env::</span>class ADSR</h4>
+<pre><code>//  §9  ADSR ENVELOPE  (unchanged from v1, retained for compatibility)
+class ADSR
+public:
+    double attack  = 0.01;
+    double decay   = 0.05;
+    double sustain = 0.7;
+    double release = 0.1;
+    ADSR() = default;
+    ADSR(double a, double d, double s, double r)
+        : attack(a), decay(d), sustain(s), release(r) {}
+    void apply(Buffer&amp; buf, double total_seconds,
+               double note_off = -1.0, int sample_rate = 0) const
+
+    /// Sample-by-sample stateful version (for voice systems).
+    struct State
+        enum Phase { ATTACK, DECAY, SUSTAIN, RELEASE, DONE } phase = ATTACK;
+        double value    = 0.0;
+        double note_off = -1.0;  ///&lt; Call note_off() to trigger release
+        size_t sample   = 0;
+        void note_off_trigger() { phase = RELEASE; }
+    float tick(State&amp; st, int sample_rate) const noexcept</code></pre>
+<h4 id="wauvio-core-env-hpp-wauvio-env-dahdsr"><span class="ns">wauvio::env::</span>class DAHDSR</h4>
+<pre><code>//  §10  AHDSR / DAHDSR MULTI-STAGE ENVELOPE
+//  Hold stage between attack and decay.
+//  Optional pre-delay (D = initial delay before attack).
+class DAHDSR
+public:
+    double pre_delay = 0.0;   ///&lt; D: seconds of silence before attack
+    double attack    = 0.01;
+    double hold      = 0.0;   ///&lt; H: seconds at peak before decay
+    double decay     = 0.05;
+    double sustain   = 0.7;
+    double release   = 0.1;
+    DAHDSR() = default;
+    DAHDSR(double d, double a, double h, double dec, double s, double r)
+        : pre_delay(d), attack(a), hold(h), decay(dec), sustain(s), release(r) {}
+    void apply(Buffer&amp; buf, double total_seconds,
+               double note_off = -1.0, int sample_rate = 0) const
+</code></pre>
+<h4 id="wauvio-core-env-hpp-wauvio-env-loopableenvelope"><span class="ns">wauvio::env::</span>class LoopableEnvelope</h4>
+<pre><code>//  §11  LOOPABLE ENVELOPE
+//  Loops the attack→decay→sustain cycle indefinitely - behaves like a
+//  slow LFO with a shaped waveform.
+class LoopableEnvelope
+public:
+    double attack  = 0.1;
+    double decay   = 0.2;
+    double sustain = 0.5;   ///&lt; Level held between decay and next attack
+    bool   loop    = true;
+    struct State
+        enum Phase { ATT, DEC, SUS } phase = ATT;
+        double value = 0.0;
+    float tick(State&amp; st, int sample_rate) const noexcept</code></pre>
+</section>
+<div class="pager"><a href="core-osc.html"><small>Previous</small>osc.hpp — oscillators and noise</a><a class="r" href="core-mod.html"><small>Next</small>mod.hpp — LFO and automation</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vocal engine overview · Wauvio Docs</title><meta name="description" content="Overview of the Yune vocal engines.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>Vocal engine overview</h1>
+
+<p>The vocal engine (<code>wauvio/vocal/</code>) is a formant/glottal-source singing and speech synthesiser for <strong>Japanese</strong>, built around the character <em>Yune</em>. It does not use samples: it models the voice (glottal source, vocal-tract formants, consonant articulation, pitch and expression) and renders it from notes with kana, romaji or phoneme lyrics. It exists in three generations that can coexist in one program.</p>
+<h2>Generations</h2><table><thead><tr><th>Generation</th><th>Namespace</th><th>Header</th><th>Adds</th></tr></thead><tbody><tr><td>v1</td><td><code>wauvio::vocal::v1</code></td><td><code>vocal/v1.hpp</code></td><td>Core singer: kana/romaji lyrics, pitch curves with vibrato, portamento and scoops, a single built-in voice, MIDI-lyric loading, <code>SingerInstrument</code></td></tr><tr><td>v2</td><td><code>wauvio::vocal::v2</code></td><td><code>vocal/v2.hpp</code></td><td>Direct upgrade of v1: voice profiles and personas, <code>.wvc</code> voicebanks, expression lanes, events (laugh, sob, …), speech (<code>say</code>), humanisation, <code>natural()</code>, auto-expression, phoneme input, mic model, 5 voices</td></tr><tr><td>v3</td><td><code>wauvio::vocal::v3</code></td><td><code>vocal/v3.hpp</code>, <code>vocal/v3_fx.hpp</code></td><td>Streaming render (<code>VoiceStream</code>), coarticulation and consonant loci, pitch accent, particles, <code>Ensemble</code> (harmonies, doubles), <code>transposed()</code>/<code>doubled()</code>, vocal FX chains, diagnostics, 7 voices</td></tr></tbody></table>
+<h2>Choosing a generation</h2>
+<ul>
+<li>Include <code>vocal/v1.hpp</code>, <code>v2.hpp</code> or <code>v3.hpp</code> directly to use a specific generation; they can be included together.</li>
+<li><code>vocal/v3_fx.hpp</code> = v3 + <code>wauvio/fx.hpp</code> + the ready-made vocal chain.</li>
+<li><code>wauvio/vocal.hpp</code> defines <code>wauvio::vocal::current</code> as an alias. <strong>In this source it aliases v2</strong> (it includes <code>vocal/v2.hpp</code> and sets <code>namespace current = v2</code>), although its comment describes it as the latest generation and mentions a <code>v4.hpp</code>; no v4 exists in the source tree. For the newest engine use <code>wauvio::vocal::v3</code> explicitly.</li>
+</ul>
+<h2>Dependencies</h2>
+<p>Each generation includes <code>wauvio.hpp</code> (core), <code>ext/core/core.hpp</code> (for <code>music::Instrument</code>, <code>Articulation</code>) and <code>midi/core.hpp</code> (the light MIDI file model, to read lyric tracks). v3’s FX chain additionally needs <code>wauvio/fx.hpp</code>, which is why it is a separate header.</p>
+<h2>Quick start (v3)</h2>
+<pre><code>#include "wauvio/vocal/v3.hpp"
+using namespace wauvio::vocal::v3;
+
+Singer s;                         // default voice: Yune
+s.set_tempo(120);
+s.natural();                      // living-voice imperfections (voice's recommended strength)
+s.auto_expression();
+s.note(69, 480, "さ");
+s.note(71, 480, "く");
+s.note(72, 960, "ら");
+s.save("sakura.wav");</code></pre>
+<h2>Pages</h2>
+<ul>
+<li><a href="vocal-v3.html">v3 Singer API</a>, <a href="vocal-v3-style.html">Style, curves and lanes</a>, <a href="vocal-lyrics.html">Lyric input</a>, <a href="vocal-v3-expression.html">Expression, ornaments and events</a>, <a href="vocal-v3-voices.html">Voices, personas and voicebanks</a>, <a href="vocal-v3-synthesis.html">Synthesis pipeline</a>, <a href="vocal-v3-ensemble-fx.html">Ensemble, FX and mic</a>, <a href="vocal-tools.html">Tools</a></li>
+<li><a href="vocal-v1.html">v1</a> (baseline), <a href="vocal-v2.html">v2 — differences from v1</a></li>
+</ul>
+
+<div class="pager"><a href="sfx-cat-reverses.html"><small>Previous</small>Reverses, Tails &amp; Transitions</a><a class="r" href="vocal-v3.html"><small>Next</small>v3 — Singer API</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

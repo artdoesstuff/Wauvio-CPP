@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MIDI layer overview · Wauvio Docs</title><meta name="description" content="MIDI layer overview.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">MIDI layer (wauvio/midi)</div><h1>MIDI layer overview</h1>
+
+<p>The MIDI layer (<code>wauvio/midi.hpp</code>, directory <code>wauvio/midi/</code>) reads Standard MIDI Files, resolves each track to a Wauvio instrument, optionally restyles the performance with a genre preset, and renders or writes MIDI. It builds on the <a href="ext.html">music layer</a> (<code>wauvio/ext.hpp</code>).</p>
+<h2>Layers</h2><table><thead><tr><th>Layer</th><th>Headers</th><th>Page</th></tr></thead><tbody><tr><td>Minimal file model (no instruments): byte reader, event types, parser, tempo map</td><td><code>midi/core.hpp</code> → <code>midi/core/*</code></td><td><a href="midi-core.html">File model</a></td></tr><tr><td>General MIDI mapping and instrument resolution</td><td><code>midi/resolution/*</code></td><td><a href="midi-resolution.html">Instrument resolution</a></td></tr><tr><td><code>MidiMusic</code>, loader, rendering, writer</td><td><code>midi/track/*</code>, <code>midi/playback.hpp</code></td><td><a href="midi-track.html">Loading, rendering and writing</a></td></tr><tr><td>Genre styling for MIDI</td><td><code>midi/genre/*</code></td><td><a href="midi-genre.html">MIDI genre system</a></td></tr></tbody></table>
+<h2>Include structure</h2>
+<ul>
+<li><code>midi/core.hpp</code> includes only <code>core/common.hpp</code> plus the file model. It is deliberately light: the Yune vocal engines include it just to read a <code>.mid</code> score.</li>
+<li><code>wauvio/midi.hpp</code> includes the full stack in order: core model, GM map, resolver, <code>midi_music</code>, genre, genre presets, loader, render, writer, playback.</li>
+</ul>
+<h2>Typical workflow</h2>
+<pre><code>#include "wauvio/midi.hpp"
+using namespace wauvio;
+
+midi::track::LoadOptions opts;
+opts.resolver.override_channel(0, [] { return std::make_shared&lt;instruments::SoloViolin&gt;(); });
+auto music = midi::track::load_midi("song.mid", opts);
+
+music.setGenre(midi::genre::presets::jazz());   // optional restyle (reversible)
+music.set_instrument&lt;instruments::Harp&gt;(2);      // swap one part
+
+render(music, "song.wav");                      // RenderOptions defaults
+play(music);                                    // blocking playback (midi/playback.hpp)</code></pre>
+
+<div class="pager"><a href="fx-mixer.html"><small>Previous</small>Mixer and bridges</a><a class="r" href="midi-core.html"><small>Next</small>MIDI file model</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

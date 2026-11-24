@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MIDI file model · Wauvio Docs</title><meta name="description" content="Parser, event types, tempo map.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">MIDI layer (wauvio/midi)</div><h1>MIDI file model</h1>
+
+<p>Headers in <code>wauvio/midi/core/</code>, namespace <code>wauvio::midi</code>.</p>
+<ul>
+<li><code>ByteReader</code> — bounds-checked big-endian reader over a byte array: <code>u8</code>, <code>u16be</code>, <code>u32be</code>, <code>read_vlq</code> (variable-length quantity), <code>skip</code>, <code>seek</code>, <code>eof</code>, <code>remaining</code>, <code>position</code>, <code>ptr</code>. Reading past the end throws <code>MidiParseError</code> (derives <code>std::runtime_error</code>).</li>
+<li><code>MidiEventType</code> — <code>NoteOff, NoteOn, PolyAftertouch, ControlChange, ProgramChange, ChannelAftertouch, PitchBend, Meta, SysEx, Other</code>.</li>
+<li><code>MidiEvent</code> — absolute tick, type, channel, <code>data1</code>/<code>data2</code>, <code>meta_type</code>, <code>meta_data</code>.</li>
+<li><code>ParsedTrack</code> (<code>name</code>, <code>instrument_name</code>, <code>events</code>) and <code>ParsedMidiFile</code> (<code>format</code>, <code>declared_track_count</code>, <code>division</code> (default 480), SMPTE fields, <code>tracks</code>).</li>
+<li><code>TimeSignatureEvent</code>, <code>KeySignatureEvent</code> — extracted meta events.</li>
+<li><code>read_whole_file(path)</code>, <code>parse_midi_file(path)</code>, <code>parse_midi_bytes(bytes, label)</code> — parse an SMF into a <code>ParsedMidiFile</code>.</li>
+<li><code>TempoMap</code> — <code>add_tempo_event(tick, µs/quarter)</code>, then <code>finalize(ticks_per_quarter)</code> (or <code>finalize_smpte(fps, ticks_per_frame)</code>) builds segments; <code>tick_to_seconds</code>, <code>seconds_to_ticks</code>, <code>bpm_at_start</code>, <code>tempo_events</code>, <code>ticks_per_quarter</code>. Handles tempo changes and SMPTE time bases.</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-midi-core-byte-reader-hpp"><h3><code>wauvio/midi/core/byte_reader.hpp</code></h3>
+<h4 id="wauvio-midi-core-byte-reader-hpp-wauvio-midi-midiparseerror"><span class="ns">wauvio::midi::</span>class MidiParseError</h4>
+<pre><code>class MidiParseError : public std::runtime_error
+public:
+    explicit MidiParseError(const std::string&amp; what) : std::runtime_error(what) {}</code></pre>
+<h4 id="wauvio-midi-core-byte-reader-hpp-wauvio-midi-bytereader"><span class="ns">wauvio::midi::</span>class ByteReader</h4>
+<pre><code>class ByteReader
+public:
+    ByteReader(const unsigned char* data, size_t size) : data_(data), size_(size) {}
+    bool eof() const noexcept { return pos_ &gt;= size_; }
+    size_t remaining() const noexcept { return pos_ &lt; size_ ? size_ - pos_ : 0; }
+    size_t position() const noexcept { return pos_; }
+    void require(size_t n) const
+    uint8_t u8()
+    uint16_t u16be()
+    uint32_t u32be()
+    void skip(size_t n)
+    void seek(size_t absolute_pos)
+    uint32_t read_vlq()
+    const unsigned char* ptr() const noexcept { return data_ + pos_; }</code></pre>
+</section>
+<section class="file" id="wauvio-midi-core-midi-types-hpp"><h3><code>wauvio/midi/core/midi_types.hpp</code></h3>
+<h4 id="wauvio-midi-core-midi-types-hpp-wauvio-midi-midieventtype"><span class="ns">wauvio::midi::</span>enum class MidiEventType</h4>
+<pre><code>enum class MidiEventType
+    NoteOff,
+    NoteOn,
+    PolyAftertouch,
+    ControlChange,
+    ProgramChange,
+    ChannelAftertouch,
+    PitchBend,
+    Meta,
+    SysEx,
+    Other</code></pre>
+<h4 id="wauvio-midi-core-midi-types-hpp-wauvio-midi-midievent"><span class="ns">wauvio::midi::</span>struct MidiEvent</h4>
+<pre><code>struct MidiEvent
+    uint64_t abs_tick = 0;
+    MidiEventType type = MidiEventType::Other;
+    uint8_t channel = 0;
+    uint8_t data1 = 0;
+    uint8_t data2 = 0;
+    uint8_t meta_type = 0;
+    std::vector&lt;uint8_t&gt; meta_data;</code></pre>
+<h4 id="wauvio-midi-core-midi-types-hpp-wauvio-midi-parsedtrack"><span class="ns">wauvio::midi::</span>struct ParsedTrack</h4>
+<pre><code>struct ParsedTrack
+    std::string name;
+    std::string instrument_name;
+    std::vector&lt;MidiEvent&gt; events;</code></pre>
+<h4 id="wauvio-midi-core-midi-types-hpp-wauvio-midi-parsedmidifile"><span class="ns">wauvio::midi::</span>struct ParsedMidiFile</h4>
+<pre><code>struct ParsedMidiFile
+    uint16_t format = 1;
+    uint16_t declared_track_count = 0;
+    uint16_t division = 480;
+    bool smpte_timing = false;
+    int smpte_fps = 30;
+    int smpte_ticks_per_frame = 80;
+    std::vector&lt;ParsedTrack&gt; tracks;</code></pre>
+<h4 id="wauvio-midi-core-midi-types-hpp-wauvio-midi-timesignatureevent"><span class="ns">wauvio::midi::</span>struct TimeSignatureEvent</h4>
+<pre><code>struct TimeSignatureEvent
+    uint64_t tick = 0;
+    int numerator = 4;
+    int denominator = 4;</code></pre>
+<h4 id="wauvio-midi-core-midi-types-hpp-wauvio-midi-keysignatureevent"><span class="ns">wauvio::midi::</span>struct KeySignatureEvent</h4>
+<pre><code>struct KeySignatureEvent
+    uint64_t tick = 0;
+    int sharps_or_flats = 0;
+    bool is_minor = false;</code></pre>
+</section>
+<section class="file" id="wauvio-midi-core-midi-parser-hpp"><h3><code>wauvio/midi/core/midi_parser.hpp</code></h3>
+<h4 id="wauvio-midi-core-midi-parser-hpp-wauvio-midi-free-functions-constants-and-aliases"><span class="ns">wauvio::midi::</span>Free functions, constants and aliases</h4>
+<pre><code>inline std::vector&lt;unsigned char&gt; read_whole_file(const std::string&amp; path)
+    inline bool magic_is(const unsigned char* p, const char* expect)
+    inline int channel_event_data_bytes(uint8_t status_hi)
+inline ParsedMidiFile parse_midi_bytes(const std::vector&lt;unsigned char&gt;&amp; bytes, const std::string&amp; source_label)
+inline ParsedMidiFile parse_midi_file(const std::string&amp; path)</code></pre>
+</section>
+<section class="file" id="wauvio-midi-core-tempo-map-hpp"><h3><code>wauvio/midi/core/tempo_map.hpp</code></h3>
+<h4 id="wauvio-midi-core-tempo-map-hpp-wauvio-midi-tempomap"><span class="ns">wauvio::midi::</span>class TempoMap</h4>
+<pre><code>class TempoMap
+public:
+    void add_tempo_event(uint64_t tick, uint32_t micros_per_quarter)
+    void finalize(uint16_t ticks_per_quarter)
+    void finalize_smpte(int fps, int ticks_per_frame)
+    double tick_to_seconds(uint64_t tick) const
+    double bpm_at_start() const
+    uint64_t seconds_to_ticks(double seconds) const
+    std::vector&lt;std::pair&lt;uint64_t,uint32_t&gt;&gt; tempo_events() const
+    uint16_t ticks_per_quarter() const noexcept { return tpq_; }</code></pre>
+</section>
+<div class="pager"><a href="midi.html"><small>Previous</small>MIDI layer overview</a><a class="r" href="midi-resolution.html"><small>Next</small>Instrument resolution and General MIDI map</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

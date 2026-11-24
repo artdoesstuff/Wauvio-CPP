@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>synth.hpp — FM and polyphony · Wauvio Docs</title><meta name="description" content="FMSynth, Voice and VoiceManager.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>synth.hpp — FM and polyphony</h1>
+
+<p>Namespace <code>wauvio::synth</code>.</p>
+<h2>FMSynth</h2>
+<p>Two-operator FM. Fields <code>carrier_freq</code>, <code>modulator_freq</code>, <code>mod_index</code>, <code>amplitude</code>; <code>render(seconds)</code> returns a mono buffer.</p>
+<h2>Voice</h2>
+<p>One polyphonic voice: two oscillators (<code>osc</code>, detuned <code>osc2</code>), an <code>ADSR</code> with its <code>State</code>, an <code>SVFilter</code>, plus <code>active</code>, <code>frequency</code>, <code>velocity</code>, <code>birth_sample</code> (used for stealing) and <code>current_amp</code>. <code>trigger(freq, vel, env, shape1, shape2, detune_hz, timestamp, sr)</code> starts a note, <code>release()</code> begins the release, <code>tick(sr)</code> returns the next sample.</p>
+<h2>VoiceManager</h2>
+<p>16-voice allocator (<code>MAX_VOICES</code>). Patch fields: <code>shape1</code> (Sawtooth), <code>shape2</code> (Square), <code>detune_hz</code> (2.5), <code>adsr</code> (0.01/0.08/0.7/0.15), <code>filter_proto</code> (copied to each voice). <code>note_on(freq, velocity)</code> takes a free voice or steals one when full; <code>note_off(freq)</code>, <code>all_notes_off()</code>, <code>tick(sr)</code>, <code>render(seconds)</code>, <code>active_voices()</code>.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-core-synth-hpp"><h3><code>wauvio/core/synth.hpp</code></h3>
+<h4 id="wauvio-core-synth-hpp-wauvio-synth-fmsynth"><span class="ns">wauvio::synth::</span>class FMSynth</h4>
+<pre><code>//  §15  FM SYNTHESIS  (unchanged from v1)
+class FMSynth
+public:
+    double carrier_freq   = 440.0;
+    double modulator_freq = 440.0;
+    double mod_index      = 1.0;
+    double amplitude      = 1.0;
+    Buffer render(double seconds, int sample_rate = 0) const</code></pre>
+<h4 id="wauvio-core-synth-hpp-wauvio-synth-voice"><span class="ns">wauvio::synth::</span>struct Voice</h4>
+<pre><code>//  §23  POLYPHONIC VOICE SYSTEM
+/// One voice in a polyphonic synth patch.
+struct Voice
+    bool        active    = false;
+    double      frequency = 440.0;
+    double      velocity  = 1.0;
+    uint64_t    birth_sample = 0;   ///&lt; When was this voice triggered (for stealing)
+    float       current_amp  = 0.0f;
+    wauvio::osc::Oscillator  osc;
+    wauvio::osc::Oscillator  osc2;     ///&lt; Optional second oscillator (detune layer)
+    wauvio::env::ADSR        adsr;
+    wauvio::env::ADSR::State adsr_state;
+    wauvio::filter::SVFilter    filt;
+    void trigger(double freq, double vel, const wauvio::env::ADSR&amp; env,
+                 wauvio::osc::WaveShape shape1, wauvio::osc::WaveShape shape2,
+                 double detune_hz, uint64_t timestamp, int /*sample_rate*/)
+
+    void release() { adsr_state.note_off_trigger(); }
+    /// Returns next sample (mono).
+    float tick(int sample_rate) noexcept</code></pre>
+<h4 id="wauvio-core-synth-hpp-wauvio-synth-voicemanager"><span class="ns">wauvio::synth::</span>class VoiceManager</h4>
+<pre><code>/// Polyphonic voice manager - allocates voices, handles stealing.
+class VoiceManager
+public:
+    static constexpr int MAX_VOICES = 16;
+    wauvio::osc::WaveShape shape1       = wauvio::osc::WaveShape::Sawtooth;
+    wauvio::osc::WaveShape shape2       = wauvio::osc::WaveShape::Square;
+    double    detune_hz    = 2.5;
+    wauvio::env::ADSR      adsr         = {0.01, 0.08, 0.7, 0.15};
+    wauvio::filter::SVFilter  filter_proto;   ///&lt; Prototype filter settings copied per voice
+    void note_on(double freq, double velocity = 1.0)
+    void note_off(double freq)
+    void all_notes_off()
+    float tick(int sample_rate) noexcept
+    Buffer render(double seconds, int sample_rate = 0)
+    int active_voices() const</code></pre>
+</section>
+<div class="pager"><a href="core-filter.html"><small>Previous</small>filter.hpp — filters and EQ</a><a class="r" href="core-fx-basic.html"><small>Next</small>fx_basic.hpp — basic effects</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

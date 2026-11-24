@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>v1 — the original singer · Wauvio Docs</title><meta name="description" content="The v1 singer.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v1 — the original singer</h1>
+
+<p>Namespace <code>wauvio::vocal::v1</code>, header <code>vocal/v1.hpp</code>, sources in <code>vocal/yune-v1/</code> (<code>japanese</code>, <code>voice</code>, <code>pitch</code>, <code>synth</code>, <code>singer</code>, plus <code>tools/sing_score.cpp</code>). It is the foundation the later generations extend.</p>
+<ul>
+<li><strong>One voice.</strong> <code>VoiceModel</code> describes the single built-in Japanese female voice; there are no profiles, personas or voicebanks.</li>
+<li><strong>Singer API.</strong> <code>set_voice</code>, <code>set_tempo</code>, <code>style()</code>, <code>parse_options()</code>, <code>phrase_pitch_curve</code>, <code>seed</code>, <code>note</code>/<code>note_sec</code>/<code>note_at</code>, <code>rest</code>/<code>rest_sec</code>, <code>load_midi_file</code>/<code>load_midi_track</code>, <code>render</code>, <code>render_stereo</code>, <code>save</code>.</li>
+<li><strong><code>NoteRef</code></strong> setters: <code>velocity</code>, <code>articulation</code>, <code>vibrato</code>, <code>no_vibrato</code>, <code>portamento</code>, <code>glide_from</code>, <code>bend</code>, <code>overshoot</code>, <code>scoop</code>, <code>style()</code>. A <code>NoteRef</code> is valid only until the next note is added to the same <code>Singer</code> (notes are stored in a <code>std::vector</code>).</li>
+<li><strong><code>SingerInstrument</code></strong> — one note, fixed lyric, with its own <code>style</code> and <code>voice_model</code>.</li>
+<li><strong>Style</strong> contains the voice, pitch, articulation and dynamics groups (see <a href="vocal-v3-style.html">Style</a>); none of the later expression fields exist.</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-vocal-yune-v1-singer-hpp"><h3><code>wauvio/vocal/yune-v1/singer.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v1-singer-hpp-wauvio-vocal-v1-free-functions-constants-and-aliases"><span class="ns">wauvio::vocal::v1::</span>Free functions, constants and aliases</h4>
+<pre><code>class Singer;</code></pre>
+<h4 id="wauvio-vocal-yune-v1-singer-hpp-wauvio-vocal-v1-noteref"><span class="ns">wauvio::vocal::v1::</span>class NoteRef</h4>
+<pre><code>// Returned by Singer::note(); chain setters to tweak that one note.
+// Valid only until the next call that adds a note to the same Singer.
+class NoteRef
+public:
+    explicit NoteRef(SynthNote&amp; n) : n_(n) {}
+    NoteRef&amp; velocity(float v)             { n_.vel = v; return *this; }
+    NoteRef&amp; articulation(wauvio::music::Articulation a) { n_.art = a; return *this; }
+    NoteRef&amp; vibrato(float depth_st, float rate_hz = -1.f, float delay_s = -1.f, float fade_s = -1.f)
+    NoteRef&amp; no_vibrato()                  { n_.style.vibrato_depth = 0.f; return *this; }
+    NoteRef&amp; portamento(float seconds)     { n_.style.portamento = seconds; return *this; }
+    NoteRef&amp; glide_from(double midi)       { n_.glide_from = midi; return *this; }
+    NoteRef&amp; bend(const Curve&amp; semitones_vs_seconds) { n_.bend = semitones_vs_seconds; return *this; }
+    NoteRef&amp; overshoot(float o)            { n_.style.overshoot = o; return *this; }
+    NoteRef&amp; scoop(float semitones)        { n_.style.scoop = semitones; return *this; }
+    Style&amp;   style()                       { return n_.style; }</code></pre>
+<h4 id="wauvio-vocal-yune-v1-singer-hpp-wauvio-vocal-v1-singer"><span class="ns">wauvio::vocal::v1::</span>class Singer</h4>
+<pre><code>class Singer
+public:
+    Singer() = default;
+    Singer&amp; set_voice(const VoiceModel&amp; v) { voice_ = v; return *this; }
+    const VoiceModel&amp; voice() const { return voice_; }
+    Singer&amp; set_tempo(double bpm, int ticks_per_quarter = 480) { bpm_ = bpm; ppq_ = ticks_per_quarter; return *this; }
+    Style&amp; style() { return style_; }                 // defaults applied to notes added afterwards
+    const Style&amp; style() const { return style_; }
+    ParseOptions&amp; parse_options() { return popt_; }
+    Singer&amp; phrase_pitch_curve(const Curve&amp; semitones_vs_seconds) { phrase_curve_ = semitones_vs_seconds; return *this; }
+    Singer&amp; seed(uint32_t s) { seed_ = s; return *this; }
+    NoteRef note(int midi, int ticks, const std::string&amp; lyric, float velocity = 0.75f)
+    Singer&amp; rest(int ticks) { cursor_ += ticks_to_sec(ticks); return *this; }
+    NoteRef note_sec(int midi, double seconds, const std::string&amp; lyric, float velocity = 0.75f)
+    Singer&amp; rest_sec(double seconds) { cursor_ += seconds; return *this; }
+    // Absolute placement; the cursor moves to the end of the note.
+    NoteRef note_at(double start_sec, int midi, double seconds, const std::string&amp; lyric, float velocity = 0.75f)
+    void clear() { notes_.clear(); cursor_ = 0.0; phrase_curve_.clear(); }
+    size_t size() const { return notes_.size(); }
+    const std::vector&lt;SynthNote&gt;&amp; notes() const { return notes_; }
+    double cursor() const { return cursor_; }
+    double ticks_to_sec(int ticks) const { return static_cast&lt;double&gt;(ticks) / ppq_ * 60.0 / bpm_; }
+    Buffer render(int sample_rate = 0) const
+    StereoBuffer render_stereo(int sample_rate = 0) const
+    void save(const std::string&amp; path, int sample_rate = 0) const
+    // Reads notes (and Lyric/Text meta events) from one track of a parsed MIDI
+    // file. track &lt; 0 picks the first track that contains lyrics. Notes without a
+    // lyric continue the previous vowel (melisma). Lyrics may be UTF-8 or
+    // Shift-JIS kana. Returns the number of notes added.
+    size_t load_midi_track(const midi::ParsedMidiFile&amp; f, int track = -1)
+    size_t load_midi_file(const std::string&amp; path, int track = -1)</code></pre>
+<h4 id="wauvio-vocal-yune-v1-singer-hpp-wauvio-vocal-v1-singerinstrument"><span class="ns">wauvio::vocal::v1::</span>class SingerInstrument</h4>
+<pre><code>// Drop-in for Arrangement / MidiMusic parts: renders ONE note with a fixed lyric
+// (no coarticulation with neighbouring notes; use Singer for phrases).
+class SingerInstrument : public wauvio::music::Instrument
+public:
+    std::string lyric = "あ";
+    Style style;
+    VoiceModel voice_model;
+    SingerInstrument() { name = "Japanese Female Singer"; }
+    explicit SingerInstrument(std::string lyr) : lyric(std::move(lyr)) { name = "Japanese Female Singer"; }
+    StereoBuffer render_note(const wauvio::music::Note&amp; n, int sample_rate = 0) const override
+    std::vector&lt;wauvio::music::Articulation&gt; supported_articulations() const override</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v1-voice-hpp"><h3><code>wauvio/vocal/yune-v1/voice.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v1-voice-hpp-wauvio-vocal-v1-voweltarget"><span class="ns">wauvio::vocal::v1::</span>struct VowelTarget</h4>
+<pre><code>struct VowelTarget
+    float f1, f2, f3;       // Hz
+    float b1, b2, b3;       // bandwidths, Hz
+    float gain;             // per-vowel loudness trim
+    float f1_track;         // 0..1: how strongly F1 follows F0 when F0 approaches F1
+    float f2_track;         // 0..1: same for F2 (only matters for very high notes)</code></pre>
+<h4 id="wauvio-vocal-yune-v1-voice-hpp-wauvio-vocal-v1-voicemodel"><span class="ns">wauvio::vocal::v1::</span>struct VoiceModel</h4>
+<pre><code>// All static data describing the singer. Only one voice ships; the struct exists
+// so the numbers live in one place, not to host a family of voices.
+struct VoiceModel
+    const char* name = "Wauvio Japanese Female (default)";
+    // Range (MIDI notes)
+    int range_low = 52, range_high = 88;       // E3 .. E6 comfortable
+    int hard_low = 40,  hard_high = 96;
+    // Japanese vowels, female, deliberately peripheral for clarity.
+    VowelTarget vowel[5] =
+    // Fixed upper formants / brightness structure
+    float f4 = 4300.f, f5 = 5600.f, f6 = 7200.f;
+    float b4 = 260.f,  b5 = 320.f,  b6 = 500.f;
+    float singer_formant_hz = 3100.f, singer_formant_bw = 600.f;
+    // Glottal source defaults (Rd parameter of the LF model; lower = tenser/brighter)
+    float rd_base      = 0.95f;
+    float aspiration   = 0.020f;    // steady aspiration level at breathiness 0
+    float tilt_hz_min  = 2600.f;    // source low-pass at brightness 0
+    float tilt_hz_max  = 11000.f;   // ... at brightness 1
+    // Vibrato defaults
+    float vib_depth_st = 0.32f;     // semitones, peak
+    float vib_rate_hz  = 5.7f;
+    float vib_delay    = 0.30f;     // s before vibrato begins
+    float vib_fade     = 0.35f;     // s to reach full depth
+    // Timbre of the synthetic character
+    float synthetic    = 0.65f;     // 0..1: tighter bandwidths, steadier source, brighter uppers
+inline const VoiceModel&amp; default_voice() { static const VoiceModel v; return v; }
+// A control curve (time, value). Time units depend on use (see Singer docs).
+using Curve = std::vector&lt;std::pair&lt;double, double&gt;&gt;;
+inline double curve_eval(const Curve&amp; c, double t, double outside = 0.0)</code></pre>
+<h4 id="wauvio-vocal-yune-v1-voice-hpp-wauvio-vocal-v1-style"><span class="ns">wauvio::vocal::v1::</span>struct Style</h4>
+<pre><code>// Musical controls. All 0..1 unless a unit is given. Every field can be set as a
+// singer-wide default and overridden per note.
+struct Style
+    // voice
+    float brightness  = 0.70f;   // high-frequency presence (source tilt + upper formants)
+    float breathiness = 0.12f;   // aspiration + more open glottis
+    float tension     = 0.50f;   // glottal tenseness (low Rd -&gt; sharper, brighter)
+    float softness    = 0.00f;   // gentle, rounded onset and breathier tone
+    float power       = 0.50f;   // vocal effort: singer's formant + tenser source
+    float resonance   = 0.60f;   // formant sharpness (narrower bandwidths)
+    float femininity  = 0.50f;   // 0.5 = model default; shifts formants by about +-6%
+    // pitch
+    float vibrato_depth = -1.f;  // semitones peak; &lt;0 = voice default
+    float vibrato_rate  = -1.f;  // Hz; &lt;0 = voice default
+    float vibrato_delay = -1.f;  // s before onset; &lt;0 = voice default
+    float vibrato_fade  = -1.f;  // s fade-in;     &lt;0 = voice default
+    float portamento    = 0.060f;   // s glide between connected notes
+    float pitch_response= 0.55f;   // 0..1 how fast pitch settles on target
+    float overshoot     = 0.20f;   // 0..1 pitch overshoot (0 = none)
+    float scoop         = 0.30f;   // semitones: note-entry slide from below after a rest
+    float exit_fall     = 0.20f;   // semitones: pitch sag at the end of a phrase-final note
+    float drift         = 0.00f;   // semitones: slow deterministic drift
+    float micro         = 0.00f;   // 0..1 tiny deterministic microvariation of vibrato
+    // articulation
+    float consonant_strength = 0.55f;
+    float consonant_duration = 1.00f;   // scale on consonant length
+    float vowel_clarity      = 0.60f;
+    float legato             = 0.50f;   // 1 = notes run together
+    float attack_sharpness   = 0.50f;
+    float release            = 0.50f;   // 0 = abrupt, 1 = long fade
+    bool  devoicing          = true;    // devoice short i/u between voiceless consonants
+    // dynamics
+    float volume            = 1.00f;
+    float velocity_response = 0.65f;
+    float compression       = 0.30f;
+    float dynamic_timbre    = 0.50f;    // louder -&gt; brighter/tenser, softer -&gt; breathier</code></pre>
+<h4 id="wauvio-vocal-yune-v1-voice-hpp-wauvio-vocal-v1-noteextras"><span class="ns">wauvio::vocal::v1::</span>struct NoteExtras</h4>
+<pre><code>// Per-note override container: the effective Style for the note is already
+// baked in at note creation time; these are note-specific extras.
+struct NoteExtras
+    Curve bend;          // semitones vs seconds from note start
+    double glide_from = -1.0;  // explicit portamento source pitch (MIDI), &lt;0 = auto
+inline float clamp01(float x) { return x &lt; 0.f ? 0.f : (x &gt; 1.f ? 1.f : x); }</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v1-pitch-hpp"><h3><code>wauvio/vocal/yune-v1/pitch.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v1-pitch-hpp-wauvio-vocal-v1-pitchnote"><span class="ns">wauvio::vocal::v1::</span>struct PitchNote</h4>
+<pre><code>struct PitchNote
+    double start = 0.0, end = 0.0;
+    double midi  = 60.0;
+    bool   connected = false;         // previous note ends right where this one starts
+    bool   followed_by_gap = true;    // no note immediately follows
+    Style  style;
+    Curve  bend;                      // semitones vs seconds-from-note-start
+    double glide_from = -1.0;
+    int    index = 0;
+constexpr double PITCH_RATE = 1000.0; // control-rate samples per second</code></pre>
+<h4 id="wauvio-vocal-yune-v1-pitch-hpp-wauvio-vocal-v1-pitchtrack"><span class="ns">wauvio::vocal::v1::</span>struct PitchTrack</h4>
+<pre><code>struct PitchTrack
+    std::vector&lt;float&gt; midi;          // fractional MIDI note per 1 ms
+    float at(double t) const
+inline double smoothstep(double x) { x = x &lt; 0 ? 0 : (x &gt; 1 ? 1 : x); return x * x * (3 - 2 * x); }
+inline PitchTrack build_pitch_track(const std::vector&lt;PitchNote&gt;&amp; notes, double total_seconds,
+                                    const VoiceModel&amp; voice, const Curve&amp; phrase_curve)
+</code></pre>
+</section><section class="file" id="wauvio-vocal-yune-v1-japanese-hpp"><h3><code>wauvio/vocal/yune-v1/japanese.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v1-japanese-hpp-wauvio-vocal-v1-vowel"><span class="ns">wauvio::vocal::v1::</span>enum class Vowel</h4>
+<pre><code>enum class Vowel : uint8_t { A = 0, I = 1, U = 2, E = 3, O = 4 };</code></pre>
+<h4 id="wauvio-vocal-yune-v1-japanese-hpp-wauvio-vocal-v1-cons"><span class="ns">wauvio::vocal::v1::</span>enum class Cons</h4>
+<pre><code>// Underlying (phonological) consonant of a mora: the kana row.
+enum class Cons : uint8_t
+    None, K, G, S, Z, T, D, N, H, P, B, M, R, Y, W</code></pre>
+<h4 id="wauvio-vocal-yune-v1-japanese-hpp-wauvio-vocal-v1-mora"><span class="ns">wauvio::vocal::v1::</span>struct Mora</h4>
+<pre><code>struct Mora
+    Cons  c        = Cons::None;
+    Vowel v        = Vowel::A;
+    bool  palatal  = false;   // yo-on: きゃ しゅ ちょ ...
+    bool  geminate = false;   // っ
+    bool  nasal    = false;   // ん (moraic nasal)
+    bool  longv    = false;   // ー or merged long vowel: continue previous vowel
+    // Foreign-sound overrides (ふぁ てぃ つぁ ...): force a particular surface
+    // consonant in place of the one implied by (c, v).
+    enum class Force : uint8_t { None, F, TI, DI, TS, J, CH, SH } force = Force::None;
+    std::string text;         // source text of the mora (UTF-8), for diagnostics</code></pre>
+<h4 id="wauvio-vocal-yune-v1-japanese-hpp-wauvio-vocal-v1-surf"><span class="ns">wauvio::vocal::v1::</span>enum class Surf</h4>
+<pre><code>// Realised consonant classes (what the synthesizer actually builds).
+enum class Surf : uint8_t
+    None,
+    K, G,            // velar stops (palatalised before i / yo-on)
+    T, D,            // alveolar stops
+    P, B,            // labial stops
+    TS, CH, J,       // affricates: ts, tɕ, dʑ
+    S, SH, Z,        // fricatives: s, ɕ, z
+    H, HY, FU,       // h, ç, ɸ
+    N, NY, M,        // nasals
+    R,               // alveolar tap ɾ
+    Y, W,            // glides j, ɰᵝ
+    GEM,             // sokuon
+    MORAIC_N         // ん
+inline bool is_voiced(Surf s)
+inline bool is_obstruent_unvoiced(Surf s)</code></pre>
+<h4 id="wauvio-vocal-yune-v1-japanese-hpp-wauvio-vocal-v1-surfacemora"><span class="ns">wauvio::vocal::v1::</span>struct SurfaceMora</h4>
+<pre><code>struct SurfaceMora
+    Surf surf    = Surf::None;
+    bool palatal = false;   // palatalised release / j-glide between C and V
+// Resolve the allophone of a mora (independent of neighbours).
+inline SurfaceMora surface(const Mora&amp; m)
+    inline bool next_cp(const std::string&amp; s, size_t&amp; i, uint32_t&amp; cp)
+    inline std::string cp_to_utf8(uint32_t cp)
+    inline bool valid_utf8(const std::string&amp; s)
+    // Katakana -&gt; hiragana (ァ..ヶ -&gt; ぁ..ゖ); ー stays.
+    inline uint32_t to_hira(uint32_t cp)
+    struct Row { Cons c; bool pal; };
+    // Basic consonant-vowel table keyed by hiragana code point -&gt; (consonant, vowel).
+    struct Cv { Cons c; Vowel v; };
+    inline const std::map&lt;uint32_t, Cv&gt;&amp; cv_table()
+    inline bool is_small_ya(uint32_t cp, Vowel&amp; v)
+    inline bool is_small_vowel(uint32_t cp, Vowel&amp; v)</code></pre>
+<h4 id="wauvio-vocal-yune-v1-japanese-hpp-wauvio-vocal-v1-parseoptions"><span class="ns">wauvio::vocal::v1::</span>struct ParseOptions</h4>
+<pre><code>struct ParseOptions
+    // "おう" / "えい" / "ああ" ... inside ONE lyric string become a single long
+    // vowel (ō, ē, aa) instead of two separate morae.
+    bool merge_long_vowels = true;
+// Kana (hiragana or katakana) -&gt; morae. Whitespace, '|', ',' and '/' are ignored.
+inline std::vector&lt;Mora&gt; parse_kana(const std::string&amp; text, const ParseOptions&amp; opt = {})
+// Hepburn/Kunrei-style romaji -&gt; morae.  "ka ki kya shi chi tsu fu n xtu(=っ) -"
+// Doubled consonants (kka, ssa, tta) produce a geminate; "n" before a vowel/y
+// must be written "n'" or "nn".
+inline std::vector&lt;Mora&gt; parse_romaji(const std::string&amp; text, const ParseOptions&amp; opt = {})
+// Parse a lyric string: UTF-8 kana first; if it is plain ASCII, treat as romaji.
+inline std::vector&lt;Mora&gt; parse_lyric(const std::string&amp; text, const ParseOptions&amp; opt = {})
+// Minimal Shift-JIS kana decoder for MIDI karaoke files (kana, ー, ASCII only).
+// Returns UTF-8, or empty if the bytes are not decodable as UTF-8/ASCII/SJIS-kana.
+inline std::string decode_lyric_bytes(const std::vector&lt;uint8_t&gt;&amp; b)</code></pre>
+</section><section class="file" id="wauvio-vocal-yune-v1-synth-hpp"><h3><code>wauvio/vocal/yune-v1/synth.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-tune"><span class="ns">wauvio::vocal::v1::</span>struct Tune</h4>
+<pre><code>struct Tune
+    float out_scale     = 0.65f;   // overall level of voiced signal
+    float asp_gain      = 3.00f;   // aspiration noise level into the tract
+    float fric_gain     = 0.30f;   // frication level scale
+    float upper_gain    = 2.00f;   // parallel upper-formant bank
+    float sing_gain     = 2.00f;   // singer's formant
+    float air_gain      = 0.10f;   // un-filtered breath "air"
+    float pre_gain      = 1.0f;    // source pre-emphasis amount (x brightness)
+    float f23_gain      = 30.0f;    // parallel boost of the moving F2/F3 (x brightness)
+inline Tune&amp; tune() { static Tune t; return t; }</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-glottaltables"><span class="ns">wauvio::vocal::v1::</span>class GlottalTables</h4>
+<pre><code>//  LF glottal flow-derivative tables, parameterised by Rd (Fant 1995)
+//  Rd ~0.4 pressed/tense, ~1.0 modal, ~2 breathy.
+class GlottalTables
+public:
+    static constexpr int N  = 1024;
+    static constexpr int NR = 12;
+    static constexpr float RD_MIN = 0.35f, RD_MAX = 2.55f;
+    GlottalTables()
+    // phase in [0,1)
+    float read(float phase, float rd) const
+inline const GlottalTables&amp; glottal_tables() { static const GlottalTables t; return t; }</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-pidx"><span class="ns">wauvio::vocal::v1::</span>enum PIdx</h4>
+<pre><code>//  Parameter vector + key-frames
+enum PIdx { F1, F2, F3, B1, B2, B3, TRK, AMP, VOICE, ASP, FRIC, FRIC_F, FRIC_BW,
+            NASAL, NZ, RD, TILT, HI, SING,
+            RF1, RF2, RF3, RTRK,      // formants of the vowel this state belongs to (loudness reference)
+            N_P };</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-pv"><span class="ns">wauvio::vocal::v1::</span>struct PV</h4>
+<pre><code>struct PV
+    std::array&lt;float, N_P&gt; v{};
+    float&amp; operator[](int i) { return v[static_cast&lt;size_t&gt;(i)]; }
+    float  operator[](int i) const { return v[static_cast&lt;size_t&gt;(i)]; }
+inline PV lerp_pv(const PV&amp; a, const PV&amp; b, float t)</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-key"><span class="ns">wauvio::vocal::v1::</span>struct Key</h4>
+<pre><code>struct Key { double t; PV p; };</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-keytrack"><span class="ns">wauvio::vocal::v1::</span>class KeyTrack</h4>
+<pre><code>class KeyTrack
+public:
+    std::vector&lt;Key&gt; keys;
+    void push(double t, const PV&amp; p)
+    PV at(double t) const
+    double last_t() const { return keys.empty() ? 0.0 : keys.back().t; }</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-synthnote"><span class="ns">wauvio::vocal::v1::</span>struct SynthNote</h4>
+<pre><code>//  Timed morae
+struct SynthNote
+    double start = 0.0, dur = 0.5;
+    int    midi = 60;
+    float  vel = 0.7f;
+    Style  style;
+    std::vector&lt;Mora&gt; morae;
+    wauvio::music::Articulation art = wauvio::music::Articulation::Sustain;
+    Curve  bend;
+    double glide_from = -1.0;</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-ev"><span class="ns">wauvio::vocal::v1::</span>struct Ev</h4>
+<pre><code>struct Ev
+    Mora m; SurfaceMora sm;
+    double t0 = 0, t1 = 0;          // vowel onset .. end of mora
+    Style st; float vel = 0.7f;
+    wauvio::music::Articulation art = wauvio::music::Articulation::Sustain;
+    Vowel v = Vowel::A;
+    bool devoiced = false;
+    bool first_in_note = false;
+    Surf next_surf = Surf::None;    // for ん place assimilation
+inline std::vector&lt;Ev&gt; build_events(const std::vector&lt;SynthNote&gt;&amp; notes)</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-articulator"><span class="ns">wauvio::vocal::v1::</span>class Articulator</h4>
+<pre><code>//  Articulation: events -&gt; key-frames
+class Articulator
+public:
+    Articulator(const VoiceModel&amp; vm, int sr) : vm_(vm), sr_(sr) {}
+    KeyTrack build(const std::vector&lt;Ev&gt;&amp; evs, double&amp; end_time)</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-tractchain"><span class="ns">wauvio::vocal::v1::</span>struct TractChain</h4>
+<pre><code>// The vocal-tract filter chain. Two instances run in parallel: the real one, and
+// a reference fed with a constant fully-voiced source whose RMS drives a slow
+// loudness normaliser, so loudness does not depend on where harmonics happen to
+// land relative to F1 (vibrato, high notes, vowel changes).
+struct TractChain
+    wauvio::filter::SVFilter r1, r2, r3, q2, q3, u4, u5, u6, sg;
+    float pre_lp = 0.f, tilt_state = 0.f;
+    float q2v = 1, q3v = 1, pre_a = 0, tilt_a = 0, k4 = 1, k5 = 1, k6 = 1, ksg = 1;
+    TractChain()
+    void set(const VoiceModel&amp; vm, const PV&amp; p, float f1, float f2, float f3, int sr)
+    // src: excitation entering the tract; hsrc: voiced-only excitation for the parallel parts
+    float tick(float src, float hsrc, float hi, float sing, int sr, const Tune&amp; tn)</code></pre>
+<h4 id="wauvio-vocal-yune-v1-synth-hpp-wauvio-vocal-v1-voicerenderer"><span class="ns">wauvio::vocal::v1::</span>class VoiceRenderer</h4>
+<pre><code>class VoiceRenderer
+public:
+    VoiceRenderer(const VoiceModel&amp; vm, int sr) : vm_(vm), sr_(sr) {}
+    Buffer render(const KeyTrack&amp; kt, const PitchTrack&amp; pt, double total_sec, uint32_t seed = 0xA17E5u) const</code></pre>
+</section>
+<div class="pager"><a href="vocal-v2.html"><small>Previous</small>v2 — differences from v1</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loudness and mastering · Wauvio Docs</title><meta name="description" content="LUFS metering and loudness mastering.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Loudness and mastering</h1>
+
+<h2>Loudness measurement (<code>loudness.hpp</code>)</h2>
+<p><code>measure_loudness(buf, sr)</code> implements ITU-R BS.1770 / EBU R128-style metering with K-weighting (high shelf +4 dB at 1.68 kHz, then 38 Hz RLB high-pass) and returns <code>LoudnessReport</code>:</p><table><thead><tr><th>Field</th><th>Meaning</th></tr></thead><tbody><tr><td><code>valid</code></td><td>False if shorter than one 400 ms block or fully gated out</td></tr><tr><td><code>integrated_lufs</code></td><td>Gated programme loudness</td></tr><tr><td><code>momentary_max_lufs</code></td><td>Loudest 400 ms</td></tr><tr><td><code>short_term_max_lufs</code></td><td>Loudest 3 s</td></tr><tr><td><code>loudness_range_lu</code></td><td>LRA (10th–95th percentile of gated short-term values)</td></tr><tr><td><code>sample_peak_db</code></td><td>dBFS</td></tr><tr><td><code>true_peak_db</code></td><td>dBTP, 4× oversampled</td></tr></tbody></table>
+<p><code>normalize_loudness(buf, sr, target_lufs, ceiling_dbtp = −1, limit = true)</code> applies gain to reach the target; if the true peak would exceed the ceiling it uses a lookahead limiter (<code>limit = true</code>) or reduces the gain (<code>limit = false</code>). Length is unchanged; the post-processing report is returned.</p>
+<h2>Mastering (<code>master.hpp</code>)</h2>
+<p><code>MasterSettings</code>: <code>preset</code> (<code>MasterPreset { Clean, Warm, Club, Loud, Gentle, LoFi }</code>), <code>target_lufs</code> −14, <code>ceiling_dbtp</code> −1, <code>glue</code> 1 (bus compression amount), <code>saturation</code> 1, <code>width</code> 1, <code>tilt_db</code> 0, <code>bass_mono</code> true. <code>MasterSettings::for_preset(p)</code> sets the preset's target:</p><table><thead><tr><th>Preset</th><th>Target LUFS</th><th>Character (from <code>build_master_chain</code>)</th></tr></thead><tbody><tr><td>Clean</td><td>−14</td><td>22 Hz high-pass, glue compressor, imager</td></tr><tr><td>Warm</td><td>−14</td><td>+1.5 dB low shelf, −1 dB high shelf, tape saturation</td></tr><tr><td>Club</td><td>−9</td><td>Bass lift, presence and air, soft saturation, multiband compression, width 1.12</td></tr><tr><td>Loud</td><td>−8</td><td>Similar to Club with heavier multiband and drive</td></tr><tr><td>Gentle</td><td>−16</td><td>Light air shelf, lower compression ratio</td></tr><tr><td>LoFi</td><td>−16</td><td>60 Hz high-pass, 9.5 kHz low-pass, tape saturation, width 0.85, no bass-mono</td></tr></tbody></table>
+<ul>
+<li><code>build_master_chain(settings)</code> returns the chain up to (not including) the loudness limiter: EQ → optional saturator → optional multiband compressor → glue compressor (RMS detector, 90 Hz detector high-pass) → stereo imager (mono below 120 Hz when <code>bass_mono</code>).</li>
+<li><code>master(buf, sr, settings)</code> masters in place to the target and returns <code>MasterReport</code> (<code>before</code>, <code>after</code>, <code>gain_db</code>, <code>limiter_reduction_db</code>, <code>target_reached</code> within 0.5 LU, <code>iterations</code>).</li>
+<li><code>master_for_genre(name)</code> returns starting settings by genre name, ignoring case, spaces and punctuation (<code>"Drum &amp; Bass"</code>, <code>"drum_and_bass"</code> and <code>"dnb"</code> all work); unknown names yield Clean at −14 LUFS. Targets: classical/ambient −18 (Gentle, reduced glue), jazz/bossa nova −16, blues −15, reggae −14, funk −13, chiptune −12 (Clean), rock −11, touhou −10, metal −9, house/trance −9, techno/dubstep/drum and bass −8 (Club), hardcore/speedcore −7 (Loud).</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-fx-mastering-loudness-hpp"><h3><code>wauvio/fx/mastering/loudness.hpp</code></h3>
+<h4 id="wauvio-fx-mastering-loudness-hpp-wauvio-fx-loudnessreport"><span class="ns">wauvio::fx::</span>struct LoudnessReport</h4>
+<pre><code>struct LoudnessReport
+    bool   valid = false;              ///&lt; false if the audio is shorter than one 400 ms block or entirely gated out
+    double integrated_lufs   = -120.0; ///&lt; gated programme loudness
+    double momentary_max_lufs = -120.0;///&lt; loudest 400 ms
+    double short_term_max_lufs = -120.0;///&lt; loudest 3 s
+    double loudness_range_lu = 0.0;    ///&lt; LRA (10th..95th percentile of gated short-term values)
+    double sample_peak_db    = -120.0; ///&lt; dBFS
+    double true_peak_db      = -120.0; ///&lt; dBTP (4x oversampled)</code></pre>
+<h4 id="wauvio-fx-mastering-loudness-hpp-wauvio-fx-kweighting"><span class="ns">wauvio::fx::</span>class KWeighting</h4>
+<pre><code>/// K-weighting filter (BS.1770): high-shelf (+4 dB @ 1.68 kHz) then RLB high-pass (38 Hz).
+/// Coefficients are derived for any sample rate (same method as libebur128).
+class KWeighting
+public:
+    void prepare(double sr)
+    float tick(float x) noexcept { return s2_.tick(s1_.tick(x)); }
+inline LoudnessReport measure_loudness(const StereoBuffer&amp; buf, int sr = 0)
+/// Bring `buf` to `target_lufs` (integrated). If the true peak would exceed `ceiling_dbtp`
+/// a lookahead limiter is used (limit = true) or the gain is reduced to fit (limit = false).
+/// The buffer keeps its length. Returns the loudness measured after processing.
+inline LoudnessReport normalize_loudness(StereoBuffer&amp; buf, int sr, double target_lufs,
+                                         double ceiling_dbtp = -1.0, bool limit = true)</code></pre>
+</section>
+<section class="file" id="wauvio-fx-mastering-master-hpp"><h3><code>wauvio/fx/mastering/master.hpp</code></h3>
+<h4 id="wauvio-fx-mastering-master-hpp-wauvio-fx-masterpreset"><span class="ns">wauvio::fx::</span>enum class MasterPreset</h4>
+<pre><code>enum class MasterPreset { Clean, Warm, Club, Loud, Gentle, LoFi };</code></pre>
+<h4 id="wauvio-fx-mastering-master-hpp-wauvio-fx-mastersettings"><span class="ns">wauvio::fx::</span>struct MasterSettings</h4>
+<pre><code>struct MasterSettings
+    MasterPreset preset = MasterPreset::Clean;
+    double target_lufs  = -14.0;    ///&lt; integrated loudness to reach
+    double ceiling_dbtp = -1.0;     ///&lt; true-peak ceiling
+    double glue         = 1.0;      ///&lt; 0 = no bus compression .. 1 = preset amount .. 2 = twice as much
+    double saturation   = 1.0;      ///&lt; 0 = off .. 1 = preset amount .. 2 = more
+    double width        = 1.0;      ///&lt; multiplies the preset's stereo width
+    double tilt_db      = 0.0;      ///&lt; + = brighter, - = darker (shelves around 300 Hz / 4 kHz)
+    bool   bass_mono    = true;     ///&lt; keep the lows centred (mono below ~120 Hz)
+    /// Preset defaults, including a sensible loudness target for the style.
+    static MasterSettings for_preset(MasterPreset p)</code></pre>
+<h4 id="wauvio-fx-mastering-master-hpp-wauvio-fx-masterreport"><span class="ns">wauvio::fx::</span>struct MasterReport</h4>
+<pre><code>struct MasterReport
+    LoudnessReport before, after;
+    double gain_db = 0.0;              ///&lt; input gain pushed into the limiter
+    double limiter_reduction_db = 0.0; ///&lt; deepest limiter gain reduction
+    bool   target_reached = false;     ///&lt; within 0.5 LU of the target
+    int    iterations = 0;
+/// Everything up to (not including) the loudness limiter.
+inline Chain build_master_chain(const MasterSettings&amp; s)
+/// Master `buf` in place to the loudness target (buffer length is unchanged).
+inline MasterReport master(StereoBuffer&amp; buf, int sr, const MasterSettings&amp; s)
+/// Starting-point mastering for a genre name (case-, space- and punctuation-insensitive:
+/// "Drum &amp; Bass", "drum_and_bass", "dnb" all work). Unknown names -&gt; Clean at -14 LUFS.
+inline MasterSettings master_for_genre(const std::string&amp; genre)</code></pre>
+</section>
+<div class="pager"><a href="fx-reverb.html"><small>Previous</small>Reverb</a><a class="r" href="fx-mixer.html"><small>Next</small>Mixer and bridges</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

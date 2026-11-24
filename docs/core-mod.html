@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>mod.hpp — LFO and automation · Wauvio Docs</title><meta name="description" content="LFO and automation curves.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>mod.hpp — LFO and automation</h1>
+
+<p>Namespace <code>wauvio::mod</code>.</p>
+<h2>LFO</h2>
+<p>Enums: <code>LFOShape { Sine, Triangle, Square, SampleHold }</code> and <code>LFOTarget { Pitch, Amplitude, FilterCutoff, Pan }</code>. Fields: <code>shape</code>, <code>target</code>, <code>rate_hz</code> (4), <code>depth</code> (0.5), <code>phase_off</code>. <code>tick(sample_rate)</code> returns a value in [-1, 1]; <code>modulate(sample_rate)</code> returns it scaled by <code>depth</code>. <code>SampleHold</code> picks a new random value each phase wrap using a fixed internal seed, so it is deterministic. The <code>target</code> field is a label for the caller: the LFO does not itself modify any other object.</p>
+<h2>Automation</h2>
+<p><code>AutoPoint {time_sec, value}</code>. <code>auto_eval(points, t)</code> linearly interpolates a time-sorted list (clamping before the first and after the last point; empty list returns 0).</p>
+<table><thead><tr><th>Function</th><th>Effect</th></tr></thead><tbody><tr><td><code>apply_volume_automation(buf, points, sr)</code></td><td>Multiplies a mono or stereo buffer by the interpolated curve.</td></tr><tr><td><code>apply_filter_automation(src, cutoff_points, Q, mode, sr)</code></td><td>Runs an <code>SVFilter</code> whose cutoff follows the curve (floored at 20 Hz), recomputing coefficients every sample. Returns a new buffer.</td></tr></tbody></table><h2>Full API listing</h2><section class="file" id="wauvio-core-mod-hpp"><h3><code>wauvio/core/mod.hpp</code></h3>
+<h4 id="wauvio-core-mod-hpp-wauvio-mod-lfoshape"><span class="ns">wauvio::mod::</span>enum class LFOShape</h4>
+<pre><code>//  §12  LFO SYSTEM
+//  Can target: pitch (freq multiplier), amplitude, filter cutoff, pan.
+enum class LFOShape { Sine, Triangle, Square, SampleHold };</code></pre>
+<h4 id="wauvio-core-mod-hpp-wauvio-mod-lfotarget"><span class="ns">wauvio::mod::</span>enum class LFOTarget</h4>
+<pre><code>enum class LFOTarget { Pitch, Amplitude, FilterCutoff, Pan };</code></pre>
+<h4 id="wauvio-core-mod-hpp-wauvio-mod-lfo"><span class="ns">wauvio::mod::</span>class LFO</h4>
+<pre><code>class LFO
+public:
+    LFOShape  shape     = LFOShape::Sine;
+    LFOTarget target    = LFOTarget::Amplitude;
+    double    rate_hz   = 4.0;    ///&lt; Oscillation frequency
+    double    depth     = 0.5;    ///&lt; Modulation depth [0,1]
+    double    phase_off = 0.0;    ///&lt; Phase offset (radians)
+    LFO() = default;
+    LFO(LFOShape sh, LFOTarget tgt, double rate, double depth_)
+        : shape(sh), target(tgt), rate_hz(rate), depth(depth_) {}
+    /// Returns the current LFO value in [-1, 1].
+    float tick(int sample_rate) noexcept
+    /// Returns depth-scaled modulation value.
+    float modulate(int sample_rate) noexcept
+    void reset() noexcept { phase_ = 0.0; }</code></pre>
+<h4 id="wauvio-core-mod-hpp-wauvio-mod-autopoint"><span class="ns">wauvio::mod::</span>struct AutoPoint</h4>
+<pre><code>//  §22  AUTOMATION SYSTEM
+//  Parameter automation curves applied to buffer data (volume, filter, pitch).
+/// An automation point: time + value.
+struct AutoPoint { double time_sec; float value; };
+/// Compute the linearly interpolated value at `t` from a sorted point list.
+inline float auto_eval(const std::vector&lt;AutoPoint&gt;&amp; pts, double t) noexcept
+/// Apply a volume automation curve to a buffer in-place.
+inline void apply_volume_automation(Buffer&amp; buf,
+                                     const std::vector&lt;AutoPoint&gt;&amp; pts,
+                                     int sample_rate = 0)
+
+/// Apply a volume automation curve to a stereo buffer in-place.
+inline void apply_volume_automation(StereoBuffer&amp; buf,
+                                     const std::vector&lt;AutoPoint&gt;&amp; pts,
+                                     int sample_rate = 0)
+
+/// Apply an SVF cutoff automation - filter moves from point to point.
+inline Buffer apply_filter_automation(const Buffer&amp; src,
+                                       const std::vector&lt;AutoPoint&gt;&amp; cutoff_pts,
+                                       double Q,
+                                       wauvio::filter::SVFilter::Mode mode = wauvio::filter::SVFilter::Mode::LowPass,
+                                       int sample_rate = 0)
+</code></pre>
+</section>
+<div class="pager"><a href="core-env.html"><small>Previous</small>env.hpp — envelopes</a><a class="r" href="core-filter.html"><small>Next</small>filter.hpp — filters and EQ</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

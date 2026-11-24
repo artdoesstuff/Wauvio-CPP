@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lyric input (kana, romaji, phonemes) · Wauvio Docs</title><meta name="description" content="Kana, romaji and phoneme lyric parsing.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>Lyric input (kana, romaji, phonemes)</h1>
+
+<p>Header <code>yune-v3/japanese.hpp</code>. Lyrics are parsed into <code>Mora</code>s by <code>parse_lyric()</code>: UTF-8 kana first; plain ASCII is read as romaji; braces switch to phoneme mode.</p>
+<h2>Accepted notations</h2><table><thead><tr><th>Notation</th><th>Example</th><th>Notes</th></tr></thead><tbody><tr><td>Hiragana / katakana</td><td><code>さくら</code>, <code>サクラ</code></td><td>Katakana is folded to hiragana; <code>ー</code> continues the previous vowel; small ゃゅょ and small vowels form yo-on and foreign sounds (ふぁ, てぃ, つぁ …); <code>っ</code> geminate; <code>ん</code> moraic nasal</td></tr><tr><td>Romaji</td><td><code>ka ki kya shi chi tsu fu n xtu -</code></td><td>Hepburn/Kunrei style; doubled consonants give a geminate; write <code>n'</code> or <code>nn</code> for ん before a vowel/y</td></tr><tr><td>Phonemes (v2+)</td><td><code>{k a n a}</code>, <code>{N}</code>, <code>{Q}</code>, <code>{ng a}</code>, <code>{v a}</code></td><td>Space-separated romaji/IPA-like tokens in braces. Consonant + vowel tokens join. Capital <code>N</code> = ん, <code>Q</code> = っ. IPA symbols accepted (ɕ ʃ tɕ dʑ ʑ ɸ ɾ ɯ ŋ ɲ ç ɴ ː)</td></tr><tr><td>Per-phoneme overrides</td><td><code>{k*1.6 a@2 n@0.5}</code></td><td><code>*x</code> consonant strength, <code>@w</code> relative share of the note’s time</td></tr><tr><td>Time weights (v2+)</td><td><code>さ[0.7]ん[0.3]</code></td><td>Relative time per segment</td></tr><tr><td>Events</td><td><code>&lt;laugh&gt;</code></td><td>Lyric tags expanded into notes; see <a href="vocal-v3-expression.html">Events</a></td></tr></tbody></table>
+<h2>ParseOptions</h2>
+<ul>
+<li><code>merge_long_vowels</code> (true) — “おう/えい/ああ” inside one lyric become a single long vowel.</li>
+<li><code>cute</code> (false, v2+) — baby-talk softening: s/z/t/d/n/r palatalise.</li>
+<li><code>particles</code> (false, v3) — a trailing は/へ is read as わ/え. Independent of the flag, a trailing <code>^</code> marks a single は/へ as a particle anywhere (<code>は^</code>, <code>へ^</code>).</li>
+</ul>
+<h2>Model types</h2>
+<ul>
+<li><code>Vowel</code> A I U E O; <code>Cons</code> (kana rows): None, K, G, S, Z, T, D, N, H, P, B, M, R, Y, W.</li>
+<li><code>Mora</code> — <code>c</code>, <code>v</code>, <code>palatal</code>, <code>geminate</code>, <code>nasal</code>, <code>longv</code>, <code>force</code> (foreign overrides F, TI, DI, TS, J, CH, SH, S, Z, V), <code>labial</code>, <code>ng</code>, <code>weight</code>, <code>cons_scale</code>, <code>text</code>.</li>
+<li><code>Surf</code> — the realised consonant classes the synthesiser builds: K G T D P B TS CH J S SH Z H HY FU N NY M R Y W GEM MORAIC_N NG V (v3 adds <code>V</code> = [v] for ヴ). <code>surface(mora)</code> resolves the allophone; <code>is_voiced</code>, <code>is_obstruent_unvoiced</code>.</li>
+<li><code>decode_lyric_bytes()</code> — decodes MIDI karaoke lyric bytes (UTF-8, ASCII or a minimal Shift-JIS kana subset).</li>
+<li><code>parse_kana</code>, <code>parse_romaji</code>, <code>parse_phonemes</code>, <code>parse_lyric</code>.</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-vocal-yune-v3-japanese-hpp"><h3><code>wauvio/vocal/yune-v3/japanese.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-japanese-hpp-wauvio-vocal-v3-vowel"><span class="ns">wauvio::vocal::v3::</span>enum class Vowel</h4>
+<pre><code>enum class Vowel : uint8_t { A = 0, I = 1, U = 2, E = 3, O = 4 };</code></pre>
+<h4 id="wauvio-vocal-yune-v3-japanese-hpp-wauvio-vocal-v3-cons"><span class="ns">wauvio::vocal::v3::</span>enum class Cons</h4>
+<pre><code>// Underlying (phonological) consonant of a mora: the kana row.
+enum class Cons : uint8_t
+    None, K, G, S, Z, T, D, N, H, P, B, M, R, Y, W</code></pre>
+<h4 id="wauvio-vocal-yune-v3-japanese-hpp-wauvio-vocal-v3-mora"><span class="ns">wauvio::vocal::v3::</span>struct Mora</h4>
+<pre><code>struct Mora
+    Cons  c        = Cons::None;
+    Vowel v        = Vowel::A;
+    bool  palatal  = false;   // yo-on: きゃ しゅ ちょ ...
+    bool  geminate = false;   // っ
+    bool  nasal    = false;   // ん (moraic nasal)
+    bool  longv    = false;   // ー or merged long vowel: continue previous vowel
+    // Foreign-sound overrides (ふぁ てぃ つぁ ...): force a particular surface
+    // consonant in place of the one implied by (c, v).
+    enum class Force : uint8_t { None, F, TI, DI, TS, J, CH, SH, S, Z, V } force = Force::None;
+    bool  labial   = false;   // V2: w-glide between consonant and vowel (くぁ ぐぁ ...)
+    bool  ng       = false;   // V2: velar nasal [ŋ] (phoneme input "ng" / ガ行 nasalisation)
+    float weight   = 1.f;     // V2: relative share of the note's time (lyric syntax さ[0.7]ん[0.3], phoneme "@0.7")
+    float cons_scale = 1.f;   // V2: consonant strength multiplier (phoneme "*1.5")
+    std::string text;         // source text of the mora (UTF-8), for diagnostics</code></pre>
+<h4 id="wauvio-vocal-yune-v3-japanese-hpp-wauvio-vocal-v3-surf"><span class="ns">wauvio::vocal::v3::</span>enum class Surf</h4>
+<pre><code>// Realised consonant classes (what the synthesizer actually builds).
+enum class Surf : uint8_t
+    None,
+    K, G,            // velar stops (palatalised before i / yo-on)
+    T, D,            // alveolar stops
+    P, B,            // labial stops
+    TS, CH, J,       // affricates: ts, tɕ, dʑ
+    S, SH, Z,        // fricatives: s, ɕ, z
+    H, HY, FU,       // h, ç, ɸ
+    N, NY, M,        // nasals
+    R,               // alveolar tap ɾ
+    Y, W,            // glides j, ɰᵝ
+    GEM,             // sokuon
+    MORAIC_N,        // ん
+    NG,              // [ŋ] velar nasal (V2: ガ行 nasalisation, phoneme input)
+    V                // V3: [v] voiced labiodental fricative (ヴ, "v" in romaji/phonemes)
+inline bool is_voiced(Surf s)
+inline bool is_obstruent_unvoiced(Surf s)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-japanese-hpp-wauvio-vocal-v3-surfacemora"><span class="ns">wauvio::vocal::v3::</span>struct SurfaceMora</h4>
+<pre><code>struct SurfaceMora
+    Surf surf    = Surf::None;
+    bool palatal = false;   // palatalised release / j-glide between C and V
+    bool labial  = false;   // w-glide between C and V (V2)
+// Resolve the allophone of a mora (independent of neighbours).
+inline SurfaceMora surface(const Mora&amp; m)
+    inline bool next_cp(const std::string&amp; s, size_t&amp; i, uint32_t&amp; cp)
+    inline std::string cp_to_utf8(uint32_t cp)
+    inline bool valid_utf8(const std::string&amp; s)
+    // Katakana -&gt; hiragana (ァ..ヶ -&gt; ぁ..ゖ); ー stays.
+    inline uint32_t to_hira(uint32_t cp)
+    struct Row { Cons c; bool pal; };
+    // Basic consonant-vowel table keyed by hiragana code point -&gt; (consonant, vowel).
+    struct Cv { Cons c; Vowel v; };
+    inline const std::map&lt;uint32_t, Cv&gt;&amp; cv_table()
+    inline bool is_small_ya(uint32_t cp, Vowel&amp; v)
+    inline bool is_small_vowel(uint32_t cp, Vowel&amp; v)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-japanese-hpp-wauvio-vocal-v3-parseoptions"><span class="ns">wauvio::vocal::v3::</span>struct ParseOptions</h4>
+<pre><code>struct ParseOptions
+    // "おう" / "えい" / "ああ" ... inside ONE lyric string become a single long
+    // vowel (ō, ē, aa) instead of two separate morae.
+    bool merge_long_vowels = true;
+    // V2: "cute speech" (baby-talk style) softening: s/z/t/d/n/r palatalise (さ -&gt; しゃ-like).
+    bool cute = false;
+    // V3: grammatical particles. When true, は / へ at the END of a lyric string are read as わ / え
+    // ("わたしは" -&gt; wa-ta-shi-wa). Independent of this flag, a trailing '^' marks a single は / へ as a
+    // particle anywhere ("は^", "へ^"), and "は" stays /ha/ otherwise.
+    bool particles = false;
+// Kana (hiragana or katakana) -&gt; morae. Whitespace, '|', ',' and '/' are ignored.
+inline std::vector&lt;Mora&gt; parse_kana(const std::string&amp; text, const ParseOptions&amp; opt = {})
+// Hepburn/Kunrei-style romaji -&gt; morae.  "ka ki kya shi chi tsu fu n xtu(=っ) -"
+// Doubled consonants (kka, ssa, tta) produce a geminate; "n" before a vowel/y
+// must be written "n'" or "nn".
+inline std::vector&lt;Mora&gt; parse_romaji(const std::string&amp; text, const ParseOptions&amp; opt = {})
+// Space-separated phonemes in a romaji/IPA-like notation, written between braces in a lyric:
+//   {k a n a}  {ky a}  {sh i}  {ts u}  {N}  {Q}  {-}  {ng a}  {v a}
+// A consonant token followed by a vowel token is joined (k + a = ka, n + a = na). Write the
+// moraic nasal ん as capital N, and the sokuon っ as Q. IPA symbols are accepted:
+// ɕ ʃ tɕ dʑ ʑ ɸ ɾ ɯ ŋ ɲ ç ɴ ː. Per-phoneme overrides follow the token:
+//   *1.5  consonant strength x1.5     @0.7  share of the note's time (relative weight)
+//   e.g. {k*1.6 a@2 n@0.5}
+inline std::vector&lt;Mora&gt; parse_phonemes(const std::string&amp; text, const ParseOptions&amp; opt = {})
+inline std::vector&lt;Mora&gt; parse_lyric_plain(const std::string&amp; text, const ParseOptions&amp; opt)
+// Parse a lyric string: UTF-8 kana first; if it is plain ASCII, treat as romaji.
+// V2 syntax: `{k a n a}` phoneme mode, and `さ[0.7]ん[0.3]` relative time weights per segment.
+inline std::vector&lt;Mora&gt; parse_lyric(const std::string&amp; text, const ParseOptions&amp; opt = {})
+// Minimal Shift-JIS kana decoder for MIDI karaoke files (kana, ー, ASCII only).
+// Returns UTF-8, or empty if the bytes are not decodable as UTF-8/ASCII/SJIS-kana.
+inline std::string decode_lyric_bytes(const std::vector&lt;uint8_t&gt;&amp; b)</code></pre>
+</section>
+<div class="pager"><a href="vocal-v3-style.html"><small>Previous</small>v3 — Style, curves and lanes</a><a class="r" href="vocal-v3-expression.html"><small>Next</small>v3 — Expression, ornaments and events</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

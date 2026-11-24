@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>filter.hpp — filters and EQ · Wauvio Docs</title><meta name="description" content="SVFilter, one-pole filters, biquad and parametric EQ.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>filter.hpp — filters and EQ</h1>
+
+<p>Namespace <code>wauvio::filter</code>.</p>
+<h2>SVFilter</h2>
+<p>Topology-preserving-transform state-variable filter. <code>Mode { LowPass, HighPass, BandPass }</code>, fields <code>mode</code>, <code>cutoff</code> (Hz), <code>Q</code> (0.707 default; higher resonates). After changing <code>cutoff</code> or <code>Q</code> call <code>update_coeffs(sample_rate)</code> (or use <code>set_params(fc, q, sr)</code>). <code>tick(x, sample_rate)</code> processes one sample; <code>process(buf)</code> a buffer; <code>reset()</code> clears state.</p>
+<h2>One-pole filters</h2>
+<p><code>LowPassFilter</code> and <code>HighPassFilter</code> are legacy 1-pole filters kept for compatibility; constructed with a cutoff, adjustable with <code>set_cutoff</code>, used via <code>tick</code> / <code>process</code>.</p>
+<h2>BiquadEQ and ParametricEQ</h2>
+<p><code>BiquadEQ</code> is one band using RBJ Audio-EQ-Cookbook formulas: <code>Type { LowShelf, HighShelf, Peak }</code>, <code>freq_hz</code>, <code>gain_db</code>, <code>Q</code>. <code>ParametricEQ</code> bundles three: <code>low_shelf</code> (200 Hz), <code>peak</code> (1 kHz) and <code>high_shelf</code> (6 kHz), all at 0 dB so it starts transparent. It processes mono or stereo buffers.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-core-filter-hpp"><h3><code>wauvio/core/filter.hpp</code></h3>
+<h4 id="wauvio-core-filter-hpp-wauvio-filter-svfilter"><span class="ns">wauvio::filter::</span>class SVFilter</h4>
+<pre><code>//  §13  STATE VARIABLE FILTER (SVF)
+//  Topology-preserving TPT form (Vadim Zavalishin) - no pre-warping needed.
+//  Provides simultaneous LP, HP, and BP outputs.
+//  Q &gt; 0.5: resonance; Q = 0.707: Butterworth; Q → ∞: self-oscillation.
+class SVFilter
+public:
+    enum class Mode { LowPass, HighPass, BandPass };
+    Mode   mode     = Mode::LowPass;
+    double cutoff   = 1000.0;  ///&lt; Hz
+    double Q        = 0.707;   ///&lt; Resonance (0.5–30 typical range)
+    SVFilter() = default;
+    SVFilter(Mode m, double fc, double q = 0.707) : mode(m), cutoff(fc), Q(q) {}
+    void set_params(double fc, double q, int sample_rate = 0)
+    /// Process one sample.  Call update_coeffs() after changing params.
+    float tick(float x, int sample_rate) noexcept
+    void process(Buffer&amp; buf, int sample_rate = 0)
+    void reset() noexcept { s1_ = s2_ = 0.0f; }
+    void update_coeffs(int sample_rate) noexcept</code></pre>
+<h4 id="wauvio-core-filter-hpp-wauvio-filter-lowpassfilter"><span class="ns">wauvio::filter::</span>class LowPassFilter</h4>
+<pre><code>//  §14  LEGACY 1-POLE FILTERS  (kept for compatibility with existing modules)
+class LowPassFilter
+public:
+    explicit LowPassFilter(double cutoff_hz = 1000.0, int sample_rate = 0)
+    void set_cutoff(double fc, int sr = 0)
+    float tick(float x) noexcept { z1_ += alpha_ * (x - z1_); return z1_; }
+    void  process(Buffer&amp; b) noexcept { for (auto&amp; s : b) s = tick(s); }
+    void  reset()  noexcept { z1_ = 0.0f; }</code></pre>
+<h4 id="wauvio-core-filter-hpp-wauvio-filter-highpassfilter"><span class="ns">wauvio::filter::</span>class HighPassFilter</h4>
+<pre><code>class HighPassFilter
+public:
+    explicit HighPassFilter(double cutoff_hz = 200.0, int sample_rate = 0)
+    void set_cutoff(double fc, int sr = 0)
+    float tick(float x) noexcept
+    void process(Buffer&amp; b) noexcept { for (auto&amp; s : b) s = tick(s); }
+    void reset()  noexcept { xp_ = yp_ = 0.0f; }</code></pre>
+<h4 id="wauvio-core-filter-hpp-wauvio-filter-biquadeq"><span class="ns">wauvio::filter::</span>class BiquadEQ</h4>
+<pre><code>//  §14b  PARAMETRIC EQ
+//  Three independent biquad bands: low shelf, peak/notch, high shelf.
+//  Each band is independently bypassable.  Uses Robert Bristow-Johnson's
+//  Audio EQ Cookbook formulae.
+/// Single biquad EQ band.
+class BiquadEQ
+public:
+    enum class Type { LowShelf, HighShelf, Peak };
+    Type   type      = Type::Peak;
+    double freq_hz   = 1000.0;  ///&lt; Centre / corner frequency
+    double gain_db   = 0.0;     ///&lt; Boost/cut in dB (Peak); shelf gain for shelves
+    double Q         = 0.707;   ///&lt; Bandwidth / slope control
+    BiquadEQ() = default;
+    BiquadEQ(Type t, double f, double g, double q = 0.707)
+        : type(t), freq_hz(f), gain_db(g), Q(q) {}
+    float tick(float x, int sample_rate) noexcept
+    void process(Buffer&amp; buf, int sample_rate = 0)
+    void reset() noexcept { x1_ = x2_ = y1_ = y2_ = 0.0f; }
+    void update_coeffs(int sample_rate) noexcept</code></pre>
+<h4 id="wauvio-core-filter-hpp-wauvio-filter-parametriceq"><span class="ns">wauvio::filter::</span>class ParametricEQ</h4>
+<pre><code>/// Three-band parametric EQ: low shelf + peak + high shelf.
+/// Each band can be bypassed independently by setting gain_db = 0.
+class ParametricEQ
+public:
+    BiquadEQ low_shelf  { BiquadEQ::Type::LowShelf,  200.0,  0.0, 0.707 };
+    BiquadEQ peak       { BiquadEQ::Type::Peak,      1000.0,  0.0, 0.707 };
+    BiquadEQ high_shelf { BiquadEQ::Type::HighShelf, 6000.0,  0.0, 0.707 };
+    float tick(float x, int sample_rate) noexcept
+    void process(Buffer&amp; buf, int sample_rate = 0)
+    void process(StereoBuffer&amp; buf, int sample_rate = 0)
+    void reset() noexcept</code></pre>
+</section>
+<div class="pager"><a href="core-mod.html"><small>Previous</small>mod.hpp — LFO and automation</a><a class="r" href="core-synth.html"><small>Next</small>synth.hpp — FM and polyphony</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

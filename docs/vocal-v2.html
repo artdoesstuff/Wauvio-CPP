@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>v2 — differences from v1 · Wauvio Docs</title><meta name="description" content="What v2 changes relative to v1.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v2 — differences from v1</h1>
+
+<p>Namespace <code>wauvio::vocal::v2</code>, header <code>vocal/v2.hpp</code>, sources in <code>vocal/yune-v2/</code>. v2 is a direct upgrade of <a href="vocal-v1.html">v1</a>: the same synthesiser and the same <code>Singer</code>/<code>NoteRef</code> shape, extended with voice profiles and a layer of expression controls. It is <strong>not</strong> the current engine: <a href="vocal.html">v3</a> reworks the articulation and adds streaming and ensembles, and is the one to use for new work. This page lists only what v2 changes relative to v1.</p>
+<div class="note"><strong>Reading guide.</strong> The concepts v2 introduced (Style expression fields, personas, lanes, events, <code>.wvc</code> voicebanks) are documented in full on the v3 pages, since v3 keeps them. Links below point there; each item is marked as introduced in v2.</div>
+<h2>Compatible with v1</h2>
+<ul>
+<li>Same <code>Singer</code> score-building API (<code>note</code>, <code>note_sec</code>, <code>note_at</code>, <code>rest</code>, <code>style()</code>, <code>parse_options()</code>, <code>seed</code>, <code>phrase_pitch_curve</code>, MIDI loading, <code>render</code>/<code>render_stereo</code>/<code>save</code>) and the same <code>NoteRef</code> setters.</li>
+<li>All new <code>Style</code> fields default to “off”, so a default <code>Style</code> renders as v1 does.</li>
+<li>Same limits as v1: a <code>NoteRef</code> is valid only until the next note is added (notes are in a <code>std::vector</code>), and there is no streaming render.</li>
+</ul>
+<h2>Added in v2</h2>
+<h3>Voices</h3>
+<ul>
+<li><strong>Voice profiles.</strong> v1 has one hard-wired voice; v2 adds <code>VoiceProfile</code> (model, default look, lyric defaults, personas, recommended <code>natural</code> strength), <code>Singer::set_profile()</code> and a <code>Singer(VoiceProfile)</code> constructor. <code>Singer()</code> defaults to Yune. <code>SingerInstrument</code> gains a <code>profile</code> member (replacing v1’s <code>voice_model</code>). See <a href="vocal-v3-voices.html">Voices, personas and voicebanks</a>.</li>
+<li><strong>Five built-in voices:</strong> <code>yune</code>, <code>yune-old</code>, <code>reiha</code>, <code>koharu</code>, <code>itsuki</code> (v3 later adds <code>mio</code> and <code>akari</code>).</li>
+<li><strong><code>.wvc</code> voicebanks</strong> — export/load voices as text (<code>save_profile</code>, <code>load_profile</code>, <code>make_voice</code>); shipped in <code>yune-v2/voicebanks/</code>.</li>
+<li><strong>Personas</strong> — named, bounded variations of a voice’s look (<code>PersonaLibrary</code>, <code>Singer::persona</code>, <code>persona_blend</code>, <code>persona_lane</code>, per-note <code>persona</code>/<code>persona_morph</code>).</li>
+<li><strong>VoiceModel changes:</strong> <code>name</code> becomes a <code>std::string</code>, and the engine gains per-voice gains in a <code>Tune</code> struct (<code>out_scale</code>, <code>asp_gain</code>, <code>fric_gain</code>, <code>upper_gain</code>, <code>sing_gain</code>, <code>air_gain</code>, <code>pre_gain</code>, <code>f23_gain</code>), so voices tune independently and rendering is thread-safe.</li>
+</ul>
+<h3>Expression</h3>
+<ul>
+<li><strong>New <code>Style</code> fields</strong> (<a href="vocal-v3-style.html">Style</a>): <code>formant_shift</code>, <code>mouth_open</code>, <code>growl</code>, <code>tremor</code>/<code>tremor_rate</code>, <code>fry</code>, <code>air</code>, <code>reg</code>/<code>reg_auto</code>, <code>glottal_onset</code>, <code>pitch_loud</code>, <code>pitch_snap</code>, <code>undershoot</code>, <code>porta_interval</code>, <code>exit_fall_min</code>, <code>bidakuon</code>, <code>n_nasalize</code>, <code>mumble</code>, <code>transition_speed</code>, <code>vv_glide</code>, <code>devoice_max</code>, <code>mora_weighting</code>, <code>glottal_final</code>, <code>grit</code>, <code>natural</code>. In v2, <code>n_nasalize</code> and <code>mora_weighting</code> default to 0 (off).</li>
+<li><strong>Automation lanes</strong> (<code>lane</code>, per note and Singer-wide) over named channels, plus <code>phrase_arc</code>.</li>
+<li><strong>NoteRef additions:</strong> <code>growl</code>, <code>tremor</code>, <code>fry</code>, <code>breathy</code>, <code>falsetto</code>, <code>formant_shift</code>, <code>mouth_open</code>, <code>hard_onset</code>, <code>ornament</code>, <code>lane</code>, <code>persona</code>, <code>persona_morph</code>.</li>
+<li><strong>Humanisation:</strong> <code>humanize()</code>, <code>natural()</code>, <code>auto_expression()</code> (<a href="vocal-v3-expression.html">Expression</a>).</li>
+<li><strong>Ornaments:</strong> fall, doit, shakuri, scoop_in, kobushi, turn, trill, mordent.</li>
+<li><strong>Mic model</strong> (<code>mic.hpp</code>): proximity, air, de-esser, mouth noise.</li>
+</ul>
+<h3>Speech and events</h3>
+<ul>
+<li><code>Singer::say()</code> — spoken utterances with intonation contours (statement, question, flat, trail, emphatic, ne, yo, ka, no). v2 has no pitch-accent argument.</li>
+<li><strong>Events</strong> (<code>event()</code> and <code>&lt;tag&gt;</code> lyrics): laugh, giggle, sob, hum, shout, kyaa and interjections.</li>
+</ul>
+<h3>Lyrics</h3>
+<ul>
+<li><strong>Phoneme input</strong> <code>{k a n a}</code> with <code>*strength</code> and <code>@weight</code> overrides, time weights <code>さ[0.7]ん[0.3]</code>, the <code>cute</code> parse option, and the [ŋ] sound (<code>ng</code>) (<a href="vocal-lyrics.html">Lyric input</a>).</li>
+</ul>
+<h3>Diagnostics and tools</h3>
+<ul>
+<li><code>Singer::diagnostics()</code>.</li>
+<li>New <code>tools/voice_tool.cpp</code> and <code>tools/listen.cpp</code>; <code>sing_score</code> gains the score commands for the new features (<a href="vocal-tools.html">Tools</a>).</li>
+</ul>
+<h2>Still not in v2 (added by v3)</h2>
+<p>Streaming render (<code>VoiceStream</code>), <code>Ensemble</code>, <code>transposed()</code>/<code>doubled()</code>, consonant locus equations and coarticulation, Tokyo pitch accent in <code>say()</code>, the <code>particles</code> option, the [v] consonant, the new vibrato controls (<code>vib_am</code>, <code>vib_shape</code>, <code>vib_accel</code>), the FX chain, extra voices, and a stable <code>NoteRef</code> (<code>std::deque</code> storage). See <a href="vocal.html">the overview</a> for the full comparison.</p>
+<h2>API listing (files new or changed in v2)</h2>
+<p class="muted">Declarations for the v2 headers that did not exist in v1, plus the changed <code>singer.hpp</code>. Unchanged-in-spirit files (<code>japanese</code>, <code>pitch</code>, <code>synth</code>) are in the <a href="vocal-v1.html">v1 listing</a> and the v3 pages.</p>
+<section class="file" id="wauvio-vocal-yune-v2-singer-hpp"><h3><code>wauvio/vocal/yune-v2/singer.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v2-singer-hpp-wauvio-vocal-v2-free-functions-constants-and-aliases"><span class="ns">wauvio::vocal::v2::</span>Free functions, constants and aliases</h4>
+<pre><code>class Singer;</code></pre>
+<h4 id="wauvio-vocal-yune-v2-singer-hpp-wauvio-vocal-v2-noteref"><span class="ns">wauvio::vocal::v2::</span>class NoteRef</h4>
+<pre><code>// Returned by Singer::note(); chain setters to tweak that one note.
+// Valid only until the next call that adds a note to the same Singer.
+class NoteRef
+public:
+    NoteRef(SynthNote&amp; n, const PersonaLibrary* lib) : n_(n), lib_(lib) {}
+    NoteRef&amp; velocity(float v)             { n_.vel = v; return *this; }
+    NoteRef&amp; articulation(wauvio::music::Articulation a) { n_.art = a; return *this; }
+    NoteRef&amp; vibrato(float depth_st, float rate_hz = -1.f, float delay_s = -1.f, float fade_s = -1.f)
+    NoteRef&amp; no_vibrato()                  { n_.style.vibrato_depth = 0.f; return *this; }
+    NoteRef&amp; portamento(float seconds)     { n_.style.portamento = seconds; return *this; }
+    NoteRef&amp; glide_from(double midi)       { n_.glide_from = midi; return *this; }
+    NoteRef&amp; bend(const Curve&amp; semitones_vs_seconds) { n_.bend = semitones_vs_seconds; return *this; }
+    NoteRef&amp; overshoot(float o)            { n_.style.overshoot = o; return *this; }
+    NoteRef&amp; scoop(float semitones)        { n_.style.scoop = semitones; return *this; }
+    Style&amp;   style()                       { return n_.style; }
+    // V2: expression and automation. Names: volume, brightness, breathiness, tension, formant,
+    // mouth, growl, tremor, fry, air, register, plus "pitch" (semitones). Curve time = seconds
+    // from the note start.
+    NoteRef&amp; lane(const std::string&amp; name, const Curve&amp; c)
+    // Persona for this note only (moves its look toward the persona by `amount`).
+    NoteRef&amp; persona(const std::string&amp; name, float amount = 1.f) { if (lib_) apply_persona(*lib_, n_.style, name, amount); return *this; }
+    // Morph this note's look toward a persona over time. amount: 0..1 vs seconds from note start.
+    // Only channel-capable fields move inside a note (see persona_morph_lanes).
+    NoteRef&amp; persona_morph(const std::string&amp; name, const Curve&amp; amount)
+    NoteRef&amp; growl(float v)         { n_.style.growl = v; return *this; }
+    NoteRef&amp; tremor(float v, float rate_hz = -1.f) { n_.style.tremor = v; if (rate_hz &gt; 0) n_.style.tremor_rate = rate_hz; return *this; }
+    NoteRef&amp; fry(float v)           { n_.style.fry = v; return *this; }
+    NoteRef&amp; breathy(float v)       { n_.style.breathiness = v; return *this; }
+    NoteRef&amp; falsetto(float v)      { n_.style.reg = v; return *this; }
+    NoteRef&amp; formant_shift(float st){ n_.style.formant_shift = st; return *this; }
+    NoteRef&amp; mouth_open(float v)    { n_.style.mouth_open = v; return *this; }
+    NoteRef&amp; hard_onset(float v)    { n_.style.glottal_onset = v; return *this; }
+    // Pitch ornament: fall, doit, shakuri, scoop_in, kobushi, turn, mordent, trill. depth scales size.
+    NoteRef&amp; ornament(const std::string&amp; name, float depth = 1.f)</code></pre>
+<h4 id="wauvio-vocal-yune-v2-singer-hpp-wauvio-vocal-v2-singer"><span class="ns">wauvio::vocal::v2::</span>class Singer</h4>
+<pre><code>class Singer
+public:
+    Singer() { set_profile(voice_yune()); }          // Yune is the default voice
+    explicit Singer(const VoiceProfile&amp; p) { set_profile(p); }
+    // Switch character: model, default look, lyric defaults and personas all come from the profile.
+    // Call before adding notes (the default look applies to notes added afterwards).
+    Singer&amp; set_profile(const VoiceProfile&amp; p) { profile_ = p; voice_ = p.model; style_ = p.style; popt_ = p.parse; return *this; }
+    const VoiceProfile&amp; profile() const { return profile_; }
+    const PersonaLibrary&amp; personas() const { return profile_.personas; }
+    // Engine-level override of the tract model only (keeps the profile's personas and look).
+    Singer&amp; set_voice(const VoiceModel&amp; v) { voice_ = v; return *this; }
+    const VoiceModel&amp; voice() const { return voice_; }
+    Singer&amp; set_tempo(double bpm, int ticks_per_quarter = 480) { bpm_ = bpm; ppq_ = ticks_per_quarter; return *this; }
+    Style&amp; style() { return style_; }                 // defaults applied to notes added afterwards
+    const Style&amp; style() const { return style_; }
+    ParseOptions&amp; parse_options() { return popt_; }
+    Singer&amp; phrase_pitch_curve(const Curve&amp; semitones_vs_seconds) { phrase_curve_ = semitones_vs_seconds; return *this; }
+    Singer&amp; seed(uint32_t s) { seed_ = s; return *this; }
+    // V2 personas. These move the Singer's default look for notes added afterwards.
+    Singer&amp; persona(const std::string&amp; name, float amount = 1.f) { apply_persona(profile_.personas, style_, name, amount); return *this; }
+    Singer&amp; persona_blend(const std::string&amp; a, const std::string&amp; b, float t, float amount = 1.f) { apply_persona_blend(profile_.personas, style_, a, b, t, amount); return *this; }
+    // Persona automation over the whole song: amount (0..1) vs absolute seconds, relative to the
+    // current default look. Drive verse/chorus changes without re-annotating notes.
+    Singer&amp; persona_lane(const std::string&amp; name, const Curve&amp; amount)
+    // V2: small deterministic imperfections in timing, length and tuning. Different seeds = different takes.
+    Singer&amp; humanize(double timing_s = 0.012, double pitch_st = 0.05, double length = 0.03, double bias_s = 0.0, uint32_t take = 1)
+    // V2: one call for a more living voice. amount 0..1 sets the `natural` voice control (jitter, wander, irregular
+    // vibrato) AND per-note human imperfections (timing, tuning, entry error, length, phrase breath pressure).
+    // `take` picks a different performance. amount 0 turns it off.
+    Singer&amp; natural(float amount = -1.f, uint32_t take = 1) {      // amount &lt; 0: the voice's recommended strength
+    // V2: rule-based expression (vibrato shape, phrase-end, dynamics). Only fills fields left at defaults.
+    Singer&amp; auto_expression(bool on = true, double phrase_gap = 0.30) { auto_.on = on; auto_.phrase_gap = phrase_gap; return *this; }
+    AutoExpr&amp; auto_expression_options() { return auto_; }
+    // V2: volume shape over [t0,t1] seconds: "arch", "crescendo", "decrescendo", "swell".
+    Singer&amp; phrase_arc(const std::string&amp; kind, double t0, double t1, float depth = 1.f)
+    // V2 speech: one utterance at `base_midi`. kind: statement, question, flat, trail, emphatic, ne, yo, ka, no.
+    // Intonation moves pitch only; vibrato and scoop are off, morae are weighted by type.
+    NoteRef say(const std::string&amp; text, double seconds, const std::string&amp; kind = "statement", int base_midi = 64, float velocity = 0.7f)
+    // Problems worth knowing about before rendering (empty = none).
+    std::vector&lt;std::string&gt; diagnostics() const
+    // V2: Singer-wide automation lane (absolute seconds). See NoteRef::lane for names.
+    Singer&amp; lane(const std::string&amp; name, const Curve&amp; c)
+    NoteRef note(int midi, int ticks, const std::string&amp; lyric, float velocity = 0.75f)
+    Singer&amp; rest(int ticks) { cursor_ += ticks_to_sec(ticks); return *this; }
+    NoteRef note_sec(int midi, double seconds, const std::string&amp; lyric, float velocity = 0.75f)
+    Singer&amp; rest_sec(double seconds) { cursor_ += seconds; return *this; }
+    // V2 events at the cursor: laugh, giggle, sob, hum, shout, kyaa and
+    // interjections (ah, eh, un, fuun, uun, eeto, ano, waa, hya, hee, eee, maa). Same as the lyric
+    // tag, e.g. note_sec(69, 1.2, "&lt;laugh&gt;"). `variant` and extra "key=value" go in the tag.
+    NoteRef event(const std::string&amp; kind, int midi, double seconds, float intensity = 0.6f, const std::string&amp; variant = "")
+    // Absolute placement; the cursor moves to the end of the note.
+    NoteRef note_at(double start_sec, int midi, double seconds, const std::string&amp; lyric, float velocity = 0.75f)
+    void clear() { notes_.clear(); cursor_ = 0.0; phrase_curve_.clear(); lanes_.clear(); }
+    size_t size() const { return notes_.size(); }
+    const std::vector&lt;SynthNote&gt;&amp; notes() const { return notes_; }
+    double cursor() const { return cursor_; }
+    double ticks_to_sec(int ticks) const { return static_cast&lt;double&gt;(ticks) / ppq_ * 60.0 / bpm_; }
+    using TapFn = std::function&lt;void(const Buffer&amp;, int)&gt;;
+    static TapFn&amp; render_tap() { static TapFn f; return f; }
+    Buffer render(int sample_rate = 0) const
+    Buffer render_impl(int sample_rate) const
+    StereoBuffer render_stereo(int sample_rate = 0) const
+    void save(const std::string&amp; path, int sample_rate = 0) const
+    // Reads notes (and Lyric/Text meta events) from one track of a parsed MIDI
+    // file. track &lt; 0 picks the first track that contains lyrics. Notes without a
+    // lyric continue the previous vowel (melisma). Lyrics may be UTF-8 or
+    // Shift-JIS kana. Returns the number of notes added.
+    size_t load_midi_track(const midi::ParsedMidiFile&amp; f, int track = -1)
+    size_t load_midi_file(const std::string&amp; path, int track = -1)</code></pre>
+<h4 id="wauvio-vocal-yune-v2-singer-hpp-wauvio-vocal-v2-singerinstrument"><span class="ns">wauvio::vocal::v2::</span>class SingerInstrument</h4>
+<pre><code>// Drop-in for Arrangement / MidiMusic parts: renders ONE note with a fixed lyric
+// (no coarticulation with neighbouring notes; use Singer for phrases).
+class SingerInstrument : public wauvio::music::Instrument
+public:
+    std::string lyric = "あ";
+    Style style;
+    VoiceProfile profile = voice_yune();   // which character sings (default Yune)
+    SingerInstrument() { name = "Japanese Female Singer"; }
+    explicit SingerInstrument(std::string lyr) : lyric(std::move(lyr)) { name = "Japanese Female Singer"; }
+    StereoBuffer render_note(const wauvio::music::Note&amp; n, int sample_rate = 0) const override
+    std::vector&lt;wauvio::music::Articulation&gt; supported_articulations() const override</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v2-persona-hpp"><h3><code>wauvio/vocal/yune-v2/persona.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v2-persona-hpp-wauvio-vocal-v2-free-functions-constants-and-aliases"><span class="ns">wauvio::vocal::v2::</span>Free functions, constants and aliases</h4>
+<pre><code>// A persona is a named, absolute "look" for the expressive Style fields. A voice stays itself:
+// the identity (VoiceModel: tract proportions, vowel centres, source family) is not touched,
+// and persona values are kept inside a bounded envelope.
+// Blending lerps the expressive fields only; volume, velocity response, compression and
+// devoicing are never changed by a persona.
+inline const std::vector&lt;float Style::*&gt;&amp; expressive_fields()
+// lerp on the expressive fields. Vibrato fields use -1 as "voice default": if only one side
+// is explicit the explicit value wins, so blending never produces a negative depth by accident.
+inline Style blend_expressive(const Style&amp; a, const Style&amp; b, float t)</code></pre>
+<h4 id="wauvio-vocal-yune-v2-persona-hpp-wauvio-vocal-v2-persona"><span class="ns">wauvio::vocal::v2::</span>struct Persona</h4>
+<pre><code>struct Persona
+    std::string name;
+    Style look;     // absolute values for the expressive fields</code></pre>
+<h4 id="wauvio-vocal-yune-v2-persona-hpp-wauvio-vocal-v2-personalibrary"><span class="ns">wauvio::vocal::v2::</span>class PersonaLibrary</h4>
+<pre><code>class PersonaLibrary
+public:
+    PersonaLibrary() = default;     // empty; each voice (voices/voice-*.hpp) supplies its own personas
+    void add(const std::string&amp; name, const Style&amp; look) { map_[name] = Persona{ name, look }; }
+    const Persona* find(const std::string&amp; name) const { auto it = map_.find(name); return it == map_.end() ? nullptr : &amp;it-&gt;second; }
+    std::vector&lt;std::string&gt; names() const { std::vector&lt;std::string&gt; v; for (auto&amp; kv : map_) v.push_back(kv.first); return v; }
+    // Text format (one persona per block):
+    //   persona sweet
+    //   brightness 0.78      # any Style field name, others stay at the Normal look
+    // Returns the number of personas read.
+    size_t load(const std::string&amp; path)
+    bool save(const std::string&amp; name, const std::string&amp; path, bool append = false) const
+// Moves the expressive fields of `s` toward persona `name` by `amount` (0..1). Unknown names
+// are ignored (returns false).
+inline bool apply_persona(const PersonaLibrary&amp; lib, Style&amp; s, const std::string&amp; name, float amount = 1.f)
+// Blend of two personas (t = 0 -&gt; a, 1 -&gt; b), then moved toward by `amount`.
+inline bool apply_persona_blend(const PersonaLibrary&amp; lib, Style&amp; s, const std::string&amp; a, const std::string&amp; b, float t, float amount = 1.f)
+// Lanes that morph a note's current look toward persona `name` over time. `amount` is a
+// curve of 0..1 vs seconds. Only fields that have a render-level channel can move inside a
+// note: brightness, breathiness, tension, volume, growl, fry, air, register, formant shift,
+// mouth opening. Values are converted into the channel's own units.
+inline std::vector&lt;Lane&gt; persona_morph_lanes(const Style&amp; cur, const Persona&amp; p, const Curve&amp; amount, double t_end, double t_begin = 0.0)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v2-expr-hpp"><h3><code>wauvio/vocal/yune-v2/expr.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v2-expr-hpp-wauvio-vocal-v2-ch"><span class="ns">wauvio::vocal::v2::</span>enum class Ch</h4>
+<pre><code>// Render-level expression channels. They are additive around a neutral zero, so an
+// all-zero track is a no-op (the V1 render path is taken untouched).
+enum class Ch : int
+    Volume, Brightness, Breath, Tension, FormantShift, MouthOpen,
+    Growl, Tremor, Fry, Air, Register, RegAuto, Natural, N
+constexpr int N_CH = static_cast&lt;int&gt;(Ch::N);</code></pre>
+<h4 id="wauvio-vocal-yune-v2-expr-hpp-wauvio-vocal-v2-lane"><span class="ns">wauvio::vocal::v2::</span>struct Lane</h4>
+<pre><code>// An automation lane: a Curve on one channel. Note lanes use seconds from the note
+// start; Singer-wide lanes use absolute seconds.
+struct Lane { Ch ch = Ch::Volume; Curve curve; };
+inline bool channel_from_name(const std::string&amp; n, Ch&amp; out)</code></pre>
+<h4 id="wauvio-vocal-yune-v2-expr-hpp-wauvio-vocal-v2-expr"><span class="ns">wauvio::vocal::v2::</span>struct Expr</h4>
+<pre><code>struct Expr
+    std::array&lt;float, N_CH&gt; v{};
+    float tremor_rate = 9.f;
+    float operator[](Ch c) const { return v[static_cast&lt;size_t&gt;(c)]; }</code></pre>
+<h4 id="wauvio-vocal-yune-v2-expr-hpp-wauvio-vocal-v2-exprtrack"><span class="ns">wauvio::vocal::v2::</span>class ExprTrack</h4>
+<pre><code>class ExprTrack
+public:
+    std::vector&lt;Expr&gt; data;     // one sample per ms (PITCH_RATE)
+    bool any = false;
+    Expr at(double t) const</code></pre>
+<h4 id="wauvio-vocal-yune-v2-expr-hpp-wauvio-vocal-v2-exprnote"><span class="ns">wauvio::vocal::v2::</span>struct ExprNote</h4>
+<pre><code>struct ExprNote
+    double start = 0.0, end = 0.0;
+    Style style;
+    std::vector&lt;Lane&gt; lanes;
+inline double expr_smooth(double x) { x = x &lt; 0 ? 0 : (x &gt; 1 ? 1 : x); return x * x * (3 - 2 * x); }
+// Builds the expression track from per-note Style fields, per-note lanes and global lanes.
+inline ExprTrack build_expr_track(const std::vector&lt;ExprNote&gt;&amp; notes, const std::vector&lt;Lane&gt;&amp; global,
+                                  double total_seconds)
+</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v2-expression-hpp"><h3><code>wauvio/vocal/yune-v2/expression.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v2-expression-hpp-wauvio-vocal-v2-free-functions-constants-and-aliases"><span class="ns">wauvio::vocal::v2::</span>Free functions, constants and aliases</h4>
+<pre><code>//   fall, doit, shakuri, scoop_in, kobushi, turn, trill, mordent
+// `depth` scales the size (1 = typical). Unknown names return an empty curve.
+inline Curve make_ornament(const std::string&amp; name, double dur, float depth = 1.f)</code></pre>
+<h4 id="wauvio-vocal-yune-v2-expression-hpp-wauvio-vocal-v2-humanize"><span class="ns">wauvio::vocal::v2::</span>struct Humanize</h4>
+<pre><code>struct Humanize
+    bool   on = false;
+    double timing = 0.0;    // s, spread of note-start offsets
+    double bias = 0.0;      // s, constant push (+ late / lazy, - ahead)
+    double length = 0.0;    // fraction, spread of note-length changes
+    double pitch = 0.0;     // semitones, spread of per-note tuning offsets
+    double tone = 0.0;      // 0..1: per-note random brightness / breathiness / mouth-opening (no two notes sound identical)
+    double entry = 0.0;     // semitones, spread of the pitch error a note starts with (corrected within ~90 ms)
+    double pressure = 0.0;  // 0..1: breath pressure sags over a phrase (slightly quieter and flatter toward its end)
+    double phrase_gap = 0.30; // s of silence that starts a new phrase
+    uint32_t seed = 1;      // different seed = a different "take"
+    inline float hash01(uint32_t x) { x ^= x &gt;&gt; 16; x *= 0x7feb352dU; x ^= x &gt;&gt; 15; x *= 0x846ca68bU; x ^= x &gt;&gt; 16; return static_cast&lt;float&gt;(x &amp; 0xFFFFFF) / 16777216.f; }
+    inline float sym3(uint32_t seed, uint32_t i, uint32_t k) {      // ~triangular in [-1,1]
+inline void apply_humanize(std::vector&lt;SynthNote&gt;&amp; ns, const Humanize&amp; h)
+// Breath pressure over phrases: a gentle level and pitch sag that resets at each new phrase.
+inline void apply_pressure(std::vector&lt;SynthNote&gt;&amp; ns, const Humanize&amp; h)</code></pre>
+<h4 id="wauvio-vocal-yune-v2-expression-hpp-wauvio-vocal-v2-autoexpr"><span class="ns">wauvio::vocal::v2::</span>struct AutoExpr</h4>
+<pre><code>struct AutoExpr
+    bool on = false;
+    bool vibrato = true;      // onset/fade/depth follow note length
+    bool dynamics = true;     // louder toward the phrase's high point
+    bool phrase_end = true;   // longer fall + release on a phrase's last note
+    bool articulation = true; // crisper consonants on fast notes
+    double phrase_gap = 0.30; // s of silence that starts a new phrase
+inline void apply_auto_expression(std::vector&lt;SynthNote&gt;&amp; ns, const AutoExpr&amp; a, const VoiceModel&amp; voice)
+inline double phrase_arc_shape(const std::string&amp; kind, double u)
+inline double speech_contour(const std::string&amp; kind, double u)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v2-events-hpp"><h3><code>wauvio/vocal/yune-v2/events.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v2-events-hpp-wauvio-vocal-v2-eventspec"><span class="ns">wauvio::vocal::v2::</span>struct EventSpec</h4>
+<pre><code>// Non-lexical vocal events (laughs, giggles, sobs, shouts, hums, interjections).
+// They are written as a lyric tag, e.g. `&lt;laugh&gt;`, `&lt;laugh:he,intensity=0.8&gt;`,
+// `&lt;sob&gt;`, `&lt;hmm?&gt;`, `&lt;kyaa&gt;`, and are expanded at render time into ordinary
+// notes with pitch contours and expression lanes, so they
+// are generated by the same voice, not spelled out as syllables.
+//   &lt;kind[:variant][,intensity=0..1][,pitch=semitones][,key=value...]&gt;
+struct EventSpec
+    std::string kind, variant;
+    std::map&lt;std::string, float&gt; p;
+    float get(const std::string&amp; k, float d) const { auto it = p.find(k); return it == p.end() ? d : it-&gt;second; }
+inline bool is_event_tag(const std::string&amp; s) { return s.size() &gt;= 3 &amp;&amp; s.front() == '&lt;' &amp;&amp; s.back() == '&gt;'; }
+inline bool parse_event_tag(const std::string&amp; tag, EventSpec&amp; out)
+    struct Rng
+        uint32_t s;
+        float next() { s ^= s &lt;&lt; 13; s ^= s &gt;&gt; 17; s ^= s &lt;&lt; 5; return static_cast&lt;float&gt;(s &amp; 0xFFFFFF) / 16777216.f; }
+        float sym() { return next() * 2.f - 1.f; }
+    // normalised (0..1) contour -&gt; seconds, offset by the fractional part of the pitch
+    inline Curve scale_contour(const std::vector&lt;std::pair&lt;double, double&gt;&gt;&amp; c, double dur, double off)
+    inline SynthNote make(const SynthNote&amp; par, double t0, double dur, double midi_f, const std::string&amp; lyric, float vel,
+                          const std::vector&lt;std::pair&lt;double, double&gt;&gt;&amp; contour)
+
+    inline void glottal_end(SynthNote&amp; n) {           // abrupt stop with a touch of creak (あっ!)
+    struct Interj { const char* lyric; std::vector&lt;std::pair&lt;double, double&gt;&gt; contour; float vel, breath; bool glottal; float mouth, tension; };
+    inline const std::map&lt;std::string, Interj&gt;&amp; interjections()
+inline std::vector&lt;std::string&gt; event_kinds()
+// Expands one event note into ordinary notes. Returns an empty list for an unknown kind.
+inline std::vector&lt;SynthNote&gt; expand_event(const SynthNote&amp; par, const EventSpec&amp; sp, uint32_t seed)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v2-mic-hpp"><h3><code>wauvio/vocal/yune-v2/mic.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v2-mic-hpp-wauvio-vocal-v2-micmodel"><span class="ns">wauvio::vocal::v2::</span>struct MicModel</h4>
+<pre><code>// Optional "recording" stage: proximity warmth, de-esser, air band, mouth/lip noise.
+// Not part of the voice (Singer::render never calls it); apply to the rendered Buffer.
+            struct MicModel
+                float proximity   = 0.f;   // 0..1: low-shelf warmth (+0..5 dB below ~200 Hz), as when singing close
+                float air         = 0.f;   // 0..1: high shelf above ~9 kHz (+0..4 dB)
+                float de_ess      = 0.f;   // 0..1: dynamic cut of 5-9 kHz when sibilants spike
+                float mouth_noise = 0.f;   // 0..1: tiny deterministic lip/tongue clicks in quiet passages
+                uint32_t seed = 7;
+                struct Bq { double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
+                    double run(double x) { const double y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; } };
+                inline Bq shelf(bool high, double fc, double gain_db, double sr) {          // RBJ shelf, S = 1
+                inline Bq bandpass(double fc, double Q, double sr)
+            inline void apply_mic(Buffer&amp; b, int sr, const MicModel&amp; m)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v2-voices-profile-hpp"><h3><code>wauvio/vocal/yune-v2/voices/profile.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v2-voices-profile-hpp-wauvio-vocal-v2-voiceprofile"><span class="ns">wauvio::vocal::v2::</span>struct VoiceProfile</h4>
+<pre><code>// A VoiceProfile is everything that makes one *character* what it is, kept out of the engine:
+//   model     - tract proportions, vowel centres, source family, range, vibrato defaults (VoiceModel)
+//   style     - the character's default look/behaviour (Style; the "Normal" persona)
+//   parse     - lyric parsing defaults
+//   personas  - the bounded variations this character can take (soft, sweet, ...)
+//   natural_amount - recommended Singer::natural() strength
+// Voices live in voices/voice-&lt;id&gt;.hpp (C++, typed). The same voice can be exported/loaded as a text voicebank (.wvc); the .wvc files live in voicebanks/.
+            struct VoiceProfile
+                std::string id = "voice";            // short key: "yune"
+                std::string display = "Voice";       // human name
+                std::string language = "ja";
+                std::string notes;                   // one line of character description
+                VoiceModel model;
+                Style style;                         // the character's default (Normal) look
+                ParseOptions parse;
+                PersonaLibrary personas;
+                float natural_amount = 0.6f;         // default strength for Singer::natural()
+                inline const std::vector&lt;std::string&gt;&amp; style_names()
+                struct MF { const char* name; float VoiceModel::* p; };
+                inline const std::vector&lt;MF&gt;&amp; model_floats()
+                struct TF { const char* name; float Tune::* p; };
+                inline const std::vector&lt;TF&gt;&amp; tune_floats()
+                inline std::string fl(float x) {       // shortest text that reads back as the same float
+                inline const char* VOW = "aiueo";
+            inline std::string profile_to_text(const VoiceProfile&amp; p)
+            inline bool save_profile(const VoiceProfile&amp; p, const std::string&amp; path)
+            // Parses profile text onto `out` (start from a copy of an existing voice to override a few values).
+            // Returns false and sets *err on a malformed line; unknown keys are an error too, so typos are caught.
+            inline bool profile_from_text(const std::string&amp; text, VoiceProfile&amp; out, std::string* err = nullptr)
+            // Voicebank files use the .wvc extension.
+            inline constexpr const char* VOICEBANK_EXT = ".wvc";
+            inline bool is_voicebank_path(const std::string&amp; s)
+            inline bool load_profile(const std::string&amp; path, VoiceProfile&amp; out, std::string* err = nullptr)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v2-voices-voices-hpp"><h3><code>wauvio/vocal/yune-v2/voices/voices.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v2-voices-voices-hpp-free-functions-constants-and-aliases">Free functions, constants and aliases</h4>
+<pre><code>// Registry of the built-in voices. To add a voice: write voices/voice-&lt;id&gt;.hpp (copy voice-template.md's checklist),
+// include it here and add one line to builtin_voices().
+            inline const std::vector&lt;std::pair&lt;std::string, std::function&lt;VoiceProfile()&gt;&gt;&gt;&amp; builtin_voices()
+            inline std::vector&lt;std::string&gt; voice_ids() { std::vector&lt;std::string&gt; o; for (auto&amp; kv : builtin_voices()) o.push_back(kv.first); return o; }
+            // "yune" -&gt; built-in voice; anything else is read as a .wvc file path. Returns false (and *err) if neither works.
+            inline bool make_voice(const std::string&amp; id_or_path, VoiceProfile&amp; out, std::string* err = nullptr)</code></pre>
+</section><p class="muted">Voice definition headers: <code>voice-itsuki.hpp</code>, <code>voice-koharu.hpp</code>, <code>voice-reiha.hpp</code>, <code>voice-yune-old.hpp</code>, <code>voice-yune.hpp</code>.</p>
+<div class="pager"><a href="vocal-tools.html"><small>Previous</small>Vocal tools</a><a class="r" href="vocal-v1.html"><small>Next</small>v1 — the original singer</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

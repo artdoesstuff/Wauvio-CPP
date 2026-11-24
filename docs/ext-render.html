@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rendering and WAV output · Wauvio Docs</title><meta name="description" content="RenderOptions and render().">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Music layer (wauvio/ext)</div><h1>Rendering and WAV output</h1>
+
+<p>Header <code>wauvio/ext/core/render.hpp</code>, namespace <code>wauvio</code>.</p>
+<h2>RenderOptions</h2><table><thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>sample_rate</code></td><td>44100</td><td>Output rate written to the file</td></tr><tr><td><code>channels</code></td><td>2</td><td>Channel count</td></tr><tr><td><code>bit_depth</code></td><td>16</td><td>16, 24 or 32 (32 is IEEE float). Other values throw <code>std::runtime_error</code></td></tr><tr><td><code>normalize</code>, <code>normalize_peak</code></td><td>true, 0.95</td><td>Peak-normalise the final mix</td></tr><tr><td><code>dither</code></td><td><code>DitherType::None</code></td><td><code>None</code> or <code>Triangular</code></td></tr><tr><td><code>render_tail_sec</code></td><td>0</td><td>Silence appended so effect tails are not cut off</td></tr><tr><td><code>loop_count</code></td><td>1</td><td>Repeat the rendered audio N times</td></tr><tr><td><code>interpolation</code></td><td>Linear</td><td>Sample-playback interpolation</td></tr><tr><td><code>worker_threads</code></td><td>0</td><td>0 = auto-resolve worker count</td></tr><tr><td><code>deterministic_seed_enabled</code>, <code>seed</code></td><td>false, 0</td><td>Seed dither noise for reproducible output</td></tr></tbody></table>
+<h2>Functions</h2>
+<ul>
+<li><code>apply_render_options(buf, opts)</code> — tail, then loop, then normalise, then clamp.</li>
+<li><code>render(StereoBuffer, path, opts)</code> and <code>render(Arrangement, path, opts)</code> — apply options and write a WAV.</li>
+<li><code>music::render_to_buffer(arrangement, opts)</code> — returns the processed buffer without writing a file.</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-ext-core-render-hpp"><h3><code>wauvio/ext/core/render.hpp</code></h3>
+<h4 id="wauvio-ext-core-render-hpp-wauvio-dithertype"><span class="ns">wauvio::</span>enum class DitherType</h4>
+<pre><code>enum class DitherType { None, Triangular };</code></pre>
+<h4 id="wauvio-ext-core-render-hpp-wauvio-renderoptions"><span class="ns">wauvio::</span>struct RenderOptions</h4>
+<pre><code>struct RenderOptions
+    int    sample_rate      = 44100;
+    int    channels         = 2;
+    int    bit_depth        = 16;
+    bool   normalize        = true;
+    float  normalize_peak   = 0.95f;
+    DitherType dither       = DitherType::None;
+    double render_tail_sec  = 0.0;
+    int    loop_count       = 1;
+    wauvio::music::InterpolationQuality interpolation = wauvio::music::InterpolationQuality::Linear;
+    unsigned worker_threads = 0;
+    bool     deterministic_seed_enabled = false;
+    uint64_t seed = 0;
+    inline unsigned resolve_worker_count(unsigned requested)
+    inline void write_u32le(std::vector&lt;unsigned char&gt;&amp; out, uint32_t v)
+    inline void write_u16le(std::vector&lt;unsigned char&gt;&amp; out, uint16_t v)
+    inline float dither_sample(float s, DitherType dither, std::mt19937&amp; rng)
+    inline void write_wav_custom(const StereoBuffer&amp; buf, const std::string&amp; path, int sample_rate,
+                                  int bit_depth, DitherType dither, uint64_t seed, bool use_seed)
+
+inline void apply_render_options(StereoBuffer&amp; buf, const RenderOptions&amp; opts)
+inline void render(const StereoBuffer&amp; buf_in, const std::string&amp; path, const RenderOptions&amp; opts = RenderOptions())
+    inline StereoBuffer render_to_buffer(const Arrangement&amp; arr, const RenderOptions&amp; opts = RenderOptions())
+inline void render(const wauvio::music::Arrangement&amp; arr, const std::string&amp; path, const RenderOptions&amp; opts = RenderOptions())</code></pre>
+</section>
+<div class="pager"><a href="ext-sampling.html"><small>Previous</small>Sampling</a><a class="r" href="ext-genre.html"><small>Next</small>Genre system</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Parameter dictionary · Wauvio Docs</title><meta name="description" content="Shared preset parameters with ranges.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">SFX engine (wauvio/sfx)</div><h1>Parameter dictionary</h1>
+
+<p>Presets draw their parameters from a shared dictionary (<code>param_dictionary()</code>, <code>param(name, default)</code>, <code>params_from({...})</code>), so the same name means the same thing across the catalog. A <code>ParamSpec</code> holds <code>name</code>, <code>description</code>, <code>unit</code>, <code>def</code>, <code>min</code>, <code>max</code> and <code>integer</code>. Presets may override the default (e.g. <code>"duration=2"</code>) but keep the dictionary’s range. <code>ParamSet</code> stores the values for an effect (<code>get</code>, <code>set</code>, <code>try_set</code>, <code>reset</code>, <code>names</code>).</p><table><thead><tr><th>Name</th><th>Description</th><th>Unit</th><th>Default</th><th>Min</th><th>Max</th><th>Integer</th></tr></thead><tbody><tr><td><code>bits</code></td><td>Bit depth used by digital degradation (lower is rougher).</td><td>bits</td><td>6</td><td>1</td><td>16</td><td></td></tr><tr><td><code>body</code></td><td>Strength of the main body layer.</td><td>0..1</td><td>0.8</td><td>0</td><td>1</td><td></td></tr><tr><td><code>brightness</code></td><td>Spectral brightness: filter ceilings and high-frequency content.</td><td>0..1</td><td>0.6</td><td>0</td><td>1</td><td></td></tr><tr><td><code>chord</code></td><td>Chord type used for tonal content (see chord_names()).</td><td>index</td><td>0</td><td>0</td><td>10</td><td>yes</td></tr><tr><td><code>decay</code></td><td>Decay length of the resonant or percussive part, from short to long.</td><td>0..1</td><td>0.5</td><td>0</td><td>1</td><td></td></tr><tr><td><code>density</code></td><td>Event or grain density, from sparse to dense.</td><td>0..1</td><td>0.5</td><td>0</td><td>1</td><td></td></tr><tr><td><code>depth</code></td><td>Modulation or gating depth.</td><td>0..1</td><td>0.7</td><td>0</td><td>1</td><td></td></tr><tr><td><code>duration</code></td><td>Nominal length of the effect (the tail, if any, is appended after it).</td><td>s</td><td>2</td><td>0.05</td><td>60</td><td></td></tr><tr><td><code>intensity</code></td><td>Overall aggressiveness: drive, resonance, modulation strength.</td><td>0..1</td><td>0.6</td><td>0</td><td>1</td><td></td></tr><tr><td><code>pitch</code></td><td>Root note of the effect.</td><td>midi</td><td>60</td><td>12</td><td>108</td><td></td></tr><tr><td><code>range</code></td><td>Size of the pitch or frequency movement.</td><td>semitones</td><td>24</td><td>0</td><td>72</td><td></td></tr><tr><td><code>rate</code></td><td>Modulation, retrigger, flutter or attractor-evolution rate.</td><td>Hz</td><td>8</td><td>0.1</td><td>1000</td><td></td></tr><tr><td><code>scale</code></td><td>Scale used for tonal content (see scale_names()).</td><td>index</td><td>1</td><td>0</td><td>10</td><td>yes</td></tr><tr><td><code>spread</code></td><td>Detune, inharmonicity or cluster width.</td><td>0..1</td><td>0.5</td><td>0</td><td>1</td><td></td></tr><tr><td><code>steps</code></td><td>Number of steps or notes.</td><td>count</td><td>8</td><td>2</td><td>32</td><td>yes</td></tr><tr><td><code>sub</code></td><td>Strength of the sub-bass layer.</td><td>0..1</td><td>0.6</td><td>0</td><td>1</td><td></td></tr><tr><td><code>subdivision</code></td><td>Length of one rhythmic step in beats (0.25 = sixteenth note).</td><td>beats</td><td>0.25</td><td>0.0625</td><td>4</td><td></td></tr><tr><td><code>swing</code></td><td>Delay applied to every second rhythmic step, as a fraction of a step.</td><td>0..0.5</td><td>0</td><td>0</td><td>0.5</td><td></td></tr><tr><td><code>tail</code></td><td>Seconds of synthetic tail appended after the duration.</td><td>s</td><td>0</td><td>0</td><td>20</td><td></td></tr><tr><td><code>transient</code></td><td>Strength of the attack transient.</td><td>0..1</td><td>0.7</td><td>0</td><td>1</td><td></td></tr><tr><td><code>width</code></td><td>Stereo width, from mono to fully decorrelated.</td><td>0..1</td><td>0.6</td><td>0</td><td>1</td><td></td></tr></tbody></table><h2>Full API listing</h2><section class="file" id="wauvio-sfx-core-sfx-params-hpp"><h3><code>wauvio/sfx/core/sfx_params.hpp</code></h3>
+<h4 id="wauvio-sfx-core-sfx-params-hpp-wauvio-sfx-paramspec"><span class="ns">wauvio::sfx::</span>struct ParamSpec</h4>
+<pre><code>struct ParamSpec
+    std::string name;
+    std::string description;
+    std::string unit;
+    double def = 0.0, min = 0.0, max = 1.0;
+    bool   integer = false;
+inline const std::map&lt;std::string, ParamSpec&gt;&amp; param_dictionary()
+inline ParamSpec param(const std::string&amp; name, double def)</code></pre>
+<h4 id="wauvio-sfx-core-sfx-params-hpp-wauvio-sfx-paramset"><span class="ns">wauvio::sfx::</span>class ParamSet</h4>
+<pre><code>class ParamSet
+public:
+    ParamSet() = default;
+    explicit ParamSet(std::vector&lt;ParamSpec&gt; specs) : specs_(std::move(specs)) { for (auto&amp; s : specs_) values_.push_back(s.def); }
+    bool has(const std::string&amp; name) const { return index(name) &gt;= 0; }
+    double get(const std::string&amp; name) const { const int i = index(name); if (i &lt; 0) throw Error("no parameter '" + name + "'"); return values_[static_cast&lt;size_t&gt;(i)]; }
+    void set(const std::string&amp; name, double v)
+    bool try_set(const std::string&amp; name, double v, std::string* why = nullptr) { try { set(name, v); return true; } catch (const Error&amp; e) { if (why) *why = e.what(); return false; } }
+    void reset() { for (size_t i = 0; i &lt; specs_.size(); ++i) values_[i] = specs_[i].def; }
+    const std::vector&lt;ParamSpec&gt;&amp; specs() const noexcept { return specs_; }
+    std::string names() const { std::string s; for (auto&amp; p : specs_) { if (!s.empty()) s += ", "; s += p.name; } return s; }</code></pre>
+</section>
+<div class="pager"><a href="sfx-presets.html"><small>Previous</small>Presets, Effect and Layered</a><a class="r" href="sfx-tool.html"><small>Next</small>wauvio_sfx_tool (command line)</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

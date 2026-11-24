@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>io.hpp — WAV export and playback · Wauvio Docs</title><meta name="description" content="save_wav, play, play_async and PlaybackHandle.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>io.hpp — WAV export and playback</h1>
+
+<p>Namespace <code>wauvio</code>.</p>
+<h2>WAV export</h2>
+<p><code>save_wav(buf, path, sr)</code> writes 16-bit PCM mono; <code>save_wav_stereo(buf, path, sr)</code> writes interleaved stereo. Both throw <code>std::runtime_error</code> if the file cannot be opened. Samples are clamped to [-1, 1] on conversion.</p>
+<h2>Playback</h2>
+<ul>
+<li><code>play(buf, sr)</code> — blocking; mono or stereo.</li>
+<li><code>play_async(buf, sr)</code> → <code>PlaybackHandle</code> — returns immediately; audio runs on a worker thread. Discarding the handle does <strong>not</strong> stop playback.</li>
+<li><code>stop_all_playback()</code> stops every active stream.</li>
+</ul>
+<h3>PlaybackHandle</h3>
+<p>Copyable, thread-safe: <code>stop()</code>, <code>pause()</code>, <code>resume()</code>, <code>is_playing()</code>, <code>set_volume(v)</code> (0–2), <code>position_seconds()</code>, <code>duration_seconds()</code>, <code>seek(s)</code> (best-effort between chunks), <code>wait()</code>, and <code>explicit operator bool</code>.</p>
+<h3>Platform back ends</h3>
+<table><thead><tr><th>Platform</th><th>Mechanism</th></tr></thead><tbody><tr><td>Windows</td><td>WaveOut with two alternating buffers of 4096 frames (link <code>winmm.lib</code>).</td></tr><tr><td>Linux</td><td>PCM (s16le) is streamed in 4096-frame chunks through <code>popen</code> to a shell pipeline that tries <code>ffmpeg … -f alsa default</code>, then <code>ffmpeg … -f pulse default</code>, then <code>ffplay</code>. FFmpeg must therefore be installed for sound. WAV export has no such requirement.</td></tr></tbody></table>
+<p>Internals (<code>wauvio::detail::PlaybackInstance</code> and <code>PlaybackRuntime</code>) are an implementation detail: a singleton registry holds weak references to running streams.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-core-io-hpp"><h3><code>wauvio/core/io.hpp</code></h3>
+<h4 id="wauvio-core-io-hpp-wauvio-free-functions-constants-and-aliases"><span class="ns">wauvio::</span>Free functions, constants and aliases</h4>
+<pre><code>//  §28  WAV FILE EXPORT  (mono and stereo)
+    /// Write a standard 16-bit PCM WAV header and samples to an open file.
+    /// `channels` must be 1 (mono) or 2 (stereo).
+    inline void write_wav_impl(FILE* f, const std::vector&lt;int16_t&gt;&amp; pcm,
+                                int sample_rate, int channels)
+
+/// Save a mono buffer as a 16-bit PCM WAV file.
+inline void save_wav(const Buffer&amp; buf, const std::string&amp; path, int sample_rate = 0)
+/// Save a stereo buffer as an interleaved L/R 16-bit PCM WAV file.
+inline void save_wav_stereo(const StereoBuffer&amp; buf, const std::string&amp; path,
+                             int sample_rate = 0)
+</code></pre>
+<h4 id="wauvio-core-io-hpp-wauvio-detail-playbackinstance"><span class="ns">wauvio::detail::</span>class PlaybackInstance</h4>
+<pre><code>   //  §29  PLAYBACK  v1.3.3
+       //  Internal state of one playback stream
+       class PlaybackInstance
+       public:
+           // Construct with a pre-converted PCM buffer + metadata.
+           // The PCM data is moved in - this instance owns it exclusively.
+           PlaybackInstance(std::vector&lt;int16_t&gt; pcm, int sample_rate, int channels)
+               : pcm_(std::move(pcm))
+               , sample_rate_(sample_rate)
+               , channels_(channels)
+               , stopped_(false)
+               , paused_(false)
+               , playing_(true)
+               , volume_(1.0f)
+{}
+           // Non-copyable, non-movable (shared_ptr is the indirection layer).
+           PlaybackInstance(const PlaybackInstance&amp;)            = delete;
+           PlaybackInstance&amp; operator=(const PlaybackInstance&amp;) = delete;
+           void stop()
+           void pause()
+           void resume()
+           bool is_playing() const noexcept
+           void set_volume(float v) noexcept
+           float volume() const noexcept
+           /// Returns the current playback position in seconds.
+           double position_seconds() const noexcept
+           /// Total duration of the buffer in seconds.
+           double duration_seconds() const noexcept
+           /// Seek to `seconds` into the buffer.  Clamped to [0, duration].
+           void seek(double seconds) noexcept
+           // Called once from the worker thread spawned by PlaybackRuntime.
+           void run()</code></pre>
+<h4 id="wauvio-core-io-hpp-wauvio-detail-playbackruntime"><span class="ns">wauvio::detail::</span>class PlaybackRuntime</h4>
+<pre><code>//  PlaybackRuntime - singleton registry of active instances
+class PlaybackRuntime
+public:
+    static PlaybackRuntime&amp; instance()
+    // Launch a new PlaybackInstance on its own thread.
+    // Returns a shared_ptr so the caller can build a PlaybackHandle.
+    std::shared_ptr&lt;PlaybackInstance&gt; launch(
+            std::vector&lt;int16_t&gt; pcm, int sample_rate, int channels)
+
+    // Request all active streams to stop (useful for clean shutdown).
+    void stop_all()
+    ~PlaybackRuntime() { stop_all(); }</code></pre>
+<h4 id="wauvio-core-io-hpp-wauvio-playbackhandle"><span class="ns">wauvio::</span>class PlaybackHandle</h4>
+<pre><code>//  PUBLIC API - PlaybackHandle
+/// Lightweight, copyable handle to an in-flight playback stream.
+/// All methods are thread-safe.
+/// Discarding the handle does NOT stop playback (fire-and-forget).
+class PlaybackHandle
+public:
+    PlaybackHandle() = default;
+    explicit PlaybackHandle(std::shared_ptr&lt;detail::PlaybackInstance&gt; inst)
+        : inst_(std::move(inst)) {}
+    /// Stop playback immediately and release resources.
+    void stop()   { if (inst_) inst_-&gt;stop();   }
+    /// Pause playback (resume() to continue).
+    void pause()  { if (inst_) inst_-&gt;pause();  }
+    /// Resume after pause().
+    void resume() { if (inst_) inst_-&gt;resume(); }
+    /// Returns true while the worker thread is still active.
+    bool is_playing() const noexcept
+    /// Set output volume multiplier [0.0, 2.0].  Thread-safe.
+    void set_volume(float v) { if (inst_) inst_-&gt;set_volume(v); }
+    /// Current playback position in seconds.
+    double position_seconds() const noexcept
+    /// Total buffer duration in seconds.
+    double duration_seconds() const noexcept
+    /// Seek to `seconds`.  Best-effort: the worker honours it between chunks.
+    void seek(double seconds) { if (inst_) inst_-&gt;seek(seconds); }
+    /// Block the calling thread until playback finishes (or is stopped).
+    void wait() const
+    /// True if this handle refers to a real stream.
+    explicit operator bool() const noexcept { return inst_ != nullptr; }
+//  play_async  -  non-blocking launch
+/// Launch mono buffer playback asynchronously.
+/// Returns immediately; audio runs on a background thread.
+inline PlaybackHandle play_async(const Buffer&amp; buf, int sample_rate = 0)
+/// Launch stereo buffer playback asynchronously.
+/// Returns immediately; audio runs on a background thread.
+inline PlaybackHandle play_async(const StereoBuffer&amp; buf, int sample_rate = 0)
+//  play  -  blocking (backward-compatible)
+/// Blocking playback of a mono buffer.
+/// Internally delegates to play_async() and waits for completion.
+inline void play(const Buffer&amp; buf, int sample_rate = 0)
+/// Blocking playback of a stereo buffer.
+/// Internally delegates to play_async() and waits for completion.
+inline void play(const StereoBuffer&amp; buf, int sample_rate = 0)
+/// Stop every active playback stream immediately.
+inline void stop_all_playback()</code></pre>
+</section>
+<div class="pager"><a href="core-seq.html"><small>Previous</small>seq.hpp — notes, tracks, sequencing</a><a class="r" href="ext.html"><small>Next</small>Music layer overview</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

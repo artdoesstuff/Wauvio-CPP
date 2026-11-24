@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EQ and dynamics · Wauvio Docs</title><meta name="description" content="EQ, compressor, limiter, gate, pump, multiband compressor.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>EQ and dynamics</h1>
+
+<h2>EQ</h2>
+<p>Multi-band parametric EQ. A <code>Band</code> has <code>type</code>, <code>freq</code>, <code>gain_db</code>, <code>q</code> (0.7071), <code>slope_db_oct</code> (12/24/36/48, for high/low-pass only) and <code>enabled</code>. Chainable builders: <code>highpass(f, slope)</code>, <code>lowpass(f, slope)</code>, <code>low_shelf(f, gain, q)</code>, <code>high_shelf</code>, <code>peak(f, gain, q = 1.0)</code>, <code>notch(f, q = 8)</code>, <code>add(Band)</code>, <code>clear_bands()</code>, <code>bands()</code>. <code>response_db(freq)</code> returns the combined magnitude response.</p>
+<h2>Compressor</h2><table><thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>threshold_db</code></td><td>−18</td><td></td></tr><tr><td><code>ratio</code></td><td>4</td><td>1 = off, large = limiting</td></tr><tr><td><code>attack_ms</code> / <code>release_ms</code></td><td>10 / 100</td><td></td></tr><tr><td><code>knee_db</code></td><td>6</td><td>0 = hard knee</td></tr><tr><td><code>makeup_db</code></td><td>0</td><td></td></tr><tr><td><code>mix</code></td><td>1</td><td>&lt;1 = parallel compression</td></tr><tr><td><code>stereo_link</code></td><td>1</td><td>1 = same gain reduction on both channels</td></tr><tr><td><code>sidechain_hpf_hz</code></td><td>0</td><td>High-pass the detector; 0 = off</td></tr><tr><td><code>detector</code></td><td>Peak</td><td><code>Detect::Peak</code> or <code>RMS</code></td></tr></tbody></table>
+<p><code>gain_reduction_db()</code> reports the deepest reduction in the last call. <code>process_sidechain(L, R, n, kL, kR)</code> detects on an external key signal.</p>
+<h2>Limiter</h2>
+<p>Lookahead brickwall: <code>ceiling_db</code> (−1), <code>input_gain_db</code>, <code>release_ms</code> (80), <code>lookahead_ms</code> (5), <code>true_peak</code> (true; detector examines 4× interpolated points via a 16-tap Lanczos kernel). Reports latency through <code>latency_samples()</code>; sample peaks are guaranteed under the ceiling, while true peak is kept within a fraction of a dB (<code>master()</code> additionally verifies with the full oversampling meter).</p>
+<h2>Gate</h2>
+<p><code>threshold_db</code> −50, <code>range_db</code> −80, <code>attack_ms</code> 1, <code>hold_ms</code> 30, <code>release_ms</code> 150, <code>hysteresis_db</code> 4.</p>
+<h2>Pump</h2>
+<p>Tempo-synced ducking without a kick track: <code>bpm</code> 128, <code>depth</code> 0.8, <code>attack_ms</code>, <code>release_ms</code> 250, <code>shape</code> 1.6, <code>offset_sec</code>, <code>pattern</code> (hit positions in beats) and <code>loop_beats</code>. <code>gain_at(t)</code> exposes the curve. For genuine track-to-track ducking use <code>Compressor::process_sidechain</code> or <code>Mixer::sidechain</code>.</p>
+<h2>MultibandCompressor</h2>
+<p>Three bands split at <code>low_freq</code> (120 Hz) and <code>high_freq</code> (2.5 kHz), each with <code>BandSettings</code> (<code>threshold_db</code> −20, <code>ratio</code> 2, <code>attack_ms</code> 20, <code>release_ms</code> 150, <code>makeup_db</code>, <code>knee_db</code> 6); <code>mix</code>; <code>gain_reduction_db(band)</code>.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-fx-effects-eq-hpp"><h3><code>wauvio/fx/effects/eq.hpp</code></h3>
+<h4 id="wauvio-fx-effects-eq-hpp-wauvio-fx-eq"><span class="ns">wauvio::fx::</span>class EQ</h4>
+<pre><code>class EQ : public Effect
+public:
+    struct Band
+        FilterType type = FilterType::Peak;
+        double freq = 1000.0;
+        double gain_db = 0.0;     ///&lt; shelves / peak
+        double q = 0.7071;
+        int    slope_db_oct = 12; ///&lt; HighPass / LowPass only: 12, 24, 36 or 48
+        bool   enabled = true;
+    std::string name() const override { return "EQ"; }
+    EQ&amp; highpass(double f, int slope_db_oct = 12)  { return add({FilterType::HighPass, f, 0, 0.7071, slope_db_oct, true}); }
+    EQ&amp; lowpass(double f, int slope_db_oct = 12)   { return add({FilterType::LowPass,  f, 0, 0.7071, slope_db_oct, true}); }
+    EQ&amp; low_shelf(double f, double gain_db, double q = 0.7071)  { return add({FilterType::LowShelf,  f, gain_db, q, 12, true}); }
+    EQ&amp; high_shelf(double f, double gain_db, double q = 0.7071) { return add({FilterType::HighShelf, f, gain_db, q, 12, true}); }
+    EQ&amp; peak(double f, double gain_db, double q = 1.0)          { return add({FilterType::Peak, f, gain_db, q, 12, true}); }
+    EQ&amp; notch(double f, double q = 8.0)                         { return add({FilterType::Notch, f, 0, q, 12, true}); }
+    EQ&amp; add(const Band&amp; b) { bands_.push_back(b); return *this; }
+    EQ&amp; clear_bands() { bands_.clear(); return *this; }
+    std::vector&lt;Band&gt;&amp; bands() { return bands_; }
+    const std::vector&lt;Band&gt;&amp; bands() const { return bands_; }
+    /// Combined magnitude response in dB at `freq` (uses the current sample rate).
+    double response_db(double freq) const
+    void reset() override { for (auto&amp; ch : st_) for (auto&amp; b : ch) b.reset(); }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+</section>
+<section class="file" id="wauvio-fx-effects-dynamics-hpp"><h3><code>wauvio/fx/effects/dynamics.hpp</code></h3>
+<h4 id="wauvio-fx-effects-dynamics-hpp-wauvio-fx-compressor"><span class="ns">wauvio::fx::</span>class Compressor</h4>
+<pre><code>class Compressor : public Effect
+public:
+    enum class Detect { Peak, RMS };
+    double threshold_db = -18.0;
+    double ratio        = 4.0;      ///&lt; 1 = off, large = limiting
+    double attack_ms    = 10.0;
+    double release_ms   = 100.0;
+    double knee_db      = 6.0;      ///&lt; 0 = hard knee
+    double makeup_db    = 0.0;
+    double mix          = 1.0;      ///&lt; &lt;1 = parallel ("New York") compression
+    double stereo_link  = 1.0;      ///&lt; 1 = both channels get the same gain reduction
+    double sidechain_hpf_hz = 0.0;  ///&lt; high-pass the detector (keeps bass from pumping the mix); 0 = off
+    Detect detector     = Detect::Peak;
+    std::string name() const override { return "Compressor"; }
+    /// Deepest gain reduction (dB, &gt;= 0) seen during the last process() call.
+    double gain_reduction_db() const noexcept { return max_gr_db_; }
+    void reset() override { gr_[0] = gr_[1] = 0.0; ms_[0] = ms_[1] = 0.0; hp_[0].reset(); hp_[1].reset(); max_gr_db_ = 0.0; }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override { process_sidechain(L, R, n, nullptr, nullptr); }
+    /// Detect on an external key signal (e.g. a kick) instead of the input itself.
+    /// kL/kR may be null (= use the input). Key buffers must hold n samples.
+    void process_sidechain(float* L, float* R, size_t n, const float* kL, const float* kR)</code></pre>
+<h4 id="wauvio-fx-effects-dynamics-hpp-wauvio-fx-limiter"><span class="ns">wauvio::fx::</span>class Limiter</h4>
+<pre><code>//  Limiter - lookahead brickwall
+//  Guarantees |output sample| &lt;= ceiling. With true_peak the detector also looks at
+//  4x-interpolated points between samples (16-tap Lanczos), so the inter-sample
+//  (true) peak stays within a fraction of a dB of the ceiling. The ceiling is only
+//  mathematically guaranteed for sample peaks; fx::master() additionally verifies the
+//  true peak with the full oversampling meter.
+class Limiter : public Effect
+public:
+    double ceiling_db    = -1.0;
+    double input_gain_db = 0.0;   ///&lt; push into the limiter (loudness maximiser)
+    double release_ms    = 80.0;
+    double lookahead_ms  = 5.0;
+    bool   true_peak     = true;
+    std::string name() const override { return "Limiter"; }
+    size_t latency_samples() const override { return la_samples() + extra(); }
+    double gain_reduction_db() const noexcept { return max_gr_db_; }
+    void reset() override
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+<h4 id="wauvio-fx-effects-dynamics-hpp-wauvio-fx-gate"><span class="ns">wauvio::fx::</span>class Gate</h4>
+<pre><code>class Gate : public Effect
+public:
+    double threshold_db   = -50.0;
+    double range_db       = -80.0;   ///&lt; attenuation when closed
+    double attack_ms      = 1.0;
+    double hold_ms        = 30.0;
+    double release_ms     = 150.0;
+    double hysteresis_db  = 4.0;
+    std::string name() const override { return "Gate"; }
+    void reset() override { env_ = 0.0; open_ = false; hold_ = 0; g_ = 1.0; }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+<h4 id="wauvio-fx-effects-dynamics-hpp-wauvio-fx-pump"><span class="ns">wauvio::fx::</span>class Pump</h4>
+<pre><code>//  Pump - tempo-synced ducking. Gives the house/trance "sidechain" pulse without
+//  needing a separate kick track. For real track-to-track sidechaining use
+//  Compressor::process_sidechain (or fx::Mixer::sidechain).
+class Pump : public Effect
+public:
+    double bpm          = 128.0;
+    double depth        = 0.8;      ///&lt; 0 = no ducking, 1 = full silence at the hit
+    double attack_ms    = 4.0;
+    double release_ms   = 250.0;
+    double shape        = 1.6;      ///&lt; 1 = linear recovery, &gt;1 = fast then settle, &lt;1 = slow start
+    double offset_sec   = 0.0;      ///&lt; time of the first hit
+    std::vector&lt;double&gt; pattern { 0.0 };  ///&lt; hit positions in beats inside one loop
+    double loop_beats   = 1.0;      ///&lt; loop length in beats (1 = every beat; 4 = hits placed in a bar)
+    std::string name() const override { return "Pump"; }
+    void reset() override { pos_ = 0; }
+    /// Gain at `t` seconds (the curve the effect applies).
+    double gain_at(double t) const
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+<h4 id="wauvio-fx-effects-dynamics-hpp-wauvio-fx-multibandcompressor"><span class="ns">wauvio::fx::</span>class MultibandCompressor</h4>
+<pre><code>class MultibandCompressor : public Effect
+public:
+    struct BandSettings
+        double threshold_db = -20.0, ratio = 2.0, attack_ms = 20.0, release_ms = 150.0, makeup_db = 0.0, knee_db = 6.0;
+    double low_freq  = 120.0;     ///&lt; low / mid crossover
+    double high_freq = 2500.0;    ///&lt; mid / high crossover
+    BandSettings low, mid, high;
+    double mix = 1.0;
+    MultibandCompressor()
+    std::string name() const override { return "MultibandCompressor"; }
+    /// Deepest gain reduction (dB) per band during the last process() call.
+    double gain_reduction_db(int band) const { return gr_[std::min(2, std::max(0, band))]; }
+    void reset() override
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+</section>
+<div class="pager"><a href="fx-core.html"><small>Previous</small>Effect, Chain and DSP utilities</a><a class="r" href="fx-saturation.html"><small>Next</small>Saturation and bitcrushing</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

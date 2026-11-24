@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recipes, trajectories and modulators · Wauvio Docs</title><meta name="description" content="Traj, Mod, Recipe, LayerSpec, sources and processors.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">SFX engine (wauvio/sfx)</div><h1>Recipes, trajectories and modulators</h1>
+
+<h2>Common utilities (<code>sfx_common.hpp</code>)</h2>
+<ul>
+<li><code>sfx::Error</code> — exception type (<code>std::runtime_error</code>) used for every validation failure.</li>
+<li>Math: <code>clampd</code>, <code>lerp</code>, <code>midi_to_hz</code>, <code>hz_to_midi</code>, <code>db_to_lin</code>, <code>lin_to_db</code>, <code>semis_to_ratio</code>, <code>is_finite</code>.</li>
+<li>Hashing / randomness: <code>hash64</code>, <code>mix_seed(a, b)</code>, <code>hash01</code>, <code>value_noise(x, seed)</code>, and the <code>Rng</code> class (<code>next</code>, <code>uniform</code>, <code>bipolar</code>, <code>range</code>, <code>chance</code>, <code>index</code>, <code>gaussian</code>).</li>
+<li>Music tables: <code>scale_names()</code>, <code>scale_degrees(i)</code>, <code>scale_step(deg, k)</code>, <code>chord_names()</code>, <code>chord_intervals(i)</code>. Scales: chromatic, major, natural_minor, harmonic_minor, pentatonic_major, pentatonic_minor, whole_tone, dorian, phrygian, lydian, mixolydian. Chords: major, minor, sus2, sus4, major7, minor7, dominant7, diminished, augmented, add9, cluster.</li>
+</ul>
+<h2>Traj — parameter trajectory</h2>
+<p>A piecewise function of normalised time <em>u</em> ∈ [0, 1] (the position inside a layer). Construct from a constant (<code>Traj(5.0)</code> converts implicitly) or add keys in time order with <code>to(t, value, Interp)</code>; the interpolation of a key describes how the segment <em>arriving</em> at it is shaped. <code>Interp</code> = <code>Linear, Exp, Smooth, Step</code> (Exp requires both end values positive, otherwise it falls back to linear). Non-finite numbers throw.</p><table><thead><tr><th>Factory / method</th><th>Meaning</th></tr></thead><tbody><tr><td><code>Traj::linear(a, b)</code>, <code>exp(a, b)</code>, <code>smooth(a, b)</code></td><td>Two-key trajectories</td></tr><tr><td><code>Traj::pitch_hz(a_hz, b_hz, interp)</code></td><td>Sweep given in Hz but stored as MIDI notes</td></tr><tr><td><code>Traj::ar(attack, peak, floor)</code></td><td>Smooth attack over the first fraction, then exponential decay to <code>floor</code></td></tr><tr><td><code>Traj::decay(floor)</code></td><td>Exponential decay from 1</td></tr><tr><td><code>Traj::stairs(a, b, n)</code></td><td>Staircase of <em>n</em> steps</td></tr><tr><td><code>at(u)</code></td><td>Evaluate (sanitises its input)</td></tr><tr><td><code>scaled(k)</code>, <code>shifted(d)</code></td><td>Return modified copies</td></tr><tr><td><code>min_value()</code>, <code>max_value()</code>, <code>key_count()</code></td><td>Inspection</td></tr></tbody></table>
+<h2>Mod — stateless LFO</h2>
+<p><code>Mod::Shape</code> = <code>Sine, Triangle, Square, Saw, Smooth, Steps</code> (the last two are seeded random). Fields: <code>rate_hz</code>, <code>beats</code> (if &gt; 0 one cycle per that many beats, tempo-synced), <code>depth</code> (output is ±depth), <code>phase</code> (cycles). <code>active()</code>, <code>eval(t_sec, bpm, seed)</code>. Because it is evaluated from time alone, layers can render in any order.</p>
+<h2>Helpers (<code>sfx_helpers.hpp</code>)</h2>
+<ul><li><code>random_stairs(rng, n, lo, hi, snap)</code>, <code>env_bell(center, width, keys, floor)</code>, <code>env_swell(peak_at, start, end)</code>, <code>env_hit(attack, floor)</code>, <code>lfo(shape, rate_hz, depth, phase)</code>, <code>lfo_beats(shape, beats_per_cycle, depth, phase)</code>, <code>hashed_pattern(seed, n, density)</code>.</li></ul>
+<h2>Recipe</h2>
+<p><code>Recipe</code> is the plain-data description of an effect: <code>name</code>, <code>duration</code> (nominal seconds), <code>tail</code> (extra seconds), <code>bpm</code> (120), <code>reverse_all</code>, <code>fade_in_ms</code> (1), <code>fade_out_ms</code> (6) and <code>layers</code>. <code>add(name)</code> appends and returns a <code>LayerSpec&amp;</code>; <code>total_seconds()</code>.</p>
+<h2>LayerSpec</h2>
+<p>One layer = one <em>source</em> → envelope → <em>processor chain</em> → post automation → level/pan. Every builder returns <code>*this</code> so calls chain. Fields <code>env</code>, <code>post</code>, <code>level</code>, <code>start</code>, <code>length</code> (&lt;0 = to the end), <code>tail</code>, <code>pan</code>, <code>width</code> (0 mono-panned … 1 independently rendered L/R), <code>fade_in_ms</code>, <code>fade_out_ms</code>, <code>seed_offset</code>.</p>
+<h3>Sources (choose one per layer)</h3><table><thead><tr><th>Builder</th><th>Source kind</th><th>Notes</th></tr></thead><tbody><tr><td><code>osc(Wave, pitch)</code></td><td>Osc</td><td><code>Wave</code>: Sine, Triangle, Saw, Square, Pulse. Options: <code>unison(voices, cents)</code>, <code>fm(index, ratio)</code>, <code>sub(g)</code>, <code>stack(ratios)</code>, <code>pw(width)</code></td></tr><tr><td><code>noise(NoiseColor, density)</code></td><td>Noise</td><td>Colors: White, Pink, Brown, Blue, Violet, Dust (density = events/s for Dust)</td></tr><tr><td><code>additive(pitch, notes, harmonics, rolloff)</code></td><td>Additive</td><td>Per-note partial stacks; <code>inharmonic(B)</code>, <code>spread(cents)</code></td></tr><tr><td><code>modal(modes, pitch, hits)</code></td><td>Modal</td><td>Resonant bodies struck at normalised times; <code>hit_notes</code>, <code>hit_jitter</code>, <code>strike(ms)</code>, <code>decay_scale</code>. Mode tables: <code>modes_bell/glass/metal/gong/wood()</code>, <code>modes_inharmonic(seed, n, t60, spread)</code></td></tr><tr><td><code>formant(vowel, pitch, breath)</code></td><td>Formant</td><td>Vowel 0=a 1=e 2=i 3=o 4=u (interpolated); <code>shift(semis)</code>, <code>whisper(breath)</code></td></tr><tr><td><code>grain(GrainSource, density, size_ms, pitch)</code></td><td>Grain</td><td>Sources: Noise, Tone, Chord, Bell, Vowel; <code>grain_pos</code>, <code>grain_pitch</code>, <code>scatter(pitch, position)</code></td></tr><tr><td><code>pluck(pitch, hits, damping)</code></td><td>Pluck</td><td>String-style decay; <code>damping</code> 0 bright … 1 dull</td></tr><tr><td><code>chaos(ChaosKind, rate, pitch)</code></td><td>Chaos</td><td>Lorenz, Logistic or Henon attractors; <code>chaos_depth(semis, amp)</code>, <code>chaos_out(direct)</code></td></tr></tbody></table>
+<h3>Shaping and placement</h3>
+<p><code>shape(Traj)</code> (envelope before the chain), <code>after(Traj)</code> (automation after the chain), <code>gain(level)</code>, <code>at(sec)</code>, <code>len(sec)</code>, <code>ring(sec)</code>, <code>place(pan, width)</code>, <code>fade(in_ms, out_ms)</code>, <code>variation(seed_offset)</code>.</p>
+<h3>Processors (applied in call order)</h3><table><thead><tr><th>Builder</th><th>Processor</th><th>Description</th></tr></thead><tbody><tr><td><code>lp / hp / bp(cutoff, q, poles)</code>, <code>notch(cutoff, q)</code></td><td>FilterP</td><td>Trajectory-driven filters; <code>filter_lfo(Mod)</code> adds an LFO (depth in octaves) to the latest filter</td></tr><tr><td><code>drive(amount, kind, mix)</code></td><td>DriveP</td><td>Kinds: Tanh, Hard, Fold, Asym, Rectify</td></tr><tr><td><code>crush(bits, down)</code></td><td>CrushP</td><td>Bit/sample-rate reduction</td></tr><tr><td><code>gate(steps, step_beats, depth, smooth_ms, swing)</code>, <code>gate_sec(...)</code></td><td>GateP</td><td>Step-sequenced gate, tempo-synced or in seconds</td></tr><tr><td><code>trem(rate, depth)</code></td><td>TremP</td><td>Tremolo</td></tr><tr><td><code>pulses(rate, decay_ms, depth, jitter)</code>, <code>pulses_at(times, ...)</code></td><td>PulsesP</td><td>Amplitude pulse trains at a rate or explicit times</td></tr><tr><td><code>stutter(seg_sec, repeats, prob, from, to)</code></td><td>StutterP</td><td>Probabilistic segment repeats</td></tr><tr><td><code>freeze(at_frac, window_sec)</code></td><td>FreezeP</td><td>Sustain a captured window</td></tr><tr><td><code>dropout(rate_per_sec, min_ms, max_ms, depth)</code></td><td>DropoutP</td><td>Random signal dropouts</td></tr><tr><td><code>comb(freq, feedback, mix)</code></td><td>CombP</td><td>Comb filter</td></tr><tr><td><code>ringmod(freq, mix)</code></td><td>RingP</td><td>Ring modulation</td></tr><tr><td><code>reverb(t60, damping, mix, predelay_ms)</code></td><td>ReverbP</td><td>Small synthetic Schroeder tail (not convolution)</td></tr><tr><td><code>echo(time_sec, feedback, mix, damping)</code></td><td>EchoP</td><td>Feedback echo</td></tr><tr><td><code>reverse()</code></td><td>ReverseP</td><td>Reverse the layer</td></tr><tr><td><code>spectral(mode, amount, at_frac)</code></td><td>SpectralP</td><td>FFT effects: Disintegrate, Scramble, TiltFade, Freeze</td></tr></tbody></table><p>The processors are stored in a <code>std::variant</code> named <code>Proc</code>.</p><h2>Full API listing</h2><section class="file" id="wauvio-sfx-core-sfx-common-hpp"><h3><code>wauvio/sfx/core/sfx_common.hpp</code></h3>
+<h4 id="wauvio-sfx-core-sfx-common-hpp-wauvio-sfx-error"><span class="ns">wauvio::sfx::</span>class Error</h4>
+<pre><code>class Error : public std::runtime_error
+public:
+    explicit Error(const std::string&amp; what) : std::runtime_error(what) {}
+inline bool   is_finite(double v) noexcept { return std::isfinite(v); }
+inline double clampd(double v, double lo, double hi) noexcept { return v &lt; lo ? lo : (v &gt; hi ? hi : v); }
+inline double lerp(double a, double b, double t) noexcept { return a + (b - a) * t; }
+inline double midi_to_hz(double m) noexcept { return 440.0 * std::pow(2.0, (m - 69.0) / 12.0); }
+inline double hz_to_midi(double f) noexcept { return 69.0 + 12.0 * std::log2(std::max(f, 1e-6) / 440.0); }
+inline double db_to_lin(double db) noexcept { return std::pow(10.0, db / 20.0); }
+inline double lin_to_db(double v) noexcept { return 20.0 * std::log10(std::max(v, 1e-12)); }
+inline double semis_to_ratio(double s) noexcept { return std::pow(2.0, s / 12.0); }
+inline uint64_t hash64(uint64_t x) noexcept
+inline uint64_t mix_seed(uint64_t a, uint64_t b) noexcept { return hash64(a ^ (hash64(b) + 0x9E3779B97F4A7C15ull + (a &lt;&lt; 6) + (a &gt;&gt; 2))); }
+inline double hash01(uint64_t x) noexcept { return static_cast&lt;double&gt;(hash64(x) &gt;&gt; 11) * (1.0 / 9007199254740992.0); }</code></pre>
+<h4 id="wauvio-sfx-core-sfx-common-hpp-wauvio-sfx-rng"><span class="ns">wauvio::sfx::</span>class Rng</h4>
+<pre><code>class Rng
+public:
+    explicit Rng(uint64_t seed = 1) noexcept { reseed(seed); }
+    void reseed(uint64_t seed) noexcept { uint64_t z = seed; for (auto&amp; s : s_) { z += 0x9E3779B97F4A7C15ull; s = hash64(z); } }
+    uint64_t next() noexcept
+    double uniform() noexcept { return static_cast&lt;double&gt;(next() &gt;&gt; 11) * (1.0 / 9007199254740992.0); }   // [0,1)
+    double bipolar() noexcept { return uniform() * 2.0 - 1.0; }                                              // [-1,1)
+    double range(double a, double b) noexcept { return a + (b - a) * uniform(); }
+    bool   chance(double p) noexcept { return uniform() &lt; p; }
+    int    index(int n) noexcept { return n &lt;= 1 ? 0 : static_cast&lt;int&gt;(uniform() * n) % n; }
+    double gaussian() noexcept { const double u1 = std::max(uniform(), 1e-12), u2 = uniform(); return std::sqrt(-2.0 * std::log(u1)) * std::cos(TWO_PI * u2); }
+inline double value_noise(double x, uint64_t seed) noexcept
+inline const std::vector&lt;std::string&gt;&amp; scale_names()
+inline std::vector&lt;int&gt; scale_degrees(int index)
+inline int scale_step(const std::vector&lt;int&gt;&amp; deg, int k)
+inline const std::vector&lt;std::string&gt;&amp; chord_names()
+inline std::vector&lt;double&gt; chord_intervals(int index)</code></pre>
+</section>
+<section class="file" id="wauvio-sfx-core-sfx-traj-hpp"><h3><code>wauvio/sfx/core/sfx_traj.hpp</code></h3>
+<h4 id="wauvio-sfx-core-sfx-traj-hpp-wauvio-sfx-interp"><span class="ns">wauvio::sfx::</span>enum class Interp</h4>
+<pre><code>enum class Interp { Linear, Exp, Smooth, Step };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-traj-hpp-wauvio-sfx-traj"><span class="ns">wauvio::sfx::</span>class Traj</h4>
+<pre><code>/// A parameter trajectory over normalised time u in [0, 1] (u = position inside the layer).
+/// Keys are added in time order; each key records how the segment *arriving* at it is
+/// interpolated. Exp interpolation needs both end values to be positive and falls back to
+/// linear otherwise. Non-finite numbers are rejected when building, and at() sanitises its input.
+///
+///   Traj::exp(200, 12000)                                           // exponential sweep (musically even)
+///   Traj(0).to(0.1, 1, Interp::Smooth).to(1, 0.001, Interp::Exp)    // attack then decay
+class Traj
+public:
+    Traj(double constant = 0.0) { check(0.0, constant); k_.push_back({0.0, constant, Interp::Linear}); }   // NOLINT implicit by design
+    static Traj linear(double a, double b) { return Traj(a).to(1.0, b, Interp::Linear); }
+    static Traj exp(double a, double b)    { return Traj(a).to(1.0, b, Interp::Exp); }
+    static Traj smooth(double a, double b) { return Traj(a).to(1.0, b, Interp::Smooth); }
+    /// Frequency sweep given in Hz, stored as MIDI notes (so a linear trajectory is an exponential sweep in Hz).
+    static Traj pitch_hz(double a_hz, double b_hz, Interp i = Interp::Linear) { return Traj(hz_to_midi(a_hz)).to(1.0, hz_to_midi(b_hz), i); }
+    /// Attack to `peak` over the first `attack` fraction, then exponential decay to `floor` at the end.
+    static Traj ar(double attack, double peak = 1.0, double floor = 0.001) { attack = clampd(attack, 0.0, 1.0); return Traj(0.0).to(attack, peak, Interp::Smooth).to(1.0, floor, Interp::Exp); }
+    /// Exponential decay from 1 to `floor`.
+    static Traj decay(double floor = 0.001) { return Traj(1.0).to(1.0, floor, Interp::Exp); }
+    /// `n` equal steps from a to b (a staircase), including both end values.
+    static Traj stairs(double a, double b, int n)
+    /// Add a key at normalised time `t` (must not be earlier than the previous key).
+    Traj&amp; to(double t, double v, Interp how = Interp::Linear)
+    double at(double u) const noexcept
+    Traj scaled(double k) const { Traj t = *this; for (auto&amp; key : t.k_) key.v *= k; return t; }
+    Traj shifted(double d) const { Traj t = *this; for (auto&amp; key : t.k_) key.v += d; return t; }
+    double min_value() const { double m = k_[0].v; for (auto&amp; k : k_) m = std::min(m, k.v); return m; }
+    double max_value() const { double m = k_[0].v; for (auto&amp; k : k_) m = std::max(m, k.v); return m; }
+    size_t key_count() const noexcept { return k_.size(); }</code></pre>
+<h4 id="wauvio-sfx-core-sfx-traj-hpp-wauvio-sfx-mod"><span class="ns">wauvio::sfx::</span>struct Mod</h4>
+<pre><code>/// Low-frequency modulator, evaluated statelessly from time (so any layer can be rendered in any order).
+struct Mod
+    enum class Shape { Sine, Triangle, Square, Saw, Smooth, Steps };   // Smooth/Steps = random (seeded)
+    Shape  shape = Shape::Sine;
+    double rate_hz = 0.0;   ///&lt; cycles per second (ignored if `beats` &gt; 0)
+    double beats   = 0.0;   ///&lt; if &gt; 0: one cycle per this many beats (tempo-synced)
+    double depth   = 0.0;   ///&lt; output range is [-depth, +depth]
+    double phase   = 0.0;   ///&lt; cycles
+    bool active() const noexcept { return depth != 0.0 &amp;&amp; (rate_hz &gt; 0.0 || beats &gt; 0.0); }
+    double eval(double t_sec, double bpm, uint64_t seed) const noexcept</code></pre>
+</section>
+<section class="file" id="wauvio-sfx-core-sfx-helpers-hpp"><h3><code>wauvio/sfx/core/sfx_helpers.hpp</code></h3>
+<h4 id="wauvio-sfx-core-sfx-helpers-hpp-wauvio-sfx-free-functions-constants-and-aliases"><span class="ns">wauvio::sfx::</span>Free functions, constants and aliases</h4>
+<pre><code>inline Traj random_stairs(Rng&amp; r, int n, double lo, double hi, bool snap = true)
+inline Traj env_bell(double center = 0.5, double width = 0.22, int keys = 24, double floor = 0.0008)
+inline Traj env_swell(double peak_at = 0.85, double start = 0.02, double end = 0.0008) { return Traj(start).to(peak_at, 1.0, Interp::Exp).to(1.0, end, Interp::Exp); }
+inline Traj env_hit(double a = 0.004, double floor = 0.0008) { return Traj::ar(a, 1.0, floor); }
+inline Mod lfo(Mod::Shape s, double rate_hz, double depth, double phase = 0.0) { Mod m; m.shape = s; m.rate_hz = rate_hz; m.depth = depth; m.phase = phase; return m; }
+inline Mod lfo_beats(Mod::Shape s, double beats_per_cycle, double depth, double phase = 0.0) { Mod m; m.shape = s; m.beats = beats_per_cycle; m.depth = depth; m.phase = phase; return m; }
+inline std::vector&lt;double&gt; hashed_pattern(uint64_t seed, int n, double density)</code></pre>
+</section><section class="file" id="wauvio-sfx-core-sfx-recipe-hpp"><h3><code>wauvio/sfx/core/sfx_recipe.hpp</code></h3>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-wave"><span class="ns">wauvio::sfx::</span>enum class Wave</h4>
+<pre><code>enum class Wave { Sine, Triangle, Saw, Square, Pulse };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-noisecolor"><span class="ns">wauvio::sfx::</span>enum class NoiseColor</h4>
+<pre><code>enum class NoiseColor { White, Pink, Brown, Blue, Violet, Dust };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-chaoskind"><span class="ns">wauvio::sfx::</span>enum class ChaosKind</h4>
+<pre><code>enum class ChaosKind { Lorenz, Logistic, Henon };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-grainsource"><span class="ns">wauvio::sfx::</span>enum class GrainSource</h4>
+<pre><code>enum class GrainSource { Noise, Tone, Chord, Bell, Vowel };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-mode"><span class="ns">wauvio::sfx::</span>struct Mode</h4>
+<pre><code>struct Mode { double ratio = 1.0; double t60 = 1.0; double amp = 1.0; };   ///&lt; one resonant mode of a modal source
+/// Mode tables for metallic / resonant bodies (frequency ratios are relative to the root).
+inline std::vector&lt;Mode&gt; modes_bell()  { return { {1.0,3.0,1.0},{2.0,2.2,0.6},{2.4,1.8,0.5},{3.0,1.4,0.4},{4.5,1.0,0.3},{5.33,0.8,0.25},{6.8,0.6,0.15} }; }
+inline std::vector&lt;Mode&gt; modes_glass() { return { {1.0,2.6,1.0},{2.32,2.0,0.55},{4.25,1.5,0.45},{6.63,1.1,0.3},{9.38,0.8,0.2} }; }
+inline std::vector&lt;Mode&gt; modes_metal() { return { {1.0,1.6,1.0},{1.47,1.3,0.8},{1.98,1.1,0.7},{2.42,1.0,0.55},{2.89,0.8,0.5},{3.51,0.7,0.4},{4.12,0.5,0.35},{5.6,0.4,0.25} }; }
+inline std::vector&lt;Mode&gt; modes_gong()  { return { {1.0,5.0,1.0},{1.58,4.0,0.8},{2.12,3.4,0.7},{2.76,2.6,0.55},{3.3,2.0,0.45},{4.37,1.4,0.3},{5.8,1.0,0.2} }; }
+inline std::vector&lt;Mode&gt; modes_wood()  { return { {1.0,0.35,1.0},{2.57,0.22,0.6},{4.2,0.14,0.35},{6.1,0.1,0.2} }; }
+inline std::vector&lt;Mode&gt; modes_inharmonic(uint64_t seed, int n, double t60, double spread = 1.0)</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-sourcekind"><span class="ns">wauvio::sfx::</span>enum class SourceKind</h4>
+<pre><code>enum class SourceKind { None, Osc, Noise, Additive, Modal, Formant, Grain, Pluck, Chaos };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-source"><span class="ns">wauvio::sfx::</span>struct Source</h4>
+<pre><code>struct Source
+    SourceKind kind = SourceKind::None;
+    Traj pitch = 60.0;                       ///&lt; MIDI note (fractional allowed); used by every pitched kind
+    // Osc
+    Wave wave = Wave::Saw; int voices = 1; Traj detune_cents = 0.0; Traj pulse_width = 0.5;
+    double sub = 0.0;                        ///&lt; sine one octave below, relative level
+    std::vector&lt;double&gt; ratios;              ///&lt; non-empty: a stack of oscillators at pitch * ratio (e.g. metallic square stacks)
+    Traj fm_index = 0.0; double fm_ratio = 1.0;   ///&lt; phase modulation of the carrier by a sine at pitch * fm_ratio
+    // Noise
+    NoiseColor color = NoiseColor::White; Traj density = 200.0;   ///&lt; density = events per second (Dust only)
+    // Additive: each note (semitone offset from `pitch`) gets `harmonics` partials
+    std::vector&lt;double&gt; notes { 0.0 }; int harmonics = 1; Traj rolloff = 1.0;   ///&lt; partial n has amplitude n^-rolloff
+    double inharmonicity = 0.0;              ///&lt; partial n sits at n*sqrt(1 + B*n^2)
+    Traj partial_spread = 0.0;               ///&lt; random per-partial detune in cents (smooth, seeded)
+    // Modal / Pluck: events happen at normalised times `hits` (+/- jitter); hit k plays pitch + hit_notes[k % size]
+    std::vector&lt;Mode&gt; modes; std::vector&lt;double&gt; hits; std::vector&lt;double&gt; hit_notes; double hit_jitter = 0.0; double velocity_var = 0.3;
+    double strike_ms = 1.5;                  ///&lt; noise burst at each hit (the "click" of the attack)
+    double t60_scale = 1.0;                  ///&lt; multiplies every mode / string decay time
+    double damping = 0.5;                    ///&lt; Pluck: 0 bright &amp; ringing .. 1 dull &amp; short
+    // Formant
+    Traj vowel = 0.0;                        ///&lt; 0=a 1=e 2=i 3=o 4=u, interpolated
+    Traj formant_shift = 0.0;                ///&lt; semitones, moves all formants
+    double breath = 0.0;                     ///&lt; 0 voiced .. 1 whispered (noise excitation)
+    bool   noise_excited = false;
+    // Grain
+    GrainSource grain_source = GrainSource::Noise; Traj grain_ms = 60.0; Traj grain_pitch = 0.0;   ///&lt; semitones
+    double pitch_scatter = 0.0; Traj position = 0.0; double position_scatter = 0.2; double grain_chord = 0.0;
+    // Chaos
+    ChaosKind chaos = ChaosKind::Lorenz; Traj chaos_rate = 40.0;   ///&lt; attractor evolution speed
+    Traj chaos_depth = 12.0;                 ///&lt; semitones of pitch modulation (carrier mode)
+    double chaos_amp = 0.0;                  ///&lt; amount the attractor also modulates the level
+    bool   chaos_direct = false;             ///&lt; output the attractor itself instead of an oscillator
+    Traj logistic_r = 3.9;</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-filterp"><span class="ns">wauvio::sfx::</span>struct FilterP</h4>
+<pre><code>struct FilterP  { enum Type { LowPass, HighPass, BandPass, Notch } type = LowPass; Traj cutoff = 1000.0; Traj q = 0.707; int poles = 2; Mod lfo; };   // lfo depth in octaves</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-drivep"><span class="ns">wauvio::sfx::</span>struct DriveP</h4>
+<pre><code>struct DriveP   { enum Kind { Tanh, Hard, Fold, Asym, Rectify } kind = Tanh; Traj amount = 2.0; double mix = 1.0; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-crushp"><span class="ns">wauvio::sfx::</span>struct CrushP</h4>
+<pre><code>struct CrushP   { Traj bits = 8.0; Traj down = 1.0; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-gatep"><span class="ns">wauvio::sfx::</span>struct GateP</h4>
+<pre><code>struct GateP    { std::vector&lt;double&gt; steps { 1.0, 0.0 }; double step_beats = 0.25; double step_sec = 0.0; double depth = 1.0; double smooth_ms = 3.0; double swing = 0.0; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-tremp"><span class="ns">wauvio::sfx::</span>struct TremP</h4>
+<pre><code>struct TremP    { Traj rate = 5.0; Traj depth = 0.5; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-pulsesp"><span class="ns">wauvio::sfx::</span>struct PulsesP</h4>
+<pre><code>struct PulsesP  { Traj rate = 8.0; std::vector&lt;double&gt; times; double decay_ms = 40.0; double attack_ms = 0.5; double depth = 1.0; double jitter = 0.0; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-stutterp"><span class="ns">wauvio::sfx::</span>struct StutterP</h4>
+<pre><code>struct StutterP { double seg_sec = 0.1; int repeats = 3; double prob = 0.5; double from = 0.0; double to = 1.0; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-freezep"><span class="ns">wauvio::sfx::</span>struct FreezeP</h4>
+<pre><code>struct FreezeP  { double at = 0.5; double window_sec = 0.06; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-dropoutp"><span class="ns">wauvio::sfx::</span>struct DropoutP</h4>
+<pre><code>struct DropoutP { double rate_per_sec = 4.0; double min_ms = 5.0; double max_ms = 40.0; double depth = 1.0; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-combp"><span class="ns">wauvio::sfx::</span>struct CombP</h4>
+<pre><code>struct CombP    { Traj freq = 220.0; double feedback = 0.8; double mix = 0.5; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-ringp"><span class="ns">wauvio::sfx::</span>struct RingP</h4>
+<pre><code>struct RingP    { Traj freq = 300.0; double mix = 1.0; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-reverbp"><span class="ns">wauvio::sfx::</span>struct ReverbP</h4>
+<pre><code>struct ReverbP  { double t60 = 2.0; double damping = 0.4; double mix = 0.3; double predelay_ms = 0.0; };   // small synthetic Schroeder tail, not a convolution reverb</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-echop"><span class="ns">wauvio::sfx::</span>struct EchoP</h4>
+<pre><code>struct EchoP    { double time_sec = 0.25; double feedback = 0.4; double mix = 0.4; double damping = 0.3; };</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-reversep"><span class="ns">wauvio::sfx::</span>struct ReverseP</h4>
+<pre><code>struct ReverseP {};</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-spectralp"><span class="ns">wauvio::sfx::</span>struct SpectralP</h4>
+<pre><code>struct SpectralP { enum Mode { Disintegrate, Scramble, TiltFade, Freeze } mode = Scramble; Traj amount = 0.5; double at = 0.5; };
+using Proc = std::variant&lt;FilterP, DriveP, CrushP, GateP, TremP, PulsesP, StutterP, FreezeP, DropoutP, CombP, RingP, ReverbP, EchoP, ReverseP, SpectralP&gt;;</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-layerspec"><span class="ns">wauvio::sfx::</span>struct LayerSpec</h4>
+<pre><code>struct LayerSpec
+    std::string name;
+    Source src;
+    std::vector&lt;Proc&gt; chain;
+    Traj env = 1.0;            ///&lt; amplitude envelope applied to the source, before the chain (tails can ring on)
+    Traj post = 1.0;           ///&lt; amplitude automation applied after the chain
+    double level = 1.0;        ///&lt; linear peak level in the mix
+    double start = 0.0;        ///&lt; seconds from the start of the effect
+    double length = -1.0;      ///&lt; seconds of source; &lt; 0 = until the end of the effect
+    double tail = 0.0;         ///&lt; extra seconds the chain may ring after the source ends
+    double pan = 0.0;          ///&lt; -1 left .. +1 right (equal power)
+    double width = 0.0;        ///&lt; 0 mono (just panned) .. 1 independently rendered L/R (decorrelated)
+    double fade_in_ms = 0.5, fade_out_ms = 4.0;
+    uint64_t seed_offset = 0;  ///&lt; change to get a different random take of just this layer
+    // sources
+    LayerSpec&amp; osc(Wave w, Traj pitch_midi) { src = Source(); src.kind = SourceKind::Osc; src.wave = w; src.pitch = pitch_midi; return *this; }
+    LayerSpec&amp; noise(NoiseColor c, Traj density = 200.0) { src = Source(); src.kind = SourceKind::Noise; src.color = c; src.density = density; return *this; }
+    LayerSpec&amp; additive(Traj pitch_midi, std::vector&lt;double&gt; notes, int harmonics, Traj rolloff = 1.0) { src = Source(); src.kind = SourceKind::Additive; src.pitch = pitch_midi; src.notes = std::move(notes); src.harmonics = harmonics; src.rolloff = rolloff; return *this; }
+    LayerSpec&amp; modal(std::vector&lt;Mode&gt; modes, Traj pitch_midi, std::vector&lt;double&gt; hits) { src = Source(); src.kind = SourceKind::Modal; src.modes = std::move(modes); src.pitch = pitch_midi; src.hits = std::move(hits); return *this; }
+    LayerSpec&amp; formant(Traj vowel, Traj pitch_midi, double breath = 0.0) { src = Source(); src.kind = SourceKind::Formant; src.vowel = vowel; src.pitch = pitch_midi; src.breath = breath; return *this; }
+    LayerSpec&amp; grain(GrainSource gs, Traj density, Traj size_ms, Traj pitch_midi = 60.0) { src = Source(); src.kind = SourceKind::Grain; src.grain_source = gs; src.density = density; src.grain_ms = size_ms; src.pitch = pitch_midi; return *this; }
+    LayerSpec&amp; pluck(Traj pitch_midi, std::vector&lt;double&gt; hits, double damping = 0.5) { src = Source(); src.kind = SourceKind::Pluck; src.pitch = pitch_midi; src.hits = std::move(hits); src.damping = damping; return *this; }
+    LayerSpec&amp; chaos(ChaosKind k, Traj rate, Traj pitch_midi = 60.0) { src = Source(); src.kind = SourceKind::Chaos; src.chaos = k; src.chaos_rate = rate; src.pitch = pitch_midi; return *this; }
+    // source options
+    LayerSpec&amp; unison(int voices, Traj cents) { src.voices = voices; src.detune_cents = cents; return *this; }
+    LayerSpec&amp; fm(Traj index, double ratio) { src.fm_index = index; src.fm_ratio = ratio; return *this; }
+    LayerSpec&amp; sub(double g) { src.sub = g; return *this; }
+    LayerSpec&amp; stack(std::vector&lt;double&gt; ratios) { src.ratios = std::move(ratios); return *this; }
+    LayerSpec&amp; pw(Traj w) { src.pulse_width = w; return *this; }
+    LayerSpec&amp; inharmonic(double b) { src.inharmonicity = b; return *this; }
+    LayerSpec&amp; spread(Traj cents) { src.partial_spread = cents; return *this; }
+    LayerSpec&amp; hit_notes(std::vector&lt;double&gt; n) { src.hit_notes = std::move(n); return *this; }
+    LayerSpec&amp; hit_jitter(double j, double vel_var = 0.3) { src.hit_jitter = j; src.velocity_var = vel_var; return *this; }
+    LayerSpec&amp; strike(double ms) { src.strike_ms = ms; return *this; }
+    LayerSpec&amp; decay_scale(double s) { src.t60_scale = s; return *this; }
+    LayerSpec&amp; scatter(double pitch_semis, double position_frac) { src.pitch_scatter = pitch_semis; src.position_scatter = position_frac; return *this; }
+    LayerSpec&amp; grain_pos(Traj p) { src.position = p; return *this; }
+    LayerSpec&amp; grain_pitch(Traj semis) { src.grain_pitch = semis; return *this; }
+    LayerSpec&amp; shift(Traj semis) { src.formant_shift = semis; return *this; }
+    LayerSpec&amp; whisper(double breath) { src.breath = breath; return *this; }
+    LayerSpec&amp; chaos_depth(Traj semis, double amp = 0.0) { src.chaos_depth = semis; src.chaos_amp = amp; return *this; }
+    LayerSpec&amp; chaos_out(bool direct) { src.chaos_direct = direct; return *this; }
+    // shaping and placement
+    LayerSpec&amp; shape(Traj e) { env = e; return *this; }
+    LayerSpec&amp; after(Traj p) { post = p; return *this; }
+    LayerSpec&amp; gain(double g) { level = g; return *this; }
+    LayerSpec&amp; at(double sec) { start = sec; return *this; }
+    LayerSpec&amp; len(double sec) { length = sec; return *this; }
+    LayerSpec&amp; ring(double sec) { tail = sec; return *this; }
+    LayerSpec&amp; place(double p, double w = 0.0) { pan = p; width = w; return *this; }
+    LayerSpec&amp; fade(double in_ms, double out_ms) { fade_in_ms = in_ms; fade_out_ms = out_ms; return *this; }
+    LayerSpec&amp; variation(uint64_t s) { seed_offset = s; return *this; }
+    // processors
+    LayerSpec&amp; lp(Traj cutoff, Traj q = 0.707, int poles = 2) { FilterP f; f.type = FilterP::LowPass; f.cutoff = cutoff; f.q = q; f.poles = poles; chain.push_back(f); return *this; }
+    LayerSpec&amp; hp(Traj cutoff, Traj q = 0.707, int poles = 2) { FilterP f; f.type = FilterP::HighPass; f.cutoff = cutoff; f.q = q; f.poles = poles; chain.push_back(f); return *this; }
+    LayerSpec&amp; bp(Traj cutoff, Traj q = 2.0, int poles = 2) { FilterP f; f.type = FilterP::BandPass; f.cutoff = cutoff; f.q = q; f.poles = poles; chain.push_back(f); return *this; }
+    LayerSpec&amp; notch(Traj cutoff, Traj q = 2.0) { FilterP f; f.type = FilterP::Notch; f.cutoff = cutoff; f.q = q; chain.push_back(f); return *this; }
+    LayerSpec&amp; filter_lfo(Mod m) { for (size_t i = chain.size(); i-- &gt; 0;) if (auto* f = std::get_if&lt;FilterP&gt;(&amp;chain[i])) { f-&gt;lfo = m; return *this; } throw Error("filter_lfo: no filter in the chain yet"); }
+    LayerSpec&amp; drive(Traj amount, DriveP::Kind k = DriveP::Tanh, double mix = 1.0) { DriveP d; d.kind = k; d.amount = amount; d.mix = mix; chain.push_back(d); return *this; }
+    LayerSpec&amp; crush(Traj bits, Traj down = 1.0) { CrushP c; c.bits = bits; c.down = down; chain.push_back(c); return *this; }
+    LayerSpec&amp; gate(std::vector&lt;double&gt; steps, double step_beats, double depth = 1.0, double smooth_ms = 3.0, double swing = 0.0) { GateP g; g.steps = std::move(steps); g.step_beats = step_beats; g.depth = depth; g.smooth_ms = smooth_ms; g.swing = swing; chain.push_back(g); return *this; }
+    LayerSpec&amp; gate_sec(std::vector&lt;double&gt; steps, double step_sec, double depth = 1.0, double smooth_ms = 2.0) { GateP g; g.steps = std::move(steps); g.step_sec = step_sec; g.depth = depth; g.smooth_ms = smooth_ms; chain.push_back(g); return *this; }
+    LayerSpec&amp; trem(Traj rate_hz, Traj depth) { TremP t; t.rate = rate_hz; t.depth = depth; chain.push_back(t); return *this; }
+    LayerSpec&amp; pulses(Traj rate_hz, double decay_ms, double depth = 1.0, double jitter = 0.0) { PulsesP p; p.rate = rate_hz; p.decay_ms = decay_ms; p.depth = depth; p.jitter = jitter; chain.push_back(p); return *this; }
+    LayerSpec&amp; pulses_at(std::vector&lt;double&gt; times, double decay_ms, double attack_ms = 0.5, double depth = 1.0) { PulsesP p; p.times = std::move(times); p.decay_ms = decay_ms; p.attack_ms = attack_ms; p.depth = depth; chain.push_back(p); return *this; }
+    LayerSpec&amp; stutter(double seg_sec, int repeats, double prob, double from = 0.0, double to = 1.0) { StutterP s; s.seg_sec = seg_sec; s.repeats = repeats; s.prob = prob; s.from = from; s.to = to; chain.push_back(s); return *this; }
+    LayerSpec&amp; freeze(double at_frac, double window_sec) { FreezeP f; f.at = at_frac; f.window_sec = window_sec; chain.push_back(f); return *this; }
+    LayerSpec&amp; dropout(double rate_per_sec, double min_ms, double max_ms, double depth = 1.0) { DropoutP d; d.rate_per_sec = rate_per_sec; d.min_ms = min_ms; d.max_ms = max_ms; d.depth = depth; chain.push_back(d); return *this; }
+    LayerSpec&amp; comb(Traj freq_hz, double feedback, double mix = 0.5) { CombP c; c.freq = freq_hz; c.feedback = feedback; c.mix = mix; chain.push_back(c); return *this; }
+    LayerSpec&amp; ringmod(Traj freq_hz, double mix = 1.0) { RingP r; r.freq = freq_hz; r.mix = mix; chain.push_back(r); return *this; }
+    LayerSpec&amp; reverb(double t60, double damping = 0.4, double mix = 0.3, double predelay_ms = 0.0) { ReverbP r; r.t60 = t60; r.damping = damping; r.mix = mix; r.predelay_ms = predelay_ms; chain.push_back(r); return *this; }
+    LayerSpec&amp; echo(double time_sec, double feedback, double mix = 0.4, double damping = 0.3) { EchoP e; e.time_sec = time_sec; e.feedback = feedback; e.mix = mix; e.damping = damping; chain.push_back(e); return *this; }
+    LayerSpec&amp; reverse() { chain.push_back(ReverseP{}); return *this; }
+    LayerSpec&amp; spectral(SpectralP::Mode m, Traj amount, double at_frac = 0.5) { SpectralP s; s.mode = m; s.amount = amount; s.at = at_frac; chain.push_back(s); return *this; }</code></pre>
+<h4 id="wauvio-sfx-core-sfx-recipe-hpp-wauvio-sfx-recipe"><span class="ns">wauvio::sfx::</span>struct Recipe</h4>
+<pre><code>struct Recipe
+    std::string name;
+    double duration = 1.0;     ///&lt; nominal length in seconds (what "duration" means to the caller)
+    double tail = 0.0;         ///&lt; extra seconds after `duration` (decay of reverb-like layers)
+    double bpm = 120.0;        ///&lt; tempo used by tempo-synced layers
+    bool   reverse_all = false;///&lt; reverse the finished mix (offline)
+    double fade_in_ms = 1.0, fade_out_ms = 6.0;
+    std::vector&lt;LayerSpec&gt; layers;
+    LayerSpec&amp; add(const std::string&amp; layer_name) { layers.emplace_back(); layers.back().name = layer_name; return layers.back(); }
+    double total_seconds() const</code></pre>
+</section>
+<div class="pager"><a href="sfx.html"><small>Previous</small>SFX engine overview</a><a class="r" href="sfx-engine.html"><small>Next</small>Render engine</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

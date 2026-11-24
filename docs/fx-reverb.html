@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reverb · Wauvio Docs</title><meta name="description" content="FDN reverb, procedural IRs and convolution reverb.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Reverb</h1>
+
+<h2>FdnReverb</h2>
+<p>An 8-line feedback delay network reverb.</p><table><thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>decay_s</code></td><td>2.5</td><td>Low-frequency RT60, 0.1–30 s</td></tr><tr><td><code>predelay_ms</code></td><td>15</td><td></td></tr><tr><td><code>size</code></td><td>1.0</td><td>Scales delay lengths (0.4 small room … 2.5 huge hall)</td></tr><tr><td><code>damping_hz</code></td><td>6000</td><td>High frequencies decay faster above this; 0 = none</td></tr><tr><td><code>diffusion</code></td><td>0.6</td><td>0..1 input smearing</td></tr><tr><td><code>mod_depth_ms</code>, <code>mod_rate_hz</code></td><td>0.25, 0.35</td><td>Delay-length wobble against metallic ringing</td></tr><tr><td><code>width</code></td><td>1.0</td><td>Wet stereo width</td></tr><tr><td><code>lowcut_hz</code>, <code>highcut_hz</code></td><td>80, 12000</td><td>Wet filtering</td></tr><tr><td><code>mix</code></td><td>0.3</td><td></td></tr></tbody></table>
+<h2>Procedural impulse responses — <code>ir::</code></h2>
+<p><code>ir::Params</code>: <code>rt60</code> 1.8, <code>predelay_ms</code> 8, <code>hf_damping</code> 0.5, <code>early</code> 0.5, <code>stereo</code> 1.0, <code>seed</code> 1. <code>ir::make(params, sr)</code> builds a stereo IR from sparse early reflections plus an exponentially decaying, progressively darker Gaussian-noise tail; identical params and seed give an identical IR. Presets:</p><table><thead><tr><th>Preset</th><th>rt60 (s)</th><th>predelay (ms)</th><th>hf_damping</th><th>early</th></tr></thead><tbody><tr><td><code>room()</code></td><td>0.6</td><td>3</td><td>0.55</td><td>0.7</td></tr><tr><td><code>chamber()</code></td><td>1.3</td><td>6</td><td>0.45</td><td>0.55</td></tr><tr><td><code>hall()</code></td><td>2.8</td><td>22</td><td>0.5</td><td>0.35</td></tr><tr><td><code>cathedral()</code></td><td>6.0</td><td>35</td><td>0.65</td><td>0.25</td></tr><tr><td><code>plate()</code></td><td>2.0</td><td>0</td><td>0.15</td><td>0.0</td></tr></tbody></table>
+<h2>ConvolutionReverb</h2>
+<p>Uniform-partitioned overlap-save FFT convolution (512-sample partitions; latency 512 samples, compensated by <code>Chain</code>). A stereo IR convolves left with left and right with right; a mono IR is used for both. Set the IR with <code>set_ir(StereoBuffer, sr)</code>, <code>set_ir(Buffer, sr)</code>, <code>set_ir(ir::Params)</code> (generated at the render rate on prepare) or <code>load_ir(path)</code> (WAV, resampled if needed). Fields: <code>mix</code> 0.3, <code>predelay_ms</code>, <code>wet_gain_db</code>, <code>normalize_ir</code> (unit energy).</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-fx-effects-reverb-hpp"><h3><code>wauvio/fx/effects/reverb.hpp</code></h3>
+<h4 id="wauvio-fx-effects-reverb-hpp-wauvio-fx-fdnreverb"><span class="ns">wauvio::fx::</span>class FdnReverb</h4>
+<pre><code>class FdnReverb : public Effect
+public:
+    double decay_s      = 2.5;      ///&lt; RT60 at low frequencies, 0.1 .. 30 s (damping makes highs shorter)
+    double predelay_ms  = 15.0;
+    double size         = 1.0;      ///&lt; scales all delay lengths (0.4 small room .. 2.5 huge hall)
+    double damping_hz   = 6000.0;   ///&lt; high frequencies decay faster above this; 0 = no damping
+    double diffusion    = 0.6;      ///&lt; 0..1, input smearing (allpass chain)
+    double mod_depth_ms = 0.25;     ///&lt; slow delay-length wobble; breaks up metallic ringing (0 = off)
+    double mod_rate_hz  = 0.35;
+    double width        = 1.0;      ///&lt; wet stereo width: 0 = mono, 1 = full
+    double lowcut_hz    = 80.0;     ///&lt; wet high-pass (0 = off)
+    double highcut_hz   = 12000.0;  ///&lt; wet low-pass (0 = off)
+    double mix          = 0.3;
+    std::string name() const override { return "FdnReverb"; }
+    double tail_seconds() const override { return predelay_ms * 0.001 + std::min(30.0, std::max(0.1, decay_s)) * 1.1; }
+    void reset() override
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override
+    struct Params
+        double rt60        = 1.8;     ///&lt; seconds to -60 dB
+        double predelay_ms = 8.0;
+        double hf_damping  = 0.5;     ///&lt; 0 = bright tail, 1 = very dark tail
+        double early       = 0.5;     ///&lt; early-reflection level 0..1 (0 = none)
+        double stereo      = 1.0;     ///&lt; 0 = both channels identical, 1 = fully decorrelated
+        uint64_t seed      = 1;
+    inline Params room()      { Params p; p.rt60 = 0.6;  p.predelay_ms = 3;  p.hf_damping = 0.55; p.early = 0.7; return p; }
+    inline Params chamber()   { Params p; p.rt60 = 1.3;  p.predelay_ms = 6;  p.hf_damping = 0.45; p.early = 0.55; return p; }
+    inline Params hall()      { Params p; p.rt60 = 2.8;  p.predelay_ms = 22; p.hf_damping = 0.5;  p.early = 0.35; return p; }
+    inline Params cathedral() { Params p; p.rt60 = 6.0;  p.predelay_ms = 35; p.hf_damping = 0.65; p.early = 0.25; return p; }
+    inline Params plate()     { Params p; p.rt60 = 2.0;  p.predelay_ms = 0;  p.hf_damping = 0.15; p.early = 0.0;  return p; }
+    /// Stereo impulse response: sparse early reflections + a gaussian-noise tail that
+    /// decays exponentially and gets darker over time. Same params + seed = same IR.
+    inline StereoBuffer make(const Params&amp; p, int sr)</code></pre>
+<h4 id="wauvio-fx-effects-reverb-hpp-wauvio-fx-convolutionreverb"><span class="ns">wauvio::fx::</span>class ConvolutionReverb</h4>
+<pre><code>//  ConvolutionReverb - uniform-partitioned overlap-save FFT convolution
+//  Stereo IR: left input * IR left, right input * IR right. Mono IR: used on both.
+//  Latency = partition size (512 samples); Chain compensates it.
+class ConvolutionReverb : public Effect
+public:
+    double mix         = 0.3;
+    double predelay_ms = 0.0;
+    double wet_gain_db = 0.0;
+    bool   normalize_ir = true;   ///&lt; scale IR to unit energy so wet level ~ input level
+    std::string name() const override { return "ConvolutionReverb"; }
+    size_t latency_samples() const override { return B; }
+    double tail_seconds() const override { return ir_seconds_ + predelay_ms * 0.001; }
+    void set_ir(const StereoBuffer&amp; ir, int ir_sr) { ir_[0] = ir.L; ir_[1] = ir.R; ir_sr_ = ir_sr; dirty_ = true; update_len(); }
+    void set_ir(const Buffer&amp; mono, int ir_sr)     { ir_[0] = mono; ir_[1] = mono; ir_sr_ = ir_sr; dirty_ = true; update_len(); }
+    /// Procedural IR (see ir::room() etc.). Generated at the current sample rate on prepare.
+    void set_ir(const ir::Params&amp; p) { proc_ = p; use_proc_ = true; dirty_ = true; ir_seconds_ = p.predelay_ms * 0.001 + p.rt60 * 1.15; }
+    /// Load a WAV impulse response (mono or stereo; resampled to the render rate if needed).
+    void load_ir(const std::string&amp; path)
+    void reset() override
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+</section>
+<div class="pager"><a href="fx-modulation-delay-stereo.html"><small>Previous</small>Modulation, delay and stereo</a><a class="r" href="fx-mastering.html"><small>Next</small>Loudness and mastering</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

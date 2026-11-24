@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Effect, Chain and DSP utilities · Wauvio Docs</title><meta name="description" content="Effect base class, Chain and shared DSP utilities.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Effect, Chain and DSP utilities</h1>
+
+<h2>Effect (abstract base)</h2>
+<p>Header <code>fx/core/fx_effect.hpp</code>. Pure virtuals: <code>name()</code>, <code>reset()</code>, <code>process(float* L, float* R, size_t n)</code> (in place, streaming). Overridable: <code>tail_seconds()</code> (how long the output rings after silence), <code>latency_samples()</code> (lookahead delay), <code>on_prepare()</code>.</p>
+<ul>
+<li><code>bypass</code> — honoured by <code>Chain</code>, which then ignores the effect's latency and tail.</li>
+<li><code>prepare(sr)</code> — allocate for a sample rate and reset; mandatory before calling the raw-pointer <code>process()</code>. <code>ensure_prepared(sr)</code>, <code>sample_rate()</code>, <code>prepared()</code>.</li>
+<li><code>process(StereoBuffer&amp;, sr)</code> — whole buffer, in place, auto-prepares; no tail extension, latency <em>not</em> compensated. <code>process(Buffer&amp;, sr)</code> runs as dual-mono and returns the channel average.</li>
+</ul>
+<h2>Chain</h2>
+<p>An ordered, owning list of effects. <code>add&lt;E&gt;(args…)</code> constructs in place and returns <code>E&amp;</code> so parameters can be set immediately; <code>add(unique_ptr)</code>, <code>at(i)</code>, <code>size()</code>, <code>empty()</code>, <code>clear()</code>, <code>reset()</code>. <code>latency_samples()</code> and <code>tail_seconds()</code> sum the non-bypassed effects. <code>process(buf, sr, keep_tail = true)</code> runs from a clean state, removes the total latency so output stays aligned with input, and (with <code>keep_tail</code>) lengthens the buffer by <code>tail_seconds()</code> so reverb/delay tails survive. Chains are move-only.</p>
+<h2>DSP utilities (<code>fx_common.hpp</code>)</h2><table><thead><tr><th>Item</th><th>Description</th></tr></thead><tbody><tr><td><code>db_to_lin</code>, <code>lin_to_db</code>, <code>flush_denormal</code></td><td>Level conversion (floor 1e-12) and denormal flush</td></tr><tr><td><code>div::whole … sixteenth</code>, <code>dotted()</code>, <code>triplet()</code></td><td>Beat-length constants (quarter = 1.0) and modifiers</td></tr><tr><td><code>beats_to_seconds(bpm, beats)</code></td><td>Tempo helper</td></tr><tr><td><code>Rng</code></td><td>Deterministic xorshift-style PRNG: <code>reseed</code>, <code>next_u64</code>, <code>uniform</code> [0,1), <code>bipolar</code>, <code>gaussian</code></td></tr><tr><td><code>FilterType</code>, <code>BiquadCoef</code>, <code>design_biquad</code>, <code>biquad_magnitude</code>, <code>Biquad</code></td><td>LowPass, HighPass, BandPass, Notch, Peak, LowShelf, HighShelf, AllPass designs; magnitude response; processing section</td></tr><tr><td><code>DCBlocker</code></td><td>One-pole DC removal</td></tr><tr><td><code>time_coef</code></td><td>Time-constant to smoothing coefficient</td></tr><tr><td><code>LfoShape</code>, <code>lfo_eval</code></td><td>Sine, Triangle, Square, SoftSquare</td></tr><tr><td><code>is_pow2</code>, <code>next_pow2</code>, <code>fft</code></td><td>FFT helpers (in-place complex FFT/IFFT)</td></tr></tbody></table>
+<h2>Audio file input (<code>fx_io.hpp</code>)</h2>
+<p><code>read_wav(path)</code> → <code>AudioData {sample_rate, channels (vector of vectors), frames()}</code>; <code>resample_linear(in, from_sr, to_sr)</code>. Used by <code>ConvolutionReverb::load_ir</code>.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-fx-core-fx-effect-hpp"><h3><code>wauvio/fx/core/fx_effect.hpp</code></h3>
+<h4 id="wauvio-fx-core-fx-effect-hpp-wauvio-fx-effect"><span class="ns">wauvio::fx::</span>class Effect</h4>
+<pre><code>/// Base class for every wauvio::fx processor.
+///
+/// Parameters are plain public fields (like the rest of Wauvio) and are re-read
+/// at the start of every process() call, so they can be changed between calls.
+/// The raw-pointer process() is the streaming entry point (call prepare() first);
+/// the StereoBuffer / Buffer overloads prepare automatically.
+class Effect
+public:
+    virtual ~Effect() = default;
+    bool bypass = false;                          ///&lt; honoured by Chain (skips the effect and its latency/tail)
+    virtual std::string name() const = 0;
+    virtual void reset() = 0;                     ///&lt; clear internal state (keeps parameters)
+    virtual void process(float* L, float* R, size_t n) = 0;   ///&lt; in place, streaming
+    virtual double tail_seconds() const { return 0.0; }       ///&lt; how long the output rings after silence
+    virtual size_t latency_samples() const { return 0; }      ///&lt; lookahead / FIR delay in samples
+    /// Allocates for `sr` and resets. Must be called before the raw process().
+    void prepare(int sr) { sr_ = sr &gt; 0 ? sr : global_config().sample_rate; prepared_ = true; on_prepare(); reset(); }
+    int  sample_rate() const noexcept { return sr_; }
+    bool prepared() const noexcept { return prepared_; }
+    void ensure_prepared(int sr) { if (sr &lt;= 0) sr = global_config().sample_rate; if (!prepared_ || sr != sr_) prepare(sr); }
+    /// Convenience: whole-buffer, in place, no tail extension, latency NOT compensated.
+    void process(StereoBuffer&amp; b, int sr = 0)
+    /// Mono convenience: runs as dual-mono and returns the channel average.
+    void process(Buffer&amp; m, int sr = 0)</code></pre>
+<h4 id="wauvio-fx-core-fx-effect-hpp-wauvio-fx-chain"><span class="ns">wauvio::fx::</span>class Chain</h4>
+<pre><code>/// An ordered list of effects. Whole-buffer processing with automatic
+/// latency compensation and tail extension.
+class Chain
+public:
+    Chain() = default;
+    Chain(Chain&amp;&amp;) = default;
+    Chain&amp; operator=(Chain&amp;&amp;) = default;
+    /// Construct an effect in place and return a reference so you can set parameters:
+    ///   auto&amp; c = chain.add&lt;Compressor&gt;(); c.threshold_db = -20;
+    template &lt;class E, class... A&gt;
+    E&amp; add(A&amp;&amp;... a)
+        auto p = std::make_unique&lt;E&gt;(std::forward&lt;A&gt;(a)...);
+        E&amp; ref = *p; fx_.push_back(std::move(p)); return ref;
+    template &lt;class E&gt;
+    E&amp; add(std::unique_ptr&lt;E&gt; p) { E&amp; ref = *p; fx_.push_back(std::move(p)); return ref; }
+    size_t size() const noexcept { return fx_.size(); }
+    bool   empty() const noexcept { return fx_.empty(); }
+    Effect&amp; at(size_t i) { return *fx_.at(i); }
+    const Effect&amp; at(size_t i) const { return *fx_.at(i); }
+    void clear() { fx_.clear(); }
+    size_t latency_samples() const { size_t t = 0; for (auto&amp; e : fx_) if (!e-&gt;bypass) t += e-&gt;latency_samples(); return t; }
+    double tail_seconds() const   { double t = 0; for (auto&amp; e : fx_) if (!e-&gt;bypass) t += e-&gt;tail_seconds(); return t; }
+    void reset() { for (auto&amp; e : fx_) e-&gt;reset(); }
+    /// Process a whole buffer from a clean state. Output is aligned with the input
+    /// (latency removed) and, if keep_tail, extended by tail_seconds() so reverb and
+    /// delay tails are not cut off.
+    void process(StereoBuffer&amp; buf, int sr = 0, bool keep_tail = true)
+    void process(Buffer&amp; mono, int sr = 0, bool keep_tail = true)</code></pre>
+</section>
+<section class="file" id="wauvio-fx-core-fx-common-hpp"><h3><code>wauvio/fx/core/fx_common.hpp</code></h3>
+<h4 id="wauvio-fx-core-fx-common-hpp-wauvio-fx-free-functions-constants-and-aliases"><span class="ns">wauvio::fx::</span>Free functions, constants and aliases</h4>
+<pre><code>inline double db_to_lin(double db) noexcept { return std::pow(10.0, db / 20.0); }
+inline double lin_to_db(double lin) noexcept { return 20.0 * std::log10(std::max(lin, 1e-12)); }
+inline float  flush_denormal(float x) noexcept { return (std::fabs(x) &lt; 1e-20f) ? 0.0f : x; }
+    constexpr double whole = 4.0, half = 2.0, quarter = 1.0, eighth = 0.5, sixteenth = 0.25;
+    constexpr double dotted(double beats)  noexcept { return beats * 1.5; }
+    constexpr double triplet(double beats) noexcept { return beats * 2.0 / 3.0; }
+inline double beats_to_seconds(double bpm, double beats) noexcept</code></pre>
+<h4 id="wauvio-fx-core-fx-common-hpp-wauvio-fx-rng"><span class="ns">wauvio::fx::</span>class Rng</h4>
+<pre><code>class Rng
+public:
+    explicit Rng(uint64_t seed = 0x9E3779B97F4A7C15ull) { reseed(seed); }
+    void reseed(uint64_t seed) { s_ = seed ? seed : 0x9E3779B97F4A7C15ull; for (int i = 0; i &lt; 4; ++i) next_u64(); }
+    uint64_t next_u64() noexcept { s_ ^= s_ &gt;&gt; 12; s_ ^= s_ &lt;&lt; 25; s_ ^= s_ &gt;&gt; 27; return s_ * 0x2545F4914F6CDD1Dull; }
+    double uniform() noexcept { return (next_u64() &gt;&gt; 11) * (1.0 / 9007199254740992.0); }     // [0,1)
+    double bipolar() noexcept { return uniform() * 2.0 - 1.0; }                                // [-1,1)
+    double gaussian() noexcept {                                                                // N(0,1), Box-Muller</code></pre>
+<h4 id="wauvio-fx-core-fx-common-hpp-wauvio-fx-filtertype"><span class="ns">wauvio::fx::</span>enum class FilterType</h4>
+<pre><code>enum class FilterType { LowPass, HighPass, BandPass, Notch, Peak, LowShelf, HighShelf, AllPass };</code></pre>
+<h4 id="wauvio-fx-core-fx-common-hpp-wauvio-fx-biquadcoef"><span class="ns">wauvio::fx::</span>struct BiquadCoef</h4>
+<pre><code>struct BiquadCoef { double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0; };
+inline BiquadCoef design_biquad(FilterType t, double fs, double f0, double q, double gain_db = 0.0)
+inline double biquad_magnitude(const BiquadCoef&amp; c, double fs, double f)</code></pre>
+<h4 id="wauvio-fx-core-fx-common-hpp-wauvio-fx-biquad"><span class="ns">wauvio::fx::</span>class Biquad</h4>
+<pre><code>class Biquad
+public:
+    void set(const BiquadCoef&amp; c) noexcept { c_ = c; }
+    const BiquadCoef&amp; coef() const noexcept { return c_; }
+    float tick(float x) noexcept
+    void reset() noexcept { z1_ = z2_ = 0.0; }</code></pre>
+<h4 id="wauvio-fx-core-fx-common-hpp-wauvio-fx-dcblocker"><span class="ns">wauvio::fx::</span>class DCBlocker</h4>
+<pre><code>class DCBlocker
+public:
+    float tick(float x) noexcept { const float y = x - x1_ + 0.9982f * y1_; x1_ = x; y1_ = flush_denormal(y); return y; }
+    void reset() noexcept { x1_ = y1_ = 0.0f; }
+inline double time_coef(double ms, double sr) noexcept</code></pre>
+<h4 id="wauvio-fx-core-fx-common-hpp-wauvio-fx-lfoshape"><span class="ns">wauvio::fx::</span>enum class LfoShape</h4>
+<pre><code>enum class LfoShape { Sine, Triangle, Square, SoftSquare };
+inline double lfo_eval(LfoShape s, double phase) noexcept
+inline bool is_pow2(size_t n) noexcept { return n &amp;&amp; !(n &amp; (n - 1)); }
+inline size_t next_pow2(size_t n) noexcept { size_t p = 1; while (p &lt; n) p &lt;&lt;= 1; return p; }
+inline void fft(std::vector&lt;std::complex&lt;float&gt;&gt;&amp; a, bool inverse)</code></pre>
+</section>
+<section class="file" id="wauvio-fx-core-fx-io-hpp"><h3><code>wauvio/fx/core/fx_io.hpp</code></h3>
+<h4 id="wauvio-fx-core-fx-io-hpp-wauvio-fx-audiodata"><span class="ns">wauvio::fx::</span>struct AudioData</h4>
+<pre><code>struct AudioData
+    int sample_rate = 44100;
+    std::vector&lt;std::vector&lt;float&gt;&gt; channels;
+    size_t frames() const { return channels.empty() ? 0 : channels[0].size(); }
+inline AudioData read_wav(const std::string&amp; path)
+inline std::vector&lt;float&gt; resample_linear(const std::vector&lt;float&gt;&amp; in, int from_sr, int to_sr)</code></pre>
+</section>
+<div class="pager"><a href="fx.html"><small>Previous</small>FX suite overview</a><a class="r" href="fx-eq-dynamics.html"><small>Next</small>EQ and dynamics</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

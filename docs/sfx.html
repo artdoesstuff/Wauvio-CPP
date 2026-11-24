@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SFX engine overview · Wauvio Docs</title><meta name="description" content="SFX engine overview.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">SFX engine (wauvio/sfx)</div><h1>SFX engine overview</h1>
+
+<p>The SFX engine (<code>wauvio/sfx.hpp</code>, namespace <code>wauvio::sfx</code>) designs and renders sound effects — risers, impacts, glitches, textures, bass FX, ear candy, vocal FX, rhythmic FX, synthetic percussion, experimental sounds, tonal motion and reverses. It ships a catalog of <strong>190 presets in 12 categories</strong>, a low-level recipe language to build your own, a layering composer and a command-line tool.</p>
+<h2>Concepts</h2><table><thead><tr><th>Concept</th><th>What it is</th><th>Page</th></tr></thead><tbody><tr><td><code>Traj</code>, <code>Mod</code></td><td>Parameter trajectories over normalised time, and stateless LFOs</td><td><a href="sfx-recipes.html">Recipes</a></td></tr><tr><td><code>Recipe</code>, <code>LayerSpec</code></td><td>Plain-data description of an effect: layers, each with one source and a processor chain</td><td><a href="sfx-recipes.html">Recipes</a></td></tr><tr><td><code>render()</code>, <code>RenderSettings</code>, <code>Rendered</code></td><td>Turn a recipe into audio, deterministically from a seed</td><td><a href="sfx-engine.html">Engine</a></td></tr><tr><td><code>Preset</code>, <code>Registry</code>, <code>Effect</code></td><td>Parametrised recipes with metadata; the tunable handle you actually use</td><td><a href="sfx-presets.html">Presets</a></td></tr><tr><td><code>Layered</code></td><td>Composite of several presets/effects/audio with offsets, pitch and pan</td><td><a href="sfx-presets.html">Presets</a></td></tr><tr><td>Parameter dictionary</td><td>The shared vocabulary of preset parameters</td><td><a href="sfx-params.html">Parameters</a></td></tr><tr><td><code>wauvio_sfx_tool</code></td><td>CLI: list, search, info, render, catalog</td><td><a href="sfx-tool.html">Tool</a></td></tr><tr><td>Examples</td><td>Eight annotated programs</td><td><a href="sfx-examples.html">Examples</a></td></tr></tbody></table>
+<h2>Quick start</h2>
+<pre><code>#include "wauvio/sfx.hpp"
+namespace sfx = wauvio::sfx;
+
+sfx::Effect hit = sfx::make("cinematic_impact");     // throws sfx::Error (with suggestions) on unknown ids
+hit.set("duration", 3.0).set("tail", 4.0).seed(1234);
+sfx::Rendered audio = hit.render();                  // 44.1 kHz stereo, peak normalised to -1 dBFS
+audio.save("impact.wav");</code></pre>
+<h2>Design principles</h2>
+<ul>
+<li><strong>Deterministic.</strong> Every random decision derives from a seed; the same recipe, seed and settings give the same audio. (Floating-point results can differ between platforms/compilers.)</li>
+<li><strong>Strict validation.</strong> Parameter values outside their range and non-finite numbers throw <code>sfx::Error</code>; nothing is silently clamped.</li>
+<li><strong>Data-driven.</strong> Recipes are plain structs; presets are functions that fill a recipe from parameters, so you can add presets to your own <code>Registry</code>.</li>
+<li><strong>Tempo aware.</strong> Effects accept a tempo and durations in beats; gates, LFOs and layered offsets can lock to it.</li>
+<li><strong>Offline.</strong> Rendering is whole-buffer, with a memory guard (<code>max_seconds</code>, default 120 s).</li>
+</ul>
+<h2>Include order (<code>sfx.hpp</code>)</h2>
+<p>core (<code>sfx_common</code>, <code>sfx_traj</code>, <code>sfx_params</code>, <code>sfx_recipe</code>, <code>sfx_helpers</code>) → render (<code>sources</code>, <code>processors</code>, <code>engine</code>) → <code>presets/registry</code> → <code>layers/layered</code> → <code>presets/builtin</code> (registers all 12 category files).</p>
+
+<div class="pager"><a href="sf2.html"><small>Previous</small>SoundFont (SF2) support</a><a class="r" href="sfx-recipes.html"><small>Next</small>Recipes, trajectories and modulators</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

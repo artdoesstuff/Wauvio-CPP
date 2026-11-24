@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Saturation and bitcrushing · Wauvio Docs</title><meta name="description" content="Saturator, Bitcrusher and the oversampler.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Saturation and bitcrushing</h1>
+
+<h2>Oversampler1</h2>
+<p>Single-channel 1×/2×/4×/8× oversampler built from 97-tap Kaiser-windowed half-band stages (≈90 dB stop-band). <code>prepare(factor)</code>, <code>process(in, out, n, fn)</code> up-samples, runs <code>fn</code> at the high rate, then down-samples; <code>latency()</code> and the static <code>latency_for(factor)</code> give the integer round-trip delay.</p>
+<h2>Saturator</h2><table><thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>mode</code></td><td>Soft</td><td><code>Soft, Tube, Tape, Hard, Fold, Asymmetric</code></td></tr><tr><td><code>drive_db</code></td><td>12</td><td>Input gain into the shaper</td></tr><tr><td><code>bias</code></td><td>0</td><td>−1..1; adds even harmonics (Tube/Asymmetric)</td></tr><tr><td><code>tone_hz</code></td><td>0</td><td>Post low-pass; 0 = off</td></tr><tr><td><code>mix</code></td><td>1</td><td></td></tr><tr><td><code>output_db</code></td><td>0</td><td></td></tr><tr><td><code>oversample</code></td><td>2</td><td>1, 2, 4 or 8; reported via <code>latency_samples()</code></td></tr></tbody></table>
+<h2>Bitcrusher</h2>
+<p><code>bits</code> (8; 2–24, fractional allowed, mid-tread so silence stays silent), <code>downsample</code> (1 = off), <code>dither</code> (TPDF, seeded), <code>mix</code>, <code>seed</code>.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-fx-effects-saturation-hpp"><h3><code>wauvio/fx/effects/saturation.hpp</code></h3>
+<h4 id="wauvio-fx-effects-saturation-hpp-wauvio-fx-oversampler1"><span class="ns">wauvio::fx::</span>class Oversampler1</h4>
+<pre><code>//  Oversampler1 - one channel. Each 2x stage is a 97-tap Kaiser-windowed half-band
+//  low-pass (beta 9, ~90 dB stop-band). Latency is an integer number of samples.
+class Oversampler1
+public:
+    static constexpr int D = 48;              // half length; taps = 2D + 1
+    static constexpr int T = 2 * D + 1;
+    /// factor: 1, 2, 4 or 8
+    void prepare(int factor)
+    int factor() const noexcept { return factor_; }
+    static int normalise_factor(int f) noexcept { return f &gt;= 8 ? 8 : f &gt;= 4 ? 4 : f &gt;= 2 ? 2 : 1; }
+    /// Round-trip delay (base-rate samples) for a given factor, before prepare().
+    static size_t latency_for(int f) noexcept { f = normalise_factor(f); return f == 1 ? 0 : static_cast&lt;size_t&gt;(D) * (2 * static_cast&lt;size_t&gt;(f) - 2) / static_cast&lt;size_t&gt;(f); }
+    /// Round-trip delay in base-rate samples (up + down).
+    size_t latency() const noexcept { return latency_for(factor_); }
+    void reset() { for (auto&amp; s : st_) { std::fill(s.up_hist.begin(), s.up_hist.end(), 0.0f);
+    /// Up-sample, run fn(float* hi, size_t m) in place at the high rate, down-sample.
+    /// `in` and `out` may be the same pointer.
+    template &lt;class F&gt;
+    void process(const float* in, float* out, size_t n, F&amp;&amp; fn)
+        if (factor_ == 1) { if (in != out) std::copy(in, in + n, out); fn(out, n); return; }
+        const size_t B = 1024;
+        for (size_t off = 0; off &lt; n; off += B)</code></pre>
+<h4 id="wauvio-fx-effects-saturation-hpp-wauvio-fx-saturator"><span class="ns">wauvio::fx::</span>class Saturator</h4>
+<pre><code>class Saturator : public Effect
+public:
+    enum class Mode { Soft, Tube, Tape, Hard, Fold, Asymmetric };
+    Mode   mode       = Mode::Soft;
+    double drive_db   = 12.0;   ///&lt; input gain into the shaper
+    double bias       = 0.0;    ///&lt; -1..1, adds even harmonics (Tube/Asymmetric); Tube always adds a little
+    double tone_hz    = 0.0;    ///&lt; post low-pass; 0 = off
+    double mix        = 1.0;
+    double output_db  = 0.0;
+    int    oversample = 2;      ///&lt; 1 (off), 2, 4 or 8 - reduces aliasing of the added harmonics
+    std::string name() const override { return "Saturator"; }
+    size_t latency_samples() const override { return Oversampler1::latency_for(oversample); }
+    void reset() override
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+<h4 id="wauvio-fx-effects-saturation-hpp-wauvio-fx-bitcrusher"><span class="ns">wauvio::fx::</span>class Bitcrusher</h4>
+<pre><code>class Bitcrusher : public Effect
+public:
+    double bits      = 8.0;     ///&lt; 2..24 -&gt; 2^bits - 1 levels (mid-tread: silence stays silent); fractions allowed
+    double downsample = 1.0;    ///&lt; hold each sample for this many samples (1 = off, 4 = quarter rate)
+    bool   dither    = false;   ///&lt; TPDF dither before quantising (seeded, deterministic)
+    double mix       = 1.0;
+    uint64_t seed    = 1;
+    std::string name() const override { return "Bitcrusher"; }
+    void reset() override { phase_[0] = phase_[1] = 1.0; held_[0] = held_[1] = 0.0f; rng_.reseed(seed); }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+</section>
+<div class="pager"><a href="fx-eq-dynamics.html"><small>Previous</small>EQ and dynamics</a><a class="r" href="fx-modulation-delay-stereo.html"><small>Next</small>Modulation, delay and stereo</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

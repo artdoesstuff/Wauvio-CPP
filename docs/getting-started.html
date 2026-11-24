@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Getting started · Wauvio Docs</title><meta name="description" content="Requirements, headers, compiling and first sounds.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Overview</div><h1>Getting started</h1>
+
+<h2>Requirements</h2>
+<ul>
+<li>A C++17 compiler (GCC, Clang or MSVC).</li>
+<li>No libraries to build or link, with one exception: on <strong>Windows</strong>, link <code>winmm.lib</code> for audio playback (<code>-lwinmm</code> with MinGW).</li>
+<li>For sound on <strong>Linux</strong>, FFmpeg must be installed: playback pipes PCM to <code>ffmpeg</code> (ALSA, then PulseAudio) or <code>ffplay</code>. Rendering to WAV needs nothing.</li>
+<li>Wauvio is header-only: add the repository root to your include path and include the header you need.</li>
+</ul>
+<h2>Which header?</h2><table><thead><tr><th>Include</th><th>Gives you</th></tr></thead><tbody><tr><td><code>"wauvio.hpp"</code></td><td>The core (<code>wauvio/core/*</code>)</td></tr><tr><td><code>"wauvio/ext.hpp"</code></td><td>Core + music layer + instruments + sampling + genre system</td></tr><tr><td><code>"wauvio/fx.hpp"</code></td><td>Core + full FX suite</td></tr><tr><td><code>"wauvio/fx/ext.hpp"</code></td><td>FX + music layer + Arrangement→Mixer bridge and <code>fx::write_wav</code></td></tr><tr><td><code>"wauvio/midi.hpp"</code></td><td>Music layer + MIDI loading, rendering, writing, genre</td></tr><tr><td><code>"wauvio/fx/midi.hpp"</code></td><td>MIDI + FX + MIDI→Mixer bridge</td></tr><tr><td><code>"wauvio/sf2.hpp"</code></td><td>Music layer + SoundFont loader</td></tr><tr><td><code>"wauvio/sfx.hpp"</code></td><td>SFX engine (needs only the core)</td></tr><tr><td><code>"wauvio/vocal/v3.hpp"</code></td><td>Vocal engine v3 (also <code>v1.hpp</code>, <code>v2.hpp</code>; <code>v3_fx.hpp</code> adds the FX chain)</td></tr></tbody></table>
+<h2>Compile</h2>
+<pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo my_program.cpp -o my_program
+# Windows (MinGW): add -lwinmm</code></pre>
+<p>Headers are large; <code>-O2</code> is recommended for rendering speed (the vocal and SFX engines are CPU-heavy).</p>
+<h2>First sound — core</h2>
+<pre><code>#include "wauvio.hpp"
+using namespace wauvio;
+
+int main() {
+    seq::Instrument ins;
+    ins.shape = osc::WaveShape::BL_Sawtooth;
+    seq::Track t;
+    t.instrument = ins;
+    t.add(theory::notes::C4, 0.5, 0.8).add(theory::notes::E4, 0.5, 0.8)
+     .rest(0.25).add(theory::notes::G4, 0.5, 0.8);
+    Buffer b = t.render();
+    normalize(b);
+    save_wav(b, "first.wav");      // 44.1 kHz, 16-bit mono
+    // play(b);                    // blocking playback
+}</code></pre>
+<h2>First arrangement — music layer</h2>
+<pre><code>#include "wauvio/ext.hpp"
+using namespace wauvio;
+
+int main() {
+    music::Arrangement arr;
+    instruments::Trumpet trumpet;
+    music::Melody m = { {60, 0.5}, {64, 0.5}, music::rest(0.5), {72, 1.0} };
+    arr.add(trumpet, m);
+    arr.limiter();
+    render(arr, "arrangement.wav");
+}</code></pre>
+<h2>Next</h2>
+<ul><li>Process or master audio: <a href="fx.html">FX suite</a>.</li><li>Play a MIDI file with real instruments: <a href="midi.html">MIDI layer</a>.</li><li>Design sound effects: <a href="sfx.html">SFX engine</a>.</li><li>Sing: <a href="vocal.html">Vocal engine</a>.</li></ul>
+<h2>Conventions worth knowing</h2>
+<ul>
+<li>Sample rate defaults to 44100 Hz (<code>global_config().sample_rate</code>); functions taking <code>sample_rate = 0</code> use it.</li>
+<li>Parameters are public fields. Where coefficients are cached, call the matching <code>init()</code>/<code>update_coeffs()</code>/<code>prepare()</code> after changing them.</li>
+<li>Instruments are referenced by pointer from tracks; keep them alive while rendering.</li>
+<li>Rendering is deterministic wherever a seed exists (SFX, vocal, genre, noise).</li>
+</ul>
+
+<div class="pager"><a href="index.html"><small>Previous</small>Wauvio documentation</a><a class="r" href="architecture.html"><small>Next</small>Architecture</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

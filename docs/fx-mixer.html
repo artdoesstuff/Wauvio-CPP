@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mixer and bridges · Wauvio Docs</title><meta name="description" content="Mixer, sends, sidechain and arrangement/MIDI bridges.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Mixer and bridges</h1>
+
+<h2>Mixer</h2>
+<p>Header <code>fx/mixer/mixer.hpp</code>. <code>Mixer(sample_rate)</code> combines audio <code>Source</code>s (<code>name</code>, <code>audio</code>, <code>start_sec</code>, linear <code>gain</code>).</p>
+<ul>
+<li><code>add_source(Source)</code> → index; <code>source(i)</code>, <code>source_count()</code>.</li>
+<li><code>insert(i)</code> → the source's insert <code>Chain&amp;</code>.</li>
+<li><code>add_bus(name)</code> → index; <code>bus(i)</code> → bus <code>Chain&amp;</code>; <code>bus_index(name)</code> (throws <code>std::out_of_range</code>).</li>
+<li><code>send(src, bus, amount, post_fader = true)</code> (index or bus name).</li>
+<li><code>sidechain(target, trigger, SidechainSettings)</code> ducks the target by the trigger's level (post-insert, pre-fader). Defaults: threshold −30 dB, ratio 6, attack 5 ms, release 150 ms, knee 4 dB, makeup 0.</li>
+<li><code>master()</code> → master <code>Chain&amp;</code>; <code>set_mastering(MasterSettings)</code>, <code>clear_mastering()</code>, <code>has_mastering()</code>, <code>last_master_report()</code>.</li>
+<li><code>render()</code> — signal flow: <strong>inserts → sidechain → sends/buses → sum → master chain → mastering</strong>. The result is not normalised or clamped.</li>
+</ul>
+<div class="note">Because <code>render()</code> keeps the mastered level, write it with <code>fx::write_wav</code> (clamps but never normalises) rather than a normalising writer.</div>
+<h2>Bridges</h2><table><thead><tr><th>Function</th><th>Header</th><th>Description</th></tr></thead><tbody><tr><td><code>mixer_from_arrangement(arr, opts)</code></td><td><code>fx/mixer/from_arrangement.hpp</code> (via <code>fx/ext.hpp</code>)</td><td>One <code>Source</code> per track with start time and gain preserved. The arrangement’s own <code>master_reverb()</code>/<code>limiter()</code> are <em>not</em> applied; use FX instead.</td></tr><tr><td><code>write_wav(buf, path, opts)</code></td><td>same</td><td>Writes the buffer as-is (clamped, never normalised) using the RenderOptions bit depth, dither and seed.</td></tr><tr><td><code>mixer_from_midi(music, opts)</code></td><td><code>fx/mixer/from_midi.hpp</code> (via <code>fx/midi.hpp</code>)</td><td>One <code>Source</code> per MIDI part, named from the file; all start at 0 and use the same instruments and genre settings as the normal MIDI render.</td></tr></tbody></table><h2>Full API listing</h2><section class="file" id="wauvio-fx-mixer-mixer-hpp"><h3><code>wauvio/fx/mixer/mixer.hpp</code></h3>
+<h4 id="wauvio-fx-mixer-mixer-hpp-wauvio-fx-source"><span class="ns">wauvio::fx::</span>struct Source</h4>
+<pre><code>struct Source
+    std::string  name;
+    StereoBuffer audio;
+    double       start_sec = 0.0;   ///&lt; where this source begins on the timeline
+    float        gain      = 1.0f;  ///&lt; fader (linear)</code></pre>
+<h4 id="wauvio-fx-mixer-mixer-hpp-wauvio-fx-sidechainsettings"><span class="ns">wauvio::fx::</span>struct SidechainSettings</h4>
+<pre><code>struct SidechainSettings
+    double threshold_db = -30.0;
+    double ratio        = 6.0;
+    double attack_ms    = 5.0;
+    double release_ms   = 150.0;
+    double knee_db      = 4.0;
+    double makeup_db    = 0.0;</code></pre>
+<h4 id="wauvio-fx-mixer-mixer-hpp-wauvio-fx-mixer"><span class="ns">wauvio::fx::</span>class Mixer</h4>
+<pre><code>class Mixer
+public:
+    explicit Mixer(int sample_rate = 0) : sr_(sample_rate &gt; 0 ? sample_rate : global_config().sample_rate) {}
+    int sample_rate() const noexcept { return sr_; }
+    size_t add_source(Source s) { srcs_.push_back(Entry{std::move(s), Chain()}); return srcs_.size() - 1; }
+    size_t source_count() const noexcept { return srcs_.size(); }
+    Source&amp; source(size_t i) { return srcs_.at(i).src; }
+    /// Insert chain for a source (runs on the source before sidechain, fader and sends).
+    Chain&amp; insert(size_t i) { return srcs_.at(i).chain; }
+    size_t add_bus(const std::string&amp; name) { buses_.push_back(Bus{name, Chain()}); return buses_.size() - 1; }
+    size_t bus_count() const noexcept { return buses_.size(); }
+    Chain&amp; bus(size_t i) { return buses_.at(i).chain; }
+    /// Look a bus up by name; throws std::out_of_range if missing.
+    size_t bus_index(const std::string&amp; name) const
+    /// Send `amount` (linear) of a source to a bus. post_fader = scaled by the source fader.
+    void send(size_t src, size_t bus_idx, double amount, bool post_fader = true)
+    void send(size_t src, const std::string&amp; bus_name, double amount, bool post_fader = true) { send(src, bus_index(bus_name), amount, post_fader); }
+    /// Duck `target` by the level of `trigger` (post-insert, pre-fader signal of the trigger).
+    void sidechain(size_t target, size_t trigger, const SidechainSettings&amp; s = SidechainSettings())
+    Chain&amp; master() { return master_; }
+    /// Optional final stage: master the summed mix to a loudness target (after the master chain).
+    void set_mastering(const MasterSettings&amp; s) { mastering_ = s; do_mastering_ = true; }
+    void clear_mastering() { do_mastering_ = false; }
+    bool has_mastering() const noexcept { return do_mastering_; }
+    const MasterReport&amp; last_master_report() const noexcept { return report_; }
+    /// Renders the mix (inserts -&gt; sidechain -&gt; sends/buses -&gt; sum -&gt; master chain -&gt; mastering).
+    /// The result is NOT normalised or clamped; write it with a level-preserving writer
+    /// (see fx::write_wav in wauvio/fx/ext.hpp) when mastering to a loudness target.
+    StereoBuffer render()</code></pre>
+</section>
+<section class="file" id="wauvio-fx-mixer-from-arrangement-hpp"><h3><code>wauvio/fx/mixer/from_arrangement.hpp</code></h3>
+<h4 id="wauvio-fx-mixer-from-arrangement-hpp-wauvio-fx-free-functions-constants-and-aliases"><span class="ns">wauvio::fx::</span>Free functions, constants and aliases</h4>
+<pre><code>/// Build a Mixer from an Arrangement: one Source per track (start time and gain preserved).
+/// The Arrangement's own master_reverb()/limiter() are NOT applied - use fx effects instead.
+inline Mixer mixer_from_arrangement(const wauvio::music::Arrangement&amp; arr, const RenderOptions&amp; opts = RenderOptions())
+/// Write a stereo buffer exactly as it is (clamped to [-1, 1]; never normalised), so a
+/// loudness-mastered mix keeps its level. Uses the RenderOptions bit depth / dither / seed.
+inline void write_wav(const StereoBuffer&amp; in, const std::string&amp; path, const RenderOptions&amp; opts = RenderOptions())</code></pre>
+</section>
+<section class="file" id="wauvio-fx-mixer-from-midi-hpp"><h3><code>wauvio/fx/mixer/from_midi.hpp</code></h3>
+<h4 id="wauvio-fx-mixer-from-midi-hpp-wauvio-fx-free-functions-constants-and-aliases"><span class="ns">wauvio::fx::</span>Free functions, constants and aliases</h4>
+<pre><code>/// One Source per MIDI part (names come from the file). Parts all start at 0 and are
+/// rendered by the same instruments / genre settings as the normal MIDI render.
+inline Mixer mixer_from_midi(const midi::track::MidiMusic&amp; music, const RenderOptions&amp; opts = RenderOptions())</code></pre>
+</section>
+<div class="pager"><a href="fx-mastering.html"><small>Previous</small>Loudness and mastering</a><a class="r" href="midi.html"><small>Next</small>MIDI layer overview</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>v3 — Expression, ornaments and events · Wauvio Docs</title><meta name="description" content="Ornaments, humanisation, speech accent and events.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v3 — Expression, ornaments and events</h1>
+
+<h2>Ornaments</h2>
+<p><code>make_ornament(name, dur, depth)</code> returns a bend curve (semitones vs seconds from note start). Names: <code>fall, doit, shakuri, scoop_in, kobushi, turn, trill, mordent</code>. <code>depth</code> scales size; unknown names return an empty curve. Apply with <code>NoteRef::ornament()</code>.</p>
+<h2>Humanisation and auto-expression</h2>
+<ul>
+<li><code>Humanize</code> — <code>timing</code>, <code>bias</code>, <code>length</code>, <code>pitch</code>, <code>tone</code> (per-note random brightness/breathiness/mouth opening), <code>entry</code> (starting pitch error corrected within ≈90 ms), <code>pressure</code> (breath pressure sag over a phrase), <code>phrase_gap</code> (0.30 s), <code>seed</code>. All deterministic; different seeds are different “takes”. <code>apply_humanize()</code>, <code>apply_pressure()</code>.</li>
+<li><code>AutoExpr</code> — switches <code>vibrato</code> (onset/fade/depth follow note length), <code>dynamics</code> (louder toward a phrase’s high point), <code>phrase_end</code> (longer fall and release on the last note), <code>articulation</code> (crisper consonants on fast notes); touches only fields still at Style defaults.</li>
+<li><code>phrase_arc_shape(kind, u)</code> — arch, crescendo, decrescendo, swell.</li>
+</ul>
+<h2>Speech intonation</h2>
+<p><code>speech_contour(kind, u)</code> gives the sentence contour. <code>accent_contour(morae, dur, nucleus, height_st = 3, declination_st = 1, mora_weighting)</code> builds a Tokyo-type pitch-accent contour: nucleus 0 = heiban (L H H…), 1 = atamadaka (H L L…), n ≥ 2 = L H…H(n) L…; a nucleus beyond the last mora means accent on the last mora. Timing follows <code>mora_cum()</code>, exactly what the engine uses.</p>
+<h2>Events</h2>
+<p>Non-lexical vocal events are written as lyric tags — <code>&lt;kind[:variant][,intensity=0..1][,pitch=semitones][,key=value…]&gt;</code> — and expanded at render time into ordinary notes with pitch contours and lanes, so they are produced by the same voice. Kinds are available from <code>event_kinds()</code>: laugh, giggle, sob, hum/hmm, shout, kyaa, and interjections (ah, eh, un, fuun, uun, eeto, ano, waa, hya, hee, eee, maa).</p>
+<ul>
+<li>Variants are lyric syllables for most kinds (they must parse to at least one mora). <code>hum</code>/<code>hmm</code> accept only “”, “hmm”, “hm?” and “mhm”; <code>laugh</code>/<code>giggle</code> also accept “kusu”.</li>
+<li><code>parse_event_tag(tag, EventSpec&amp;)</code>, <code>is_event_tag()</code>, <code>diagnose_event(spec)</code> (unknown kind/variant/parameter; empty = fine), <code>expand_event(note, spec, seed)</code>. <code>EventSpec::bad</code> lists malformed parameters.</li>
+<li>Use <code>Singer::event(kind, midi, seconds, intensity, variant)</code> or put the tag in a lyric (<code>note_sec(69, 1.2, "&lt;laugh&gt;")</code>).</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-vocal-yune-v3-expression-hpp"><h3><code>wauvio/vocal/yune-v3/expression.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-expression-hpp-wauvio-vocal-v3-free-functions-constants-and-aliases"><span class="ns">wauvio::vocal::v3::</span>Free functions, constants and aliases</h4>
+<pre><code>//   fall, doit, shakuri, scoop_in, kobushi, turn, trill, mordent
+// `depth` scales the size (1 = typical). Unknown names return an empty curve.
+inline Curve make_ornament(const std::string&amp; name, double dur, float depth = 1.f)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-expression-hpp-wauvio-vocal-v3-humanize"><span class="ns">wauvio::vocal::v3::</span>struct Humanize</h4>
+<pre><code>struct Humanize
+    bool   on = false;
+    double timing = 0.0;    // s, spread of note-start offsets
+    double bias = 0.0;      // s, constant push (+ late / lazy, - ahead)
+    double length = 0.0;    // fraction, spread of note-length changes
+    double pitch = 0.0;     // semitones, spread of per-note tuning offsets
+    double tone = 0.0;      // 0..1: per-note random brightness / breathiness / mouth-opening (no two notes sound identical)
+    double entry = 0.0;     // semitones, spread of the pitch error a note starts with (corrected within ~90 ms)
+    double pressure = 0.0;  // 0..1: breath pressure sags over a phrase (slightly quieter and flatter toward its end)
+    double phrase_gap = 0.30; // s of silence that starts a new phrase
+    uint32_t seed = 1;      // different seed = a different "take"
+    inline float hash01(uint32_t x) { x ^= x &gt;&gt; 16; x *= 0x7feb352dU; x ^= x &gt;&gt; 15; x *= 0x846ca68bU; x ^= x &gt;&gt; 16; return static_cast&lt;float&gt;(x &amp; 0xFFFFFF) / 16777216.f; }
+    inline float sym3(uint32_t seed, uint32_t i, uint32_t k) {      // ~triangular in [-1,1]
+inline void apply_humanize(std::vector&lt;SynthNote&gt;&amp; ns, const Humanize&amp; h)
+// Breath pressure over phrases: a gentle level and pitch sag that resets at each new phrase.
+inline void apply_pressure(std::vector&lt;SynthNote&gt;&amp; ns, const Humanize&amp; h)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-expression-hpp-wauvio-vocal-v3-autoexpr"><span class="ns">wauvio::vocal::v3::</span>struct AutoExpr</h4>
+<pre><code>struct AutoExpr
+    bool on = false;
+    bool vibrato = true;      // onset/fade/depth follow note length
+    bool dynamics = true;     // louder toward the phrase's high point
+    bool phrase_end = true;   // longer fall + release on a phrase's last note
+    bool articulation = true; // crisper consonants on fast notes
+    double phrase_gap = 0.30; // s of silence that starts a new phrase
+inline void apply_auto_expression(std::vector&lt;SynthNote&gt;&amp; ns, const AutoExpr&amp; a, const VoiceModel&amp; voice)
+inline double phrase_arc_shape(const std::string&amp; kind, double u)
+/// V3: Tokyo-type pitch accent as a contour (semitones vs seconds from the start of an utterance).
+/// nucleus: 0 = heiban (L H H H ... no fall), 1 = atamadaka (H L L ...), n &gt;= 2 = L H .. H(n) L ...
+/// (the pitch falls after mora n; a nucleus past the last mora means accent on the last mora, as in
+/// "otouto" + particle). height_st is the L-H distance; declination_st is the slow downdrift over the utterance.
+/// Mora timing follows mora_cum(), i.e. exactly what the engine will do with those morae.
+inline Curve accent_contour(const std::vector&lt;Mora&gt;&amp; ms, double dur, int nucleus,
+                            float height_st = 3.0f, float declination_st = 1.0f, float mora_weighting = 1.f)
+inline double speech_contour(const std::string&amp; kind, double u)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v3-events-hpp"><h3><code>wauvio/vocal/yune-v3/events.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-events-hpp-wauvio-vocal-v3-eventspec"><span class="ns">wauvio::vocal::v3::</span>struct EventSpec</h4>
+<pre><code>// Non-lexical vocal events (laughs, giggles, sobs, shouts, hums, interjections).
+// They are written as a lyric tag, e.g. `&lt;laugh&gt;`, `&lt;laugh:he,intensity=0.8&gt;`,
+// `&lt;sob&gt;`, `&lt;hmm?&gt;`, `&lt;kyaa&gt;`, and are expanded at render time into ordinary
+// notes with pitch contours and expression lanes, so they
+// are generated by the same voice, not spelled out as syllables.
+//   &lt;kind[:variant][,intensity=0..1][,pitch=semitones][,key=value...]&gt;
+struct EventSpec
+    std::string kind, variant;
+    std::map&lt;std::string, float&gt; p;
+    std::vector&lt;std::string&gt; bad;    // V3: problems found while parsing (malformed or non-numeric parameters)
+    float get(const std::string&amp; k, float d) const { auto it = p.find(k); return it == p.end() ? d : it-&gt;second; }
+inline bool is_event_tag(const std::string&amp; s) { return s.size() &gt;= 3 &amp;&amp; s.front() == '&lt;' &amp;&amp; s.back() == '&gt;'; }
+inline bool parse_event_tag(const std::string&amp; tag, EventSpec&amp; out)
+    struct Rng
+        uint32_t s;
+        float next() { s ^= s &lt;&lt; 13; s ^= s &gt;&gt; 17; s ^= s &lt;&lt; 5; return static_cast&lt;float&gt;(s &amp; 0xFFFFFF) / 16777216.f; }
+        float sym() { return next() * 2.f - 1.f; }
+    // normalised (0..1) contour -&gt; seconds, offset by the fractional part of the pitch
+    inline Curve scale_contour(const std::vector&lt;std::pair&lt;double, double&gt;&gt;&amp; c, double dur, double off)
+    inline SynthNote make(const SynthNote&amp; par, double t0, double dur, double midi_f, const std::string&amp; lyric, float vel,
+                          const std::vector&lt;std::pair&lt;double, double&gt;&gt;&amp; contour)
+
+    inline void glottal_end(SynthNote&amp; n) {           // abrupt stop with a touch of creak (あっ!)
+    struct Interj { const char* lyric; std::vector&lt;std::pair&lt;double, double&gt;&gt; contour; float vel, breath; bool glottal; float mouth, tension; };
+    inline const std::map&lt;std::string, Interj&gt;&amp; interjections()
+inline std::vector&lt;std::string&gt; event_kinds()
+/// V3: everything wrong with a parsed event tag (unknown kind, unknown variant, unknown or malformed parameter).
+/// Empty = fine. Variants are lyric syllables for most kinds (they must parse to at least one mora);
+/// hum/hmm accept only "", "hmm", "hm?" and "mhm"; laugh/giggle also accept "kusu".
+inline std::vector&lt;std::string&gt; diagnose_event(const EventSpec&amp; sp)
+// Expands one event note into ordinary notes. Returns an empty list for an unknown kind.
+inline std::vector&lt;SynthNote&gt; expand_event(const SynthNote&amp; par, const EventSpec&amp; sp, uint32_t seed)</code></pre>
+</section>
+<div class="pager"><a href="vocal-lyrics.html"><small>Previous</small>Lyric input (kana, romaji, phonemes)</a><a class="r" href="vocal-v3-voices.html"><small>Next</small>v3 — Voices, personas and voicebanks</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

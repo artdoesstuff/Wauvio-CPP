@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modulation, delay and stereo · Wauvio Docs</title><meta name="description" content="Tremolo, auto-pan, stereo chorus, delay, imager, utility.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Modulation, delay and stereo</h1>
+
+<h2>Modulation (<code>effects/modulation.hpp</code>)</h2>
+<ul>
+<li><code>FracDelay</code> — ring-buffer delay with Catmull-Rom fractional reads: <code>init(max_samples)</code>, <code>push</code>, <code>read(d)</code> (<code>d ≥ 1</code>), <code>at(back)</code>, <code>clear</code>, <code>capacity</code>.</li>
+<li><code>Tremolo</code> — <code>rate_hz</code> 5, optional tempo sync (<code>sync_bpm</code>, <code>sync_beats</code>), <code>depth</code> 0.5, <code>stereo_phase_deg</code> (180 = alternating L/R), <code>shape</code>.</li>
+<li><code>AutoPan</code> — <code>rate_hz</code> 0.5, <code>sync_bpm</code>, <code>sync_beats</code> 4, <code>depth</code> 1, <code>shape</code>, <code>phase_deg</code>.</li>
+<li><code>StereoChorus</code> — <code>rate_hz</code> 0.6, <code>depth_ms</code> 2.5, <code>delay_ms</code> 14, <code>voices</code> 1–6 per channel (3), <code>spread</code>, <code>mix</code> 0.5, <code>shape</code>.</li>
+<li><code>DualMono&lt;T&gt;</code> — adapter that runs a core mono effect (anything with <code>init(sr)</code> and <code>process(Buffer&amp;)</code>, such as <code>fx::basic::Flanger</code> or <code>Phaser</code>) independently on each channel. Access sides with <code>left()</code>/<code>right()</code> or set both via <code>configure(fn)</code>; set <code>extra_tail_seconds</code> if the wrapped effect rings.</li>
+</ul>
+<h2>StereoDelay (<code>effects/delay.hpp</code>)</h2><table><thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>time_ms</code>, <code>time_ms_right</code></td><td>350, −1</td><td>Left/both delay; right &lt; 0 = same as left</td></tr><tr><td><code>sync_bpm</code>, <code>sync_beats_left</code>, <code>sync_beats_right</code></td><td>0, dotted eighth, −1</td><td>When <code>sync_bpm &gt; 0</code> beat values replace milliseconds</td></tr><tr><td><code>feedback</code></td><td>0.4</td><td>0..0.98</td></tr><tr><td><code>ping_pong</code></td><td>false</td><td>Echoes alternate L→R→L</td></tr><tr><td><code>lowcut_hz</code>, <code>highcut_hz</code></td><td>0, 6000</td><td>Filters in the feedback path (each repeat darker)</td></tr><tr><td><code>mod_depth_ms</code>, <code>mod_rate_hz</code></td><td>0, 0.4</td><td>Tape-style wobble</td></tr><tr><td><code>mix</code></td><td>0.35</td><td></td></tr></tbody></table>
+<h2>Stereo (<code>effects/stereo.hpp</code>)</h2>
+<ul>
+<li><code>StereoImager</code> — <code>width</code> (0 mono, 1 unchanged, 2 double), <code>mid_gain_db</code>, <code>side_gain_db</code>, <code>mono_below_hz</code> (4th-order high-pass on the side signal), <code>balance</code>.</li>
+<li><code>Utility</code> — <code>gain_db</code>, <code>pan</code> (equal power), <code>mute</code>, <code>invert_left</code>, <code>invert_right</code>, <code>swap_channels</code>, <code>mono</code>, <code>remove_dc</code>.</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-fx-effects-modulation-hpp"><h3><code>wauvio/fx/effects/modulation.hpp</code></h3>
+<h4 id="wauvio-fx-effects-modulation-hpp-wauvio-fx-fracdelay"><span class="ns">wauvio::fx::</span>class FracDelay</h4>
+<pre><code>class FracDelay
+public:
+    void init(size_t max_samples) { buf_.assign(max_samples + 8, 0.0f); pos_ = 0; }
+    void clear() { std::fill(buf_.begin(), buf_.end(), 0.0f); pos_ = 0; }
+    size_t capacity() const noexcept { return buf_.size() &gt; 8 ? buf_.size() - 8 : 0; }
+    void push(float x) noexcept { buf_[pos_] = x; pos_ = (pos_ + 1) % buf_.size(); }
+    /// Read `d` samples back (d &gt;= 1; 1 = the most recent push). Fractional delays use
+    /// Catmull-Rom interpolation.
+    float read(double d) const noexcept</code></pre>
+<h4 id="wauvio-fx-effects-modulation-hpp-wauvio-fx-tremolo"><span class="ns">wauvio::fx::</span>class Tremolo</h4>
+<pre><code>class Tremolo : public Effect
+public:
+    double rate_hz   = 5.0;
+    double sync_bpm  = 0.0;        ///&lt; &gt; 0: rate follows tempo (one cycle per sync_beats)
+    double sync_beats = 1.0;
+    double depth     = 0.5;        ///&lt; 0..1
+    double stereo_phase_deg = 0.0; ///&lt; right channel LFO offset (180 = alternating L/R)
+    LfoShape shape   = LfoShape::Sine;
+    std::string name() const override { return "Tremolo"; }
+    void reset() override { pos_ = 0; }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+<h4 id="wauvio-fx-effects-modulation-hpp-wauvio-fx-autopan"><span class="ns">wauvio::fx::</span>class AutoPan</h4>
+<pre><code>class AutoPan : public Effect
+public:
+    double rate_hz = 0.5, sync_bpm = 0.0, sync_beats = 4.0;
+    double depth = 1.0;           ///&lt; 0 = centre, 1 = full left &lt;-&gt; right
+    LfoShape shape = LfoShape::Sine;
+    double phase_deg = 0.0;
+    std::string name() const override { return "AutoPan"; }
+    void reset() override { pos_ = 0; }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+<h4 id="wauvio-fx-effects-modulation-hpp-wauvio-fx-stereochorus"><span class="ns">wauvio::fx::</span>class StereoChorus</h4>
+<pre><code>class StereoChorus : public Effect
+public:
+    double rate_hz  = 0.6;
+    double depth_ms = 2.5;
+    double delay_ms = 14.0;
+    int    voices   = 3;          ///&lt; 1..6 per channel
+    double spread   = 1.0;        ///&lt; 0..1: how far apart the L/R LFO phases are
+    double mix      = 0.5;
+    LfoShape shape  = LfoShape::Sine;
+    std::string name() const override { return "StereoChorus"; }
+    double tail_seconds() const override { return (delay_ms + depth_ms) * 0.001; }
+    void reset() override { pos_ = 0; for (auto&amp; d : dl_) d.clear(); }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override
+/// Adapter for Wauvio's core mono effects (anything with init(sr) and process(Buffer&amp;)).
+///   auto&amp; fl = chain.add&lt;DualMono&lt;wauvio::Flanger&gt;&gt;();  fl.left().rate_hz = 0.3;
+/// Use configure() to change both sides at once.
+template &lt;class T&gt;</code></pre>
+<h4 id="wauvio-fx-effects-modulation-hpp-wauvio-fx-dualmono"><span class="ns">wauvio::fx::</span>class DualMono</h4>
+<pre><code>class DualMono : public Effect
+public:
+    DualMono() = default;
+    std::string name() const override { return "DualMono"; }
+    T&amp; left()  { return l_; }
+    T&amp; right() { return r_; }
+    template &lt;class F&gt; DualMono&amp; configure(F&amp;&amp; f) { f(l_); f(r_); return *this; }
+    double extra_tail_seconds = 0.0;   ///&lt; set if the wrapped effect rings (e.g. a flanger with feedback)
+    double tail_seconds() const override { return extra_tail_seconds; }
+    void reset() override { l_.init(sr_); r_.init(sr_); }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+</section>
+<section class="file" id="wauvio-fx-effects-delay-hpp"><h3><code>wauvio/fx/effects/delay.hpp</code></h3>
+<h4 id="wauvio-fx-effects-delay-hpp-wauvio-fx-stereodelay"><span class="ns">wauvio::fx::</span>class StereoDelay</h4>
+<pre><code>class StereoDelay : public Effect
+public:
+    // Time: either milliseconds or tempo sync (sync_bpm &gt; 0 -&gt; sync_beats_* are used).
+    double time_ms        = 350.0;   ///&lt; left (or both) delay time
+    double time_ms_right  = -1.0;    ///&lt; &lt; 0 = same as left
+    double sync_bpm       = 0.0;
+    double sync_beats_left  = div::dotted(div::eighth);   ///&lt; default: dotted eighth
+    double sync_beats_right = -1.0;                       ///&lt; &lt; 0 = same as left
+    double feedback       = 0.4;     ///&lt; 0..0.98
+    bool   ping_pong      = false;   ///&lt; input into the left line, echoes bounce L -&gt; R -&gt; L ...
+    double lowcut_hz      = 0.0;     ///&lt; high-pass in the feedback path (0 = off)
+    double highcut_hz     = 6000.0;  ///&lt; low-pass in the feedback path (0 = off) - each repeat gets darker
+    double mod_depth_ms   = 0.0;     ///&lt; tape-style wobble
+    double mod_rate_hz    = 0.4;
+    double mix            = 0.35;
+    std::string name() const override { return "StereoDelay"; }
+    double tail_seconds() const override
+    void reset() override { pos_ = 0; dl_[0].clear(); dl_[1].clear(); for (auto&amp; f : lc_) f.reset(); for (auto&amp; f : hc_) f.reset(); }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+</section>
+<section class="file" id="wauvio-fx-effects-stereo-hpp"><h3><code>wauvio/fx/effects/stereo.hpp</code></h3>
+<h4 id="wauvio-fx-effects-stereo-hpp-wauvio-fx-stereoimager"><span class="ns">wauvio::fx::</span>class StereoImager</h4>
+<pre><code>class StereoImager : public Effect
+public:
+    double width         = 1.0;    ///&lt; 0 = mono, 1 = unchanged, 2 = twice as wide
+    double mid_gain_db   = 0.0;
+    double side_gain_db  = 0.0;
+    double mono_below_hz = 0.0;    ///&lt; side signal is high-passed (4th order): bass stays centred. 0 = off
+    double balance       = 0.0;    ///&lt; -1 = left only, +1 = right only
+    std::string name() const override { return "StereoImager"; }
+    void reset() override { for (auto&amp; b : hp_) b.reset(); }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+<h4 id="wauvio-fx-effects-stereo-hpp-wauvio-fx-utility"><span class="ns">wauvio::fx::</span>class Utility</h4>
+<pre><code>/// Gain, pan, polarity, channel swap, mono sum, DC removal.
+class Utility : public Effect
+public:
+    double gain_db = 0.0;
+    double pan     = 0.0;          ///&lt; -1..1, equal power (0 = unchanged)
+    bool   mute = false, invert_left = false, invert_right = false, swap_channels = false, mono = false, remove_dc = false;
+    std::string name() const override { return "Utility"; }
+    void reset() override { dc_[0].reset(); dc_[1].reset(); }
+    using Effect::process;
+    void process(float* L, float* R, size_t n) override</code></pre>
+</section>
+<div class="pager"><a href="fx-saturation.html"><small>Previous</small>Saturation and bitcrushing</a><a class="r" href="fx-reverb.html"><small>Next</small>Reverb</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

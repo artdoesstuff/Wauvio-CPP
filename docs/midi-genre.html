@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MIDI genre system · Wauvio Docs</title><meta name="description" content="Applying genre presets to MIDI files.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">MIDI layer (wauvio/midi)</div><h1>MIDI genre system</h1>
+
+<p>Headers <code>midi/genre/genre_midi.hpp</code> and <code>genre_midi_presets.hpp</code>, namespace <code>wauvio::midi::genre</code>. It wraps the <a href="ext-genre.html">music-layer genre presets</a> and applies them to a loaded <code>MidiMusic</code>.</p>
+<h2>Types</h2>
+<ul>
+<li><code>MidiGenrePreset</code> — wraps a base <code>GenrePresetPtr</code> and adds <code>melodic_program_overrides</code> (GM program → factory) and an optional <code>percussion_kit</code> factory. <code>name()</code> returns the base name. <code>MidiGenrePresetPtr</code> is <code>shared_ptr&lt;const MidiGenrePreset&gt;</code>.</li>
+<li><code>GenreApplyOptions</code> — <code>allow_instrumentation</code> (false: only restyle notes/FX, do not swap instruments), <code>override_explicit_programs</code> (false: keep programs set in the file), <code>seed</code> (1; all variation is deterministic).</li>
+</ul>
+<h2>What <code>setGenre</code> does</h2>
+<ol>
+<li>First call stores a pristine copy of the parts and each instrument’s style baseline, so the operation is reversible. Every call restarts from that baseline, so calling <code>setGenre</code> twice never compounds.</li>
+<li>Each part gets a role: percussion part → <code>Percussion</code>; GM programs 32–39 → <code>Bass</code>; otherwise <code>Melodic</code> (<code>role_for_part</code>).</li>
+<li><code>apply_role_profile</code> processes every note: optional thinning of soft notes, register shift, forced articulation (shortening the note by <code>fallback_gate_ratio</code> if the instrument lacks it), quantisation to a beat fraction, swing on off-beat eighths, fixed timing offset, humanisation, then dynamics (velocity scale, per-beat accent pattern, downbeat de-emphasis, variance) clamped between <code>velocity_floor</code> and 1.</li>
+<li>If <code>allow_instrumentation</code> is set, unpinned parts get preset instruments/drum kit (skipping parts whose program came from the file unless <code>override_explicit_programs</code>).</li>
+<li>Instruments are restyled with the preset’s timbre/FX wants (<code>style_instrument</code>, and <code>style_percussion_kit</code> for kits).</li>
+</ol>
+<p>Beat length and beats per bar are estimated from the file (<code>estimate_beat_seconds</code>, <code>estimate_beats_per_bar</code>). <code>clearGenre()</code> restores the pristine state.</p>
+<h2>Presets</h2>
+<p><code>presets::classical, jazz, rock, metal, house, techno, drum_and_bass, chiptune, ambient, touhou, funk, blues, reggae, trance, dubstep, bossa_nova, hardcore, speedcore</code> — one per music-layer preset, plus program overrides and kits (for example <code>metal()</code> maps programs 26, 27 and 29 to <code>DistortedElectricGuitar</code> and uses <code>IndustrialKit</code>; <code>bossa_nova_kit()</code> builds a bossa drum kit).</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-midi-genre-genre-midi-hpp"><h3><code>wauvio/midi/genre/genre_midi.hpp</code></h3>
+<h4 id="wauvio-midi-genre-genre-midi-hpp-wauvio-midi-genre-genreapplyoptions"><span class="ns">wauvio::midi::genre::</span>struct GenreApplyOptions</h4>
+<pre><code>struct GenreApplyOptions
+    bool allow_instrumentation      = false;
+    bool override_explicit_programs = false;
+    uint64_t seed                   = 1;</code></pre>
+<h4 id="wauvio-midi-genre-genre-midi-hpp-wauvio-midi-genre-midigenrepreset"><span class="ns">wauvio::midi::genre::</span>class MidiGenrePreset</h4>
+<pre><code>class MidiGenrePreset
+public:
+    wauvio::music::genre::GenrePresetPtr base;
+    std::unordered_map&lt;int, InstrumentFactory&gt; melodic_program_overrides;
+    std::function&lt;std::shared_ptr&lt;wauvio::music::DrumKit&gt;()&gt; percussion_kit;
+    explicit MidiGenrePreset(wauvio::music::genre::GenrePresetPtr b) : base(std::move(b)) {}
+    const std::string&amp; name() const noexcept
+using MidiGenrePresetPtr = std::shared_ptr&lt;const MidiGenrePreset&gt;;
+inline wauvio::music::genre::Role role_for_part(const track::MidiPart&amp; part) noexcept
+inline double estimate_beat_seconds(const track::MidiMusic&amp; music) noexcept
+inline int estimate_beats_per_bar(const track::MidiMusic&amp; music) noexcept
+inline void apply_role_profile(track::MidiPart&amp; part, const wauvio::music::genre::RoleProfile&amp; prof,
+                                double beat_seconds, int beats_per_bar, uint64_t seed)
+
+inline void apply_instrumentation(track::MidiMusic&amp; music, const MidiGenrePreset&amp; preset,
+                                   const GenreApplyOptions&amp; opts)
+
+inline void style_percussion_kit(wauvio::music::DrumKit&amp; kit, const wauvio::music::genre::GenrePreset&amp; preset)</code></pre>
+<h4 id="wauvio-midi-genre-genre-midi-hpp-wauvio-midi-free-functions-constants-and-aliases"><span class="ns">wauvio::midi::</span>Free functions, constants and aliases</h4>
+<pre><code>inline void MidiMusic::setGenre(std::shared_ptr&lt;const midi::genre::MidiGenrePreset&gt; preset)
+inline void MidiMusic::setGenre(std::shared_ptr&lt;const midi::genre::MidiGenrePreset&gt; preset,
+                                 const midi::genre::GenreApplyOptions&amp; options)
+
+inline void MidiMusic::clearGenre()</code></pre>
+</section>
+<section class="file" id="wauvio-midi-genre-genre-midi-presets-hpp"><h3><code>wauvio/midi/genre/genre_midi_presets.hpp</code></h3>
+<h4 id="wauvio-midi-genre-genre-midi-presets-hpp-wauvio-midi-genre-presets-free-functions-constants-and-aliases"><span class="ns">wauvio::midi::genre::presets::</span>Free functions, constants and aliases</h4>
+<pre><code>inline MidiGenrePresetPtr classical()
+inline MidiGenrePresetPtr jazz()
+inline MidiGenrePresetPtr rock()
+inline MidiGenrePresetPtr metal()
+inline MidiGenrePresetPtr house()
+inline MidiGenrePresetPtr techno()
+inline MidiGenrePresetPtr drum_and_bass()
+inline MidiGenrePresetPtr chiptune()
+inline MidiGenrePresetPtr ambient()
+inline MidiGenrePresetPtr touhou()
+inline std::shared_ptr&lt;wauvio::music::DrumKit&gt; bossa_nova_kit()
+inline MidiGenrePresetPtr funk()
+inline MidiGenrePresetPtr blues()
+inline MidiGenrePresetPtr reggae()
+inline MidiGenrePresetPtr trance()
+inline MidiGenrePresetPtr dubstep()
+inline MidiGenrePresetPtr bossa_nova()
+inline MidiGenrePresetPtr hardcore()
+inline MidiGenrePresetPtr speedcore()</code></pre>
+</section>
+<div class="pager"><a href="midi-track.html"><small>Previous</small>Loading, rendering and writing</a><a class="r" href="sf2.html"><small>Next</small>SoundFont (SF2) support</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

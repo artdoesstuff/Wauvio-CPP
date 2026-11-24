@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sampling · Wauvio Docs</title><meta name="description" content="WAV loading, sample zones and sampled instruments.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Music layer (wauvio/ext)</div><h1>Sampling</h1>
+
+<p>Header <code>wauvio/ext/samples/sampling.hpp</code>, namespace <code>wauvio::music</code>.</p>
+<ul>
+<li><code>load_wav(path)</code> → <code>WavData {audio, was_mono, sample_rate}</code> (stereo buffer; mono files are duplicated).</li>
+<li><code>InterpolationQuality { Nearest, Linear, Cubic }</code>; <code>default_interpolation_quality()</code> returns a mutable global used by <code>SampledInstrument</code>.</li>
+<li><code>LoopMode { None, Forward, PingPong }</code>.</li>
+</ul>
+<h2>SampleZone</h2>
+<p>One sample plus its mapping and playback parameters.</p><table><thead><tr><th>Group</th><th>Fields</th></tr></thead><tbody><tr><td>Audio</td><td><code>audio</code> or <code>shared_audio</code> (shared pointer avoids copies); <code>sample_rate</code>; <code>start</code>/<code>end</code> (0 = whole buffer)</td></tr><tr><td>Mapping</td><td><code>root_note</code> 60, <code>low_note</code>/<code>high_note</code> 0–127, <code>low_vel</code>/<code>high_vel</code> 0–127, <code>articulation</code>, <code>is_release_sample</code></td></tr><tr><td>Looping</td><td><code>looping</code>, <code>loop_mode</code>, <code>loop_start</code>, <code>loop_end</code>, <code>loop_crossfade_samples</code></td></tr><tr><td>Tuning / level</td><td><code>coarse_tune_semitones</code>, <code>fine_tune_cents</code>, <code>scale_tuning</code>, <code>pan</code>, <code>attenuation_db</code></td></tr><tr><td>Filter / envelope</td><td><code>filter_cutoff_hz</code> 20000, <code>filter_q</code> 0.7, <code>envelope</code> (DAHDSR, release 5 ms)</td></tr><tr><td>Voice groups</td><td><code>round_robin_group</code>, <code>exclusive_class</code></td></tr></tbody></table>
+<p><code>buffer()</code> returns whichever audio source is set; <code>matches(note, vel127, art)</code> tests the mapping.</p>
+<h2>MultiSample, SamplePlayer, SampledInstrument</h2>
+<ul>
+<li><code>MultiSample</code> stores zones; <code>find_zone(note, velocity01, articulation)</code> picks one, cycling through round-robin groups.</li>
+<li><code>SamplePlayer::render(zone, note, sample_rate, quality)</code> pitch-shifts and plays one zone for a note.</li>
+<li><code>SampledInstrument</code> is an <code>Instrument</code> with <code>samples</code>, an optional <code>fallback_model</code> (<code>std::function&lt;StereoBuffer(const Note&amp;, int)&gt;</code>) and an <code>articulations</code> list. Rendering order: rest → silence; matching zone → sample playback; otherwise <code>fallback_model</code>; otherwise silence. <code>load_samples({...})</code> and <code>load_sample_file(path, root, low, high, vlow, vhigh, art, rr_group)</code> populate it.</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-ext-samples-sampling-hpp"><h3><code>wauvio/ext/samples/sampling.hpp</code></h3>
+<h4 id="wauvio-ext-samples-sampling-hpp-wauvio-music-wavdata"><span class="ns">wauvio::music::</span>struct WavData</h4>
+<pre><code>struct WavData
+    StereoBuffer audio;
+    bool         was_mono = true;
+    int          sample_rate = 44100;
+    inline uint32_t read_u32(const unsigned char* p)
+    inline uint16_t read_u16(const unsigned char* p)
+inline WavData load_wav(const std::string&amp; path)</code></pre>
+<h4 id="wauvio-ext-samples-sampling-hpp-wauvio-music-interpolationquality"><span class="ns">wauvio::music::</span>enum class InterpolationQuality</h4>
+<pre><code>enum class InterpolationQuality { Nearest, Linear, Cubic };
+inline InterpolationQuality&amp; default_interpolation_quality()</code></pre>
+<h4 id="wauvio-ext-samples-sampling-hpp-wauvio-music-loopmode"><span class="ns">wauvio::music::</span>enum class LoopMode</h4>
+<pre><code>enum class LoopMode { None, Forward, PingPong };</code></pre>
+<h4 id="wauvio-ext-samples-sampling-hpp-wauvio-music-samplezone"><span class="ns">wauvio::music::</span>struct SampleZone</h4>
+<pre><code>struct SampleZone
+    StereoBuffer audio;
+    std::shared_ptr&lt;const StereoBuffer&gt; shared_audio;
+    int          sample_rate = 44100;
+    int  root_note = 60;
+    int  low_note  = 0,   high_note = 127;
+    int  low_vel   = 0,   high_vel  = 127;
+    size_t start = 0, end = 0;
+    bool   looping    = false;
+    LoopMode loop_mode = LoopMode::None;
+    size_t loop_start = 0, loop_end = 0;
+    size_t loop_crossfade_samples = 0;
+    double coarse_tune_semitones = 0.0;
+    double fine_tune_cents       = 0.0;
+    double pan                   = 0.0;
+    double attenuation_db        = 0.0;
+    double filter_cutoff_hz      = 20000.0;
+    double filter_q              = 0.7;
+    double scale_tuning          = 1.0;
+    wauvio::env::DAHDSR envelope { 0.0, 0.0, 0.0, 0.0, 1.0, 0.005 };
+    int          round_robin_group = 0;
+    int          exclusive_class   = 0;
+    Articulation articulation      = Articulation::Sustain;
+    bool         is_release_sample = false;
+    const StereoBuffer&amp; buffer() const { return shared_audio ? *shared_audio : audio; }
+    LoopMode effective_loop_mode() const
+    size_t effective_end() const { return end &gt; 0 ? end : buffer().size(); }
+    bool matches(int midi_note, int velocity127, Articulation art) const</code></pre>
+<h4 id="wauvio-ext-samples-sampling-hpp-wauvio-music-multisample"><span class="ns">wauvio::music::</span>class MultiSample</h4>
+<pre><code>class MultiSample
+public:
+    void add_zone(SampleZone z) { zones_.push_back(std::move(z)); }
+    bool empty() const { return zones_.empty(); }
+    size_t zone_count() const { return zones_.size(); }
+    const SampleZone* find_zone(int midi_note, double velocity01, Articulation art) const</code></pre>
+<h4 id="wauvio-ext-samples-sampling-hpp-wauvio-music-sampleplayer"><span class="ns">wauvio::music::</span>class SamplePlayer</h4>
+<pre><code>class SamplePlayer
+public:
+    static StereoBuffer render(const SampleZone&amp; zone, const Note&amp; note, int sample_rate,
+                                InterpolationQuality quality = InterpolationQuality::Linear)
+</code></pre>
+<h4 id="wauvio-ext-samples-sampling-hpp-wauvio-music-sampledinstrument"><span class="ns">wauvio::music::</span>class SampledInstrument</h4>
+<pre><code>class SampledInstrument : public Instrument
+public:
+    using SynthModel = std::function&lt;StereoBuffer(const Note&amp;, int sample_rate)&gt;;
+    MultiSample                samples;
+    SynthModel                 fallback_model;
+    std::vector&lt;Articulation&gt;  articulations = { Articulation::Sustain };
+    StereoBuffer render_note(const Note&amp; note, int sample_rate = 0) const override
+    std::vector&lt;Articulation&gt; supported_articulations() const override { return articulations; }
+    SampledInstrument&amp; load_samples(std::initializer_list&lt;SampleZone&gt; zones)
+    SampledInstrument&amp; load_sample_file(const std::string&amp; path, int root_note,
+                                         int low_note = 0, int high_note = 127,
+                                         int low_vel = 0, int high_vel = 127,
+                                         Articulation art = Articulation::Sustain,
+                                         int round_robin_group = 0)
+</code></pre>
+</section>
+<div class="pager"><a href="ext-modeling.html"><small>Previous</small>Modeled instruments</a><a class="r" href="ext-render.html"><small>Next</small>Rendering and WAV output</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

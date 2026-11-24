@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>v3 — Synthesis pipeline · Wauvio Docs</title><meta name="description" content="The v3 synthesis pipeline and VoiceStream.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v3 — Synthesis pipeline</h1>
+
+<p>Header <code>yune-v3/synth.hpp</code> (the engine core). You normally never call it directly — <code>Singer</code> does — but it is public and usable for tooling.</p>
+<h2>Pipeline</h2>
+<ol>
+<li><strong>Notes → events.</strong> <code>Singer::prepare_notes()</code> sorts notes, expands event tags into ordinary notes (per-event deterministic seeds) and applies humanisation, auto-expression and pressure. <code>SynthNote</code> holds <code>start</code>, <code>dur</code>, <code>midi</code>, <code>vel</code>, <code>style</code>, <code>morae</code>, <code>art</code>, <code>bend</code>, <code>glide_from</code>, <code>lanes</code>, <code>event</code>.</li>
+<li><strong>Articulation.</strong> <code>build_events()</code> and the <code>Articulator</code> turn morae into a <code>KeyTrack</code>: key-frames of <code>PV</code> parameter vectors (indices <code>F1 F2 F3 B1 B2 B3 TRK AMP VOICE ASP FRIC FRIC_F FRIC_BW …</code>). Mora timing comes from <code>mora_cum()</code>. Vowel formants, consonant loci (v3), coarticulation, voiceless-vowel devoicing, nasals, bursts and frication are all expressed as key-frames; each parameter has its own motion law (<code>param_motion</code>: log or linear, with a speed).</li>
+<li><strong>Pitch and expression.</strong> <code>build_pitch_track()</code> and <code>build_expr_track()</code> produce millisecond-rate tracks.</li>
+<li><strong>Rendering.</strong> <code>VoiceRenderer(vm, sr)</code> produces audio from the three tracks via <code>render(...)</code> (whole buffer) or <code>stream(...)</code> (<code>VoiceStream</code>). The voice is a glottal source (LF-model-style, using precomputed <code>GlottalTables</code>) through a formant tract chain with a parallel upper-formant bank, singer’s formant, nasal anti-formant (notch), aspiration and frication noise, optional growl/fry/tremor/air and per-sample expression (<code>apply_expr</code>).</li>
+</ol>
+<h2>VoiceStream</h2>
+<p>Block-based synthesiser with fixed score at construction. <code>read(dst, n)</code> returns the samples written (0 when finished); <code>read_all()</code>, <code>position()</code>, <code>position_seconds()</code>, <code>total_samples()</code>, <code>finished()</code>, <code>sample_rate()</code>. Output is independent of chunking (<code>read(1)</code>, <code>read(100)</code> and <code>read(all)</code> produce identical samples), which makes it suitable for real-time pulling.</p>
+<h2>Determinism</h2>
+<p>The voice uses its own counter-hash noise generator (<code>VoiceNoise</code>) instead of <code>std::uniform_real_distribution</code>, because the standard does not specify the latter bit-for-bit across libraries: the same seed yields the same noise on every compiler. Variation helpers (<code>vary</code>, <code>vnoise</code>) are hash-based.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-vocal-yune-v3-synth-hpp"><h3><code>wauvio/vocal/yune-v3/synth.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-glottaltables"><span class="ns">wauvio::vocal::v3::</span>class GlottalTables</h4>
+<pre><code>//  LF glottal flow-derivative tables, parameterised by Rd (Fant 1995)
+//  Rd ~0.4 pressed/tense, ~1.0 modal, ~2 breathy.
+class GlottalTables
+public:
+    static constexpr int N  = 2048;     // samples per period
+    static constexpr int NR = 12;       // Rd steps
+    static constexpr int NL = 9;        // band-limit levels: level l keeps (N/2)&gt;&gt;l harmonics (1024, 512, ... 4)
+    static constexpr float RD_MIN = 0.35f, RD_MAX = 2.55f;
+    GlottalTables()
+    /// phase in [0,1); inc = f0 / sample_rate (phase increment per sample). V3: the table is read from
+    /// the mip level whose harmonics all fit below Nyquist, so the source cannot alias at high pitch.
+    float read(float phase, float rd, float inc) const
+inline const GlottalTables&amp; glottal_tables() { static const GlottalTables t; return t; }</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-pidx"><span class="ns">wauvio::vocal::v3::</span>enum PIdx</h4>
+<pre><code>//  Parameter vector + key-frames
+enum PIdx { F1, F2, F3, B1, B2, B3, TRK, AMP, VOICE, ASP, FRIC, FRIC_F, FRIC_BW,
+            NASAL, NZ, RD, TILT, HI, SING,
+            RF1, RF2, RF3, RTRK,      // formants of the vowel this state belongs to (loudness reference)
+            TRK2, RTRK2,              // F2 follows F0 (very high notes)
+            FSC,                      // V3: tract-size scale applied to the fixed upper formants (F4..F6, singer's formant)
+            N_P };</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-pv"><span class="ns">wauvio::vocal::v3::</span>struct PV</h4>
+<pre><code>struct PV
+    std::array&lt;float, N_P&gt; v{};
+    float&amp; operator[](int i) { return v[static_cast&lt;size_t&gt;(i)]; }
+    float  operator[](int i) const { return v[static_cast&lt;size_t&gt;(i)]; }
+inline PV lerp_pv(const PV&amp; a, const PV&amp; b, float t)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-key"><span class="ns">wauvio::vocal::v3::</span>struct Key</h4>
+<pre><code>struct Key { double t; PV p; };</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-parammotion"><span class="ns">wauvio::vocal::v3::</span>struct ParamMotion</h4>
+<pre><code>// V3: how each parameter moves between two key-frames.
+//   log   : interpolate geometrically (formant/filter frequencies and bandwidths move proportionally in
+//           pitch space rather than linearly in Hz)
+//   speed : &gt;1 = the parameter lags (starts late), &lt;1 = it leads (starts early). F2/F3 are the fast
+//           articulators (tongue body/front), F1 (jaw) is slower.
+struct ParamMotion { bool log; float speed; };
+inline ParamMotion param_motion(int i)
+inline PV interp_pv(const PV&amp; a, const PV&amp; b, double u_raw)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-keytrack"><span class="ns">wauvio::vocal::v3::</span>class KeyTrack</h4>
+<pre><code>class KeyTrack
+public:
+    std::vector&lt;Key&gt; keys;
+    void push(double t, const PV&amp; p)
+    PV at(double t) const
+    double last_t() const { return keys.empty() ? 0.0 : keys.back().t; }</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-notekind"><span class="ns">wauvio::vocal::v3::</span>enum class NoteKind</h4>
+<pre><code>// Kind of note. (An ingressive "Inhale" kind existed in early V2 and was removed: it did not sound right.)
+enum class NoteKind : uint8_t { Normal };</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-synthnote"><span class="ns">wauvio::vocal::v3::</span>struct SynthNote</h4>
+<pre><code>//  Timed morae
+struct SynthNote
+    double start = 0.0, dur = 0.5;
+    int    midi = 60;
+    float  vel = 0.7f;
+    Style  style;
+    std::vector&lt;Mora&gt; morae;
+    wauvio::music::Articulation art = wauvio::music::Articulation::Sustain;
+    Curve  bend;
+    double glide_from = -1.0;
+    std::vector&lt;Lane&gt; lanes;   // V2 automation lanes (seconds from note start)
+    NoteKind kind = NoteKind::Normal;
+    std::string event;         // non-empty: an unexpanded event tag, e.g. "laugh:ha,intensity=0.7"</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-ev"><span class="ns">wauvio::vocal::v3::</span>struct Ev</h4>
+<pre><code>struct Ev
+    Mora m; SurfaceMora sm;
+    double t0 = 0, t1 = 0;          // vowel onset .. end of mora
+    Style st; float vel = 0.7f;
+    wauvio::music::Articulation art = wauvio::music::Articulation::Sustain;
+    Vowel v = Vowel::A;
+    bool devoiced = false;
+    bool first_in_note = false;
+    Surf next_surf = Surf::None;    // for ん place assimilation
+    NoteKind kind = NoteKind::Normal;
+    float bid = 1.f;                // ガ行 nasalisation amount (Surf::NG from bidakuon)
+    bool  next_vowel = false;       // the next sounding mora starts with a vowel/glide/h (for ん nasalisation)
+/// Cumulative mora boundaries (0..1, size = morae + 1) for one note. Uniform split when mora_weighting is 0
+/// and no explicit weights are given; otherwise weighted by mora type (ん/っ shorter, ー longer).
+inline std::vector&lt;double&gt; mora_cum(const std::vector&lt;Mora&gt;&amp; ms, float mora_weighting)
+inline std::vector&lt;Ev&gt; build_events(const std::vector&lt;SynthNote&gt;&amp; notes)
+//  Articulation: events -&gt; key-frames
+/// V3: deterministic variation for one event (a mora): same seed and same time give the same number, a different
+/// take (seed) gives a different one. Roughly triangular in [-1, 1], so most values are small.
+inline float vary(uint32_t seed, double t, uint32_t k)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-articulator"><span class="ns">wauvio::vocal::v3::</span>class Articulator</h4>
+<pre><code>class Articulator
+public:
+    Articulator(const VoiceModel&amp; vm, int sr, uint32_t seed = 0xA17E5u) : vm_(vm), sr_(sr), seed_(seed) {}
+    KeyTrack build(const std::vector&lt;Ev&gt;&amp; evs, double&amp; end_time)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-voicenoise"><span class="ns">wauvio::vocal::v3::</span>class VoiceNoise</h4>
+<pre><code>// Portable white noise (V3). std::uniform_real_distribution is not specified bit-for-bit across standard
+// libraries, so the voice uses its own counter-hash generator: the same seed gives the same noise on every compiler.
+class VoiceNoise
+public:
+    explicit VoiceNoise(uint32_t seed = 1u) : s_(seed * 2654435761u + 0x9E3779B9u) {}
+    uint32_t next()
+    float tick_white() { return static_cast&lt;float&gt;(static_cast&lt;int32_t&gt;(next())) * 4.6566129e-10f; }   // [-1, 1)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-notch"><span class="ns">wauvio::vocal::v3::</span>struct Notch</h4>
+<pre><code>// RBJ notch (the nasal anti-formant). Transposed direct form II: safe to retune every block.
+struct Notch
+    float b0 = 1, b1 = 0, b2 = 1, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
+    void set(float f, float q, int sr)
+    float tick(float x) { const float y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-tractchain"><span class="ns">wauvio::vocal::v3::</span>struct TractChain</h4>
+<pre><code>// The vocal-tract filter chain. Two instances run in parallel: the real one, and
+// a reference fed with a constant fully-voiced source whose RMS drives a slow
+// loudness normaliser, so loudness does not depend on where harmonics happen to
+// land relative to F1 (vibrato, high notes, vowel changes).
+struct TractChain
+    wauvio::filter::SVFilter r1, r2, r3, q2, q3, u4, u5, u6, sg;
+    float pre_lp = 0.f, tilt_state = 0.f;
+    float q2v = 1, q3v = 1, pre_a = 0, tilt_a = 0, k4 = 1, k5 = 1, k6 = 1, ksg = 1;
+    TractChain()
+    // fsc: tract-size scale (V3). F4..F6 and the singer's formant move with the voice's formant scale,
+    // not only F1..F3, so a formant shift changes the whole tract instead of just its lower half.
+    void set(const VoiceModel&amp; vm, const PV&amp; p, float f1, float f2, float f3, int sr, float fsc = 1.f)
+    // src: excitation entering the tract; hsrc: voiced-only excitation for the parallel parts
+    float tick(float src, float hsrc, float hi, float sing, int sr, const Tune&amp; tn)
+// Applies the expression channels to a parameter frame. Written so every channel is a
+// strict no-op at 0.
+inline void apply_expr(PV&amp; p, const Expr&amp; e, double f0)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-voicestream"><span class="ns">wauvio::vocal::v3::</span>class VoiceStream</h4>
+<pre><code>/// Block-based voice synthesiser (V3). The score (key-frames, pitch, expression) is fixed when the stream is
+/// created; samples are then produced on demand in any chunk size. The output does not depend on how it is
+/// chunked: read(1), read(100) and read(all) give identical samples.
+class VoiceStream
+public:
+    VoiceStream(const VoiceModel&amp; vm, int sr, KeyTrack kt, PitchTrack pt, ExprTrack ex, bool has_ex,
+                double total_sec, uint32_t seed = 0xA17E5u)
+        : vm_(vm), sr_(sr), kt_(std::move(kt)), pt_(std::move(pt)), ex_(std::move(ex)), has_ex_(has_ex), seed_(seed),
+          nz_asp_(seed), nz_fric_(seed ^ 0x5bd1e995u), nz_irr_(seed ^ 0x9e3779b9u)
+
+    size_t total_samples() const noexcept { return total_; }
+    size_t position() const noexcept { return s0_ - (blen_ - bpos_); }
+    double position_seconds() const noexcept { return static_cast&lt;double&gt;(position()) / sr_; }
+    bool   finished() const noexcept { return position() &gt;= total_; }
+    int    sample_rate() const noexcept { return sr_; }
+    /// Writes up to n samples; returns how many were written (0 once the stream is finished).
+    size_t read(float* dst, size_t n)
+    Buffer read_all() { Buffer out(total_ - position(), 0.0f); const size_t got = read(out.data(), out.size()); out.resize(got); return out; }</code></pre>
+<h4 id="wauvio-vocal-yune-v3-synth-hpp-wauvio-vocal-v3-voicerenderer"><span class="ns">wauvio::vocal::v3::</span>class VoiceRenderer</h4>
+<pre><code>class VoiceRenderer
+public:
+    VoiceRenderer(const VoiceModel&amp; vm, int sr) : vm_(vm), sr_(sr) {}
+    /// Whole-buffer render (a VoiceStream read to the end).
+    Buffer render(const KeyTrack&amp; kt, const PitchTrack&amp; pt, double total_sec, uint32_t seed = 0xA17E5u,
+                  const ExprTrack* ex = nullptr) const
+    /// On-demand render: pull samples with VoiceStream::read().
+    VoiceStream stream(const KeyTrack&amp; kt, const PitchTrack&amp; pt, double total_sec, uint32_t seed = 0xA17E5u,
+                       const ExprTrack* ex = nullptr) const</code></pre>
+</section>
+<div class="pager"><a href="vocal-v3-voices.html"><small>Previous</small>v3 — Voices, personas and voicebanks</a><a class="r" href="vocal-v3-ensemble-fx.html"><small>Next</small>v3 — Ensemble, FX chain and mic</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

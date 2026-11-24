@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>theory.hpp — notes and frequencies · Wauvio Docs</title><meta name="description" content="Frequency helpers and the note table.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>theory.hpp — notes and frequencies</h1>
+
+<p>Namespace <code>wauvio::theory</code>.</p>
+<ul>
+<li><code>midi_to_freq(int midi_note)</code> → <code>440 · 2^((n−69)/12)</code> (equal temperament, A4 = 440 Hz, MIDI 69).</li>
+<li><code>theory::notes</code> contains <code>constexpr double</code> frequencies named <code>C0 … B9</code>, with sharps spelled <code>Cs</code>, <code>Ds</code>, <code>Fs</code>, <code>Gs</code>, <code>As</code> (e.g. <code>notes::Cs4</code>, <code>notes::A4 = 440.0</code>), and <code>REST = 0.0</code>.</li>
+</ul>
+<p><code>REST</code> is meaningful to <code>seq</code>: frequencies below 1 Hz render as silence of the note's duration.</p>
+<h2>Full API listing</h2><p class="muted">The note table is ~120 constants; see <code>wauvio/core/theory.hpp</code>. Flats are not defined: use the enharmonic sharp.</p>
+<div class="pager"><a href="core-fx-basic.html"><small>Previous</small>fx_basic.hpp — basic effects</a><a class="r" href="core-seq.html"><small>Next</small>seq.hpp — notes, tracks, sequencing</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Examples · Wauvio Docs</title><meta name="description" content="The eight SFX example programs.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">SFX engine (wauvio/sfx)</div><h1>Examples</h1>
+<p>Each example is a standalone program in <code>wauvio/sfx/examples/</code>. Build with <code>g++ -std=c++17 -O2 -I&lt;repo root&gt; NAME.cpp</code>; WAVs are written to <code>sfx_examples_out/</code>.</p><h2 id="01">01_render_preset.cpp</h2><p>Render one preset to a WAV file.</p><pre><code>// Render one preset to a WAV file.
+//   g++ -std=c++17 -O2 -I&lt;repo root&gt; 01_render_preset.cpp -o ex01 &amp;&amp; ./ex01
+#include &quot;../../sfx.hpp&quot;
+#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    namespace sfx = wauvio::sfx;
+    std::filesystem::create_directories(&quot;sfx_examples_out&quot;);
+
+    sfx::Effect riser = sfx::make(&quot;noise_riser&quot;);     // a preset id; throws sfx::Error (with suggestions) if unknown
+    sfx::Rendered audio = riser.render();             // 44.1 kHz stereo, peak normalised to -1 dBFS
+    audio.save(&quot;sfx_examples_out/noise_riser.wav&quot;);
+
+    const sfx::Stats s = audio.stats();
+    std::cout &lt;&lt; &quot;noise_riser: &quot; &lt;&lt; s.seconds &lt;&lt; &quot; s, peak &quot; &lt;&lt; s.peak_db() &lt;&lt; &quot; dB, rms &quot; &lt;&lt; s.rms_db() &lt;&lt; &quot; dB\n&quot;;
+}
+</code></pre><h2 id="02">02_customize.cpp</h2><p>Change parameters, seed and sample rate; list what a preset offers.</p><pre><code>// Change parameters, seed and sample rate; list what a preset offers.
+#include &quot;../../sfx.hpp&quot;
+#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    namespace sfx = wauvio::sfx;
+    std::filesystem::create_directories(&quot;sfx_examples_out&quot;);
+
+    const sfx::Preset* p = sfx::find(&quot;cinematic_impact&quot;);
+    std::cout &lt;&lt; p-&gt;name &lt;&lt; &quot;: &quot; &lt;&lt; p-&gt;description &lt;&lt; &quot;\nparameters:\n&quot;;
+    for (const auto&amp; s : p-&gt;params) std::cout &lt;&lt; &quot;  &quot; &lt;&lt; s.name &lt;&lt; &quot; = &quot; &lt;&lt; s.def &lt;&lt; &quot;  [&quot; &lt;&lt; s.min &lt;&lt; &quot; .. &quot; &lt;&lt; s.max &lt;&lt; &quot; &quot; &lt;&lt; s.unit &lt;&lt; &quot;]\n&quot;;
+
+    sfx::Effect hit = sfx::make(&quot;cinematic_impact&quot;);
+    hit.set(&quot;duration&quot;, 3.0).set(&quot;sub&quot;, 1.0).set(&quot;brightness&quot;, 0.3).set(&quot;tail&quot;, 4.0).seed(1234);
+
+    sfx::RenderSettings settings;
+    settings.sample_rate = 48000;                      // 8000 .. 192000
+    settings.peak_db = -3.0;                           // leave some headroom
+    hit.render(settings).save(&quot;sfx_examples_out/impact_dark_long.wav&quot;);
+
+    try { hit.set(&quot;brightness&quot;, 7.0); }                // invalid values are rejected, never silently clamped
+    catch (const sfx::Error&amp; e) { std::cout &lt;&lt; &quot;rejected: &quot; &lt;&lt; e.what() &lt;&lt; &quot;\n&quot;; }
+}
+</code></pre><h2 id="03">03_layered_transition.cpp</h2><p>Compose a transition from several presets with Layered: a riser, a reverse cymbal and an impact on the downbeat.</p><pre><code>// Compose a transition from several presets with Layered: a riser, a reverse cymbal and an impact on the downbeat.
+#include &quot;../../sfx.hpp&quot;
+#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    namespace sfx = wauvio::sfx;
+    std::filesystem::create_directories(&quot;sfx_examples_out&quot;);
+
+    sfx::Layered transition;
+    transition.tempo(128).seed(7);
+    transition.add(&quot;noise_riser&quot;,     sfx::LayerOpts().dur(3.75).gain(-3).place(-0.2));                // builds for 8 beats (3.75 s at 128 bpm)
+    transition.add(&quot;tonal_riser&quot;,     sfx::LayerOpts().dur(3.75).gain(-8).set(&quot;pitch&quot;, 45));           // parameters can be overridden per layer
+    transition.add(&quot;reverse_cymbal&quot;,  sfx::LayerOpts().dur(1.8).at(1.95).gain(-6));                    // swells into the downbeat
+    transition.add(&quot;cinematic_impact&quot;, sfx::LayerOpts().at_beats(8).dur(2.0).gain(0));                 // lands exactly on beat 8
+
+    sfx::Rendered audio = transition.render();
+    audio.save(&quot;sfx_examples_out/transition.wav&quot;);
+    std::cout &lt;&lt; &quot;transition: &quot; &lt;&lt; audio.seconds() &lt;&lt; &quot; s, &quot; &lt;&lt; transition.size() &lt;&lt; &quot; layers\n&quot;;
+}
+</code></pre><h2 id="04">04_tempo_riser.cpp</h2><p>Tempo-aware effects: durations in beats, rhythmic steps locked to the tempo.</p><pre><code>// Tempo-aware effects: durations in beats, rhythmic steps locked to the tempo.
+#include &quot;../../sfx.hpp&quot;
+#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    namespace sfx = wauvio::sfx;
+    std::filesystem::create_directories(&quot;sfx_examples_out&quot;);
+
+    for (double bpm : { 90.0, 140.0 }) {
+        sfx::Effect riser = sfx::make(&quot;rhythmic_riser&quot;);
+        riser.tempo(bpm).duration_beats(8);            // 8 beats, resolved to seconds when rendering
+        std::cout &lt;&lt; bpm &lt;&lt; &quot; bpm: 8 beats = &quot; &lt;&lt; riser.duration() &lt;&lt; &quot; s\n&quot;;
+        riser.render().save(&quot;sfx_examples_out/rhythmic_riser_&quot; + std::to_string(static_cast&lt;int&gt;(bpm)) + &quot;bpm.wav&quot;);
+    }
+
+    sfx::Effect gate = sfx::make(&quot;gated_noise&quot;);       // &quot;subdivision&quot; is the step length in beats (0.25 = sixteenth)
+    gate.tempo(120).set(&quot;subdivision&quot;, 0.5).set(&quot;swing&quot;, 0.2).duration_beats(8);
+    gate.render().save(&quot;sfx_examples_out/gated_noise_eighths.wav&quot;);
+}
+</code></pre><h2 id="05">05_atmosphere.cpp</h2><p>A sustained atmosphere: three textures layered for twenty seconds.</p><pre><code>// A sustained atmosphere: three textures layered for twenty seconds.
+#include &quot;../../sfx.hpp&quot;
+#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    namespace sfx = wauvio::sfx;
+    std::filesystem::create_directories(&quot;sfx_examples_out&quot;);
+
+    sfx::Layered bed;
+    bed.seed(3);
+    bed.add(&quot;detuned_atmosphere&quot;, sfx::LayerOpts().dur(20).set(&quot;pitch&quot;, 41).set(&quot;brightness&quot;, 0.35));                 // warm pad underneath
+    bed.add(&quot;granular_cloud&quot;,     sfx::LayerOpts().dur(20).gain(-9).set(&quot;pitch&quot;, 77).set(&quot;density&quot;, 0.4));           // bell grains on top
+    bed.add(&quot;air_texture&quot;,        sfx::LayerOpts().dur(20).gain(-14));                                                // a little hiss
+
+    sfx::RenderSettings settings;
+    settings.peak_db = -6.0;
+    sfx::Rendered audio = bed.render(settings);
+    audio.save(&quot;sfx_examples_out/atmosphere.wav&quot;);
+    std::cout &lt;&lt; &quot;atmosphere: &quot; &lt;&lt; audio.seconds() &lt;&lt; &quot; s\n&quot;;
+}
+</code></pre><h2 id="06">06_deterministic_random.cpp</h2><p>Seeds: the same seed always gives the same audio; a different seed gives a different take.</p><pre><code>// Seeds: the same seed always gives the same audio; a different seed gives a different take.
+#include &quot;../../sfx.hpp&quot;
+#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    namespace sfx = wauvio::sfx;
+    std::filesystem::create_directories(&quot;sfx_examples_out&quot;);
+
+    auto take = [](uint64_t seed) { sfx::Effect e = sfx::make(&quot;glitch_fill&quot;); e.seed(seed); return e.render(); };
+    const sfx::Rendered a = take(100), b = take(100), c = take(101);
+    std::cout &lt;&lt; &quot;same seed identical:      &quot; &lt;&lt; (a.left == b.left &amp;&amp; a.right == b.right ? &quot;yes&quot; : &quot;NO&quot;) &lt;&lt; &quot;\n&quot;
+              &lt;&lt; &quot;different seed identical: &quot; &lt;&lt; (a.left == c.left ? &quot;yes&quot; : &quot;no&quot;) &lt;&lt; &quot;\n&quot;;
+    for (uint64_t s = 1; s &lt;= 4; ++s) take(s).save(&quot;sfx_examples_out/glitch_fill_take&quot; + std::to_string(s) + &quot;.wav&quot;);
+}
+</code></pre><h2 id="07">07_custom_recipe.cpp</h2><p>Build your own effect from sources and processors, render it, and register it as a preset.</p><pre><code>// Build your own effect from sources and processors, render it, and register it as a preset.
+#include &quot;../../sfx.hpp&quot;
+#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    namespace sfx = wauvio::sfx;
+    using sfx::Traj; using sfx::Wave; using sfx::NoiseColor;
+    std::filesystem::create_directories(&quot;sfx_examples_out&quot;);
+
+    // 1) a Recipe is plain data: layers of one source plus a chain of processors
+    sfx::Recipe r;
+    r.name = &quot;my_whoosh&quot;; r.duration = 2.0; r.tail = 1.0;
+    r.add(&quot;air&quot;).noise(NoiseColor::Pink)
+        .bp(Traj::exp(200, 6000), 3.0, 4)              // cutoff trajectory in Hz, exponential
+        .shape(sfx::Traj(0.02).to(0.7, 1.0, sfx::Interp::Exp).to(1.0, 0.001, sfx::Interp::Exp))
+        .place(0.0, 0.9).reverb(1.2, 0.5, 0.5);
+    r.add(&quot;tone&quot;).osc(Wave::Saw, Traj::linear(40, 76)).unison(3, 12).lp(Traj::exp(300, 5000), 1.5, 4).gain(0.4);
+    sfx::render(r, /*seed=*/5).save(&quot;sfx_examples_out/my_whoosh.wav&quot;);
+
+    // 2) the same thing as a preset with parameters, in your own registry next to the built-in catalog
+    sfx::Registry mine = sfx::builtin_registry();
+    sfx::Preset p;
+    p.name = &quot;My Whoosh&quot;; p.category = sfx::Category::Risers; p.behavior = sfx::Behavior::Evolving;
+    p.description = &quot;A pink-noise whoosh with a saw underneath, tunable brightness.&quot;;
+    p.tags = { &quot;custom&quot;, &quot;whoosh&quot; };
+    p.params = sfx::params_from({ &quot;duration=2&quot;, &quot;brightness=0.6&quot;, &quot;pitch=40&quot; });
+    p.build = [](sfx::Recipe&amp; rec, const sfx::BuildCtx&amp; c) {
+        rec.add(&quot;air&quot;).noise(NoiseColor::Pink).bp(Traj::exp(200, c.lg(c.p(&quot;brightness&quot;), 2000, 9000)), 3.0, 4).shape(sfx::env_swell());
+        rec.add(&quot;tone&quot;).osc(Wave::Saw, Traj::linear(c.p(&quot;pitch&quot;), c.p(&quot;pitch&quot;) + 36)).lp(4000).gain(0.4);
+    };
+    mine.add(p);
+    sfx::Effect e(*mine.find(&quot;my_whoosh&quot;));
+    e.set(&quot;brightness&quot;, 0.9).render().save(&quot;sfx_examples_out/my_whoosh_preset.wav&quot;);
+    std::cout &lt;&lt; &quot;registry now holds &quot; &lt;&lt; mine.size() &lt;&lt; &quot; presets (built-in catalog: &quot; &lt;&lt; sfx::builtin_registry().size() &lt;&lt; &quot;)\n&quot;;
+}
+</code></pre><h2 id="08">08_collection.cpp</h2><p>Render a collection: every preset tagged &quot;riser&quot;, at the same tempo and seed, into one folder.</p><pre><code>// Render a collection: every preset tagged &quot;riser&quot;, at the same tempo and seed, into one folder.
+#include &quot;../../sfx.hpp&quot;
+#include &lt;filesystem&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    namespace sfx = wauvio::sfx;
+    std::filesystem::create_directories(&quot;sfx_examples_out/risers&quot;);
+    size_t n = 0;
+    for (const sfx::Preset* p : sfx::search(&quot;riser&quot;)) {
+        sfx::Effect e(*p);
+        e.tempo(128).seed(42);
+        try { e.render().save(&quot;sfx_examples_out/risers/&quot; + p-&gt;id + &quot;.wav&quot;); ++n; }
+        catch (const sfx::Error&amp; err) { std::cerr &lt;&lt; p-&gt;id &lt;&lt; &quot;: &quot; &lt;&lt; err.what() &lt;&lt; &quot;\n&quot;; return 1; }   // never skip a failure silently
+    }
+    std::cout &lt;&lt; &quot;rendered &quot; &lt;&lt; n &lt;&lt; &quot; presets\n&quot;;
+}
+</code></pre>
+<div class="pager"><a href="sfx-tool.html"><small>Previous</small>wauvio_sfx_tool (command line)</a><a class="r" href="sfx-catalog.html"><small>Next</small>Catalog index</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

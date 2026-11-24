@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Render engine · Wauvio Docs</title><meta name="description" content="RenderSettings, Rendered, Stats and render().">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">SFX engine (wauvio/sfx)</div><h1>Render engine</h1>
+
+<h2>Rendering</h2>
+<p><code>render(const Recipe&amp;, uint64_t seed = 1, const RenderSettings&amp; = {})</code> validates the recipe and settings (<code>validate_recipe</code>, <code>validate_settings</code>), renders every layer with a seed derived from the master seed, mixes, optionally reverses the whole mix, applies fades and a DC blocker, and normalises.</p>
+<h3>RenderSettings</h3><table><thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>sample_rate</code></td><td>44100</td><td>8000–192000</td></tr><tr><td><code>channels</code></td><td>2</td><td>1 or 2</td></tr><tr><td><code>normalize</code></td><td>true</td><td>Scale so the peak equals <code>peak_db</code></td></tr><tr><td><code>peak_db</code></td><td>−1.0</td><td>≤ 0 dBFS</td></tr><tr><td><code>max_seconds</code></td><td>120</td><td>Refuse longer renders (memory guard)</td></tr><tr><td><code>dc_cutoff_hz</code></td><td>12</td><td>DC blocker; 0 = off</td></tr></tbody></table>
+<h3>Rendered</h3>
+<p><code>left</code>, <code>right</code>, <code>sample_rate</code>, <code>channels</code>; <code>frames()</code>, <code>seconds()</code>, <code>stats()</code>, <code>to_stereo()</code>, <code>to_mono()</code>, <code>save(path)</code> (mono or stereo WAV via the core writers).</p>
+<h3>Stats</h3>
+<p><code>seconds</code>, <code>peak</code>, <code>rms</code>, <code>dc</code>, <code>clip_ratio</code>, <code>crest</code>, <code>silent</code>; <code>peak_db()</code>, <code>rms_db()</code>. Useful for checking a render is not silent or clipped.</p>
+<h2>Source generators (<code>render/sources.hpp</code>)</h2>
+<p>One generator per source kind (<code>gen_osc</code>, <code>gen_noise</code>, <code>gen_additive</code>, <code>gen_modal</code>, <code>gen_formant</code>, <code>gen_grain</code>, <code>gen_pluck</code>, <code>gen_chaos</code>), dispatched by <code>generate_source</code>. Also a TPT state-variable filter (<code>Svf</code>) that stays stable under fast modulation, and wave helpers.</p>
+<h2>Processor implementations (<code>render/processors.hpp</code>)</h2>
+<p>One function per processor (<code>proc_filter</code>, <code>proc_drive</code>, <code>proc_crush</code>, <code>proc_gate</code>, <code>proc_trem</code>, <code>proc_pulses</code>, <code>proc_stutter</code>, <code>proc_freeze</code>, <code>proc_dropout</code>, <code>proc_comb</code>, <code>proc_ring</code>, <code>proc_reverb</code>, <code>proc_echo</code>, <code>proc_spectral</code>), dispatched by <code>run_proc</code>, with an internal FFT. These live in a <code>detail</code> namespace and are not part of the stable API.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-sfx-render-engine-hpp"><h3><code>wauvio/sfx/render/engine.hpp</code></h3>
+<h4 id="wauvio-sfx-render-engine-hpp-wauvio-sfx-rendersettings"><span class="ns">wauvio::sfx::</span>struct RenderSettings</h4>
+<pre><code>struct RenderSettings
+    int    sample_rate = 44100;      ///&lt; 8000 .. 192000
+    int    channels    = 2;          ///&lt; 1 (mono) or 2 (stereo)
+    bool   normalize   = true;       ///&lt; scale the finished effect so its peak equals peak_db
+    double peak_db     = -1.0;       ///&lt; target peak when normalising (&lt;= 0 dBFS)
+    double max_seconds = 120.0;      ///&lt; refuse to render anything longer (memory guard)
+    double dc_cutoff_hz = 12.0;      ///&lt; DC blocker (0 = off)</code></pre>
+<h4 id="wauvio-sfx-render-engine-hpp-wauvio-sfx-stats"><span class="ns">wauvio::sfx::</span>struct Stats</h4>
+<pre><code>struct Stats
+    double seconds = 0.0, peak = 0.0, rms = 0.0, dc = 0.0, clip_ratio = 0.0, crest = 0.0;
+    bool silent = true;
+    double peak_db() const { return lin_to_db(peak); }
+    double rms_db() const { return lin_to_db(rms); }</code></pre>
+<h4 id="wauvio-sfx-render-engine-hpp-wauvio-sfx-rendered"><span class="ns">wauvio::sfx::</span>struct Rendered</h4>
+<pre><code>struct Rendered
+    Buffer left, right;
+    int sample_rate = 44100;
+    int channels = 2;
+    size_t frames() const noexcept { return left.size(); }
+    double seconds() const noexcept { return sample_rate &gt; 0 ? static_cast&lt;double&gt;(left.size()) / sample_rate : 0.0; }
+    Stats stats() const
+    StereoBuffer to_stereo() const { StereoBuffer b; b.L = left; b.R = right; return b; }
+    Buffer to_mono() const { Buffer m(left.size()); for (size_t i = 0; i &lt; m.size(); ++i) m[i] = 0.5f * (left[i] + right[i]); return m; }
+    void save(const std::string&amp; path) const { if (channels == 1) save_wav(to_mono(), path, sample_rate); else save_wav_stereo(to_stereo(), path, sample_rate); }
+inline void validate_settings(const RenderSettings&amp; st)
+inline void validate_recipe(const Recipe&amp; r)
+    struct LayerCtx { double sr; double bpm; double duration; };
+    inline Buffer render_layer(const LayerSpec&amp; L, const LayerCtx&amp; c, uint64_t seed)
+/// Render a recipe. `seed` makes every random decision reproducible; the same recipe, seed and
+/// settings give the same audio (floating-point results can differ across platforms).
+inline Rendered render(const Recipe&amp; r, uint64_t seed = 1, const RenderSettings&amp; st = RenderSettings())</code></pre>
+</section>
+<div class="pager"><a href="sfx-recipes.html"><small>Previous</small>Recipes, trajectories and modulators</a><a class="r" href="sfx-presets.html"><small>Next</small>Presets, Effect and Layered</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

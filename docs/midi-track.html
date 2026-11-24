@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loading, rendering and writing · Wauvio Docs</title><meta name="description" content="MidiMusic, load_midi, rendering, stems and MIDI writing.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">MIDI layer (wauvio/midi)</div><h1>Loading, rendering and writing</h1>
+
+<h2>MidiMusic and MidiPart</h2>
+<p>Header <code>midi/track/midi_music.hpp</code>, namespace <code>wauvio::midi::track</code>.</p>
+<ul>
+<li><code>ResolvedNote</code> — absolute time <code>t</code>, <code>dur</code>, <code>midi_note</code>, <code>dyn</code>, <code>articulation</code>, <code>expression</code>, <code>pitch_bend_semitones</code>, <code>pitch_bend_curve</code>, <code>glide_from_midi</code>.</li>
+<li><code>MidiPart</code> — one playable part: <code>name</code>, <code>source_track_index</code>, <code>channel</code>, <code>gm_program</code>, <code>bank_msb</code>/<code>bank_lsb</code>, <code>is_percussion</code>, <code>program_from_midi_file</code>, <code>instrument_pinned</code>, <code>instrument</code> or <code>drum_kit</code>, and <code>notes</code>.</li>
+<li><code>MidiMusic</code> — <code>parts</code>, <code>duration_seconds</code>, <code>initial_bpm</code>, <code>ticks_per_quarter</code>, <code>smpte_timing</code>, <code>source_path</code>, <code>time_signatures</code>, <code>key_signatures</code>, <code>raw_midi</code>. Methods: <code>part_count()</code>, <code>part(i)</code>, <code>set_instrument&lt;T&gt;(i)</code> / <code>set_instrument(i, ptr)</code>, <code>set_drum_kit(i, kit)</code>, <code>pin_instrument(i)</code> / <code>unpin_instrument(i)</code> (protects an instrument from genre instrumentation), <code>setGenre(preset[, options])</code>, <code>clearGenre()</code>, <code>has_genre()</code>, <code>current_genre()</code>, <code>total_samples(sr)</code>, <code>render_part(i, sr, total_len)</code>, <code>render(sr)</code>.</li>
+</ul>
+<h2>Loader</h2>
+<p><code>load_midi(path, LoadOptions)</code> in <code>midi/track/loader.hpp</code>.</p><table><thead><tr><th>LoadOptions field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>resolver</code></td><td>—</td><td><code>InstrumentResolver</code> used to assign instruments</td></tr><tr><td><code>honor_sustain_pedal</code></td><td>true</td><td>CC64 extends held notes until pedal release</td></tr><tr><td><code>honor_portamento</code></td><td>true</td><td>Portamento on/off controller creates glides (<code>glide_from_midi</code>)</td></tr><tr><td><code>pitch_bend_range_semitones</code></td><td>2.0</td><td>Initial bend range (RPN changes update it per channel)</td></tr><tr><td><code>default_glide_time</code></td><td>0.08</td><td>Glide duration in seconds</td></tr><tr><td><code>retain_raw_midi</code></td><td>true</td><td>Keep the <code>ParsedMidiFile</code> in <code>MidiMusic::raw_midi</code></td></tr></tbody></table>
+<p>The loader tracks per-channel state (program, bank select, sustain, portamento, pitch bend, expression and volume CCs, RPN) and converts note-on velocity to <code>Dynamics</code> and expression.</p>
+<h2>Rendering</h2>
+<ul>
+<li><code>MidiMusic::render(sr)</code> mixes all parts to a stereo buffer.</li>
+<li><code>midi::track::render_to_buffer(music, RenderOptions)</code> applies the <a href="ext-render.html">render options</a>.</li>
+<li><code>wauvio::render(music, path, opts)</code> writes a WAV.</li>
+<li><code>render_stems(music, output_dir, opts)</code> writes one WAV per part (filenames sanitised from part names) and returns the paths.</li>
+<li><code>wauvio::play(music, sr)</code> / <code>play_async(music, sr)</code> (<code>midi/playback.hpp</code>) render then play through the core playback API.</li>
+</ul>
+<h2>Writing MIDI</h2>
+<p><code>save_midi(const music::Arrangement&amp;, path, ppq = 480)</code> and <code>save_midi(const MidiMusic&amp;, path)</code> in <code>midi/track/midi_writer.hpp</code> write Standard MIDI Files. The internal <code>MidiTrackBuilder</code> emits track name, tempo, program change, control change, note on/off events with VLQ delta times.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-midi-track-midi-music-hpp"><h3><code>wauvio/midi/track/midi_music.hpp</code></h3>
+<h4 id="wauvio-midi-track-midi-music-hpp-wauvio-midi-genre-free-functions-constants-and-aliases"><span class="ns">wauvio::midi::genre::</span>Free functions, constants and aliases</h4>
+<pre><code>    class MidiGenrePreset;
+    struct GenreApplyOptions;
+} }</code></pre>
+<h4 id="wauvio-midi-track-midi-music-hpp-wauvio-midi-track-resolvednote"><span class="ns">wauvio::midi::track::</span>struct ResolvedNote</h4>
+<pre><code>struct ResolvedNote
+    double t = 0.0;
+    double dur = 0.0;
+    int midi_note = 60;
+    wauvio::music::Dynamics dyn = wauvio::music::Dynamics::mf;
+    wauvio::music::Articulation articulation = wauvio::music::Articulation::Sustain;
+    double expression = 1.0;
+    double pitch_bend_semitones = 0.0;
+    std::vector&lt;std::pair&lt;double,double&gt;&gt; pitch_bend_curve;
+    int glide_from_midi = -1;</code></pre>
+<h4 id="wauvio-midi-track-midi-music-hpp-wauvio-midi-track-midipart"><span class="ns">wauvio::midi::track::</span>class MidiPart</h4>
+<pre><code>class MidiPart
+public:
+    std::string name;
+    int source_track_index = -1;
+    int channel = 0;
+    int gm_program = 0;
+    int bank_msb = 0;
+    int bank_lsb = 0;
+    bool is_percussion = false;
+    bool program_from_midi_file = false;
+    bool instrument_pinned = false;
+    midi::InstrumentPtr instrument;
+    std::shared_ptr&lt;wauvio::music::DrumKit&gt; drum_kit;
+    std::vector&lt;ResolvedNote&gt; notes;</code></pre>
+<h4 id="wauvio-midi-track-midi-music-hpp-wauvio-midi-track-midimusic"><span class="ns">wauvio::midi::track::</span>class MidiMusic</h4>
+<pre><code>class MidiMusic
+public:
+    std::vector&lt;MidiPart&gt; parts;
+    double duration_seconds = 0.0;
+    double initial_bpm = 120.0;
+    uint16_t ticks_per_quarter = 480;
+    bool smpte_timing = false;
+    std::string source_path;
+    std::vector&lt;midi::TimeSignatureEvent&gt; time_signatures;
+    std::vector&lt;midi::KeySignatureEvent&gt; key_signatures;
+    std::shared_ptr&lt;midi::ParsedMidiFile&gt; raw_midi;
+    size_t part_count() const noexcept { return parts.size(); }
+    const MidiPart&amp; part(size_t index) const { return parts.at(index); }
+    MidiPart&amp; part(size_t index) { return parts.at(index); }
+    template &lt;typename T&gt;
+    void set_instrument(size_t part_index)
+    void set_instrument(size_t part_index, midi::InstrumentPtr instr)
+    void set_drum_kit(size_t part_index, std::shared_ptr&lt;wauvio::music::DrumKit&gt; kit)
+    void pin_instrument(size_t part_index)
+    void unpin_instrument(size_t part_index)
+    void setGenre(std::shared_ptr&lt;const midi::genre::MidiGenrePreset&gt; preset);
+    void setGenre(std::shared_ptr&lt;const midi::genre::MidiGenrePreset&gt; preset,
+                  const midi::genre::GenreApplyOptions&amp; options);
+    void clearGenre();
+    bool has_genre() const noexcept { return genre_preset_ != nullptr; }
+    std::shared_ptr&lt;const midi::genre::MidiGenrePreset&gt; current_genre() const noexcept { return genre_preset_; }
+    size_t total_samples(int sample_rate) const
+    StereoBuffer render_part(size_t part_index, int sample_rate, size_t total_len) const
+    StereoBuffer render(int sample_rate = 0) const</code></pre>
+</section>
+<section class="file" id="wauvio-midi-track-loader-hpp"><h3><code>wauvio/midi/track/loader.hpp</code></h3>
+<h4 id="wauvio-midi-track-loader-hpp-wauvio-midi-track-loadoptions"><span class="ns">wauvio::midi::track::</span>struct LoadOptions</h4>
+<pre><code>struct LoadOptions
+    midi::InstrumentResolver resolver;
+    bool honor_sustain_pedal = true;
+    bool honor_portamento = true;
+    double pitch_bend_range_semitones = 2.0;
+    double default_glide_time = 0.08;
+    bool retain_raw_midi = true;
+    struct ChannelState
+        int program = 0;
+        int bank_msb = 0;
+        int bank_lsb = 0;
+        bool sustain_on = false;
+        bool portamento_on = false;
+        double pitch_bend_semitones = 0.0;
+        double pitch_bend_range_semitones = 2.0;
+        double expression = 1.0;
+        double volume = 1.0;
+        int last_note_on_pitch = -1;
+        int rpn_msb = 0x7F;
+        int rpn_lsb = 0x7F;
+    struct HeldNote
+        uint64_t start_tick = 0;
+        uint8_t velocity = 64;
+        double expression_at_onset = 1.0;
+        double bend_at_onset = 0.0;
+        int glide_from_midi = -1;
+        int program_at_onset = 0;
+        int bank_msb_at_onset = 0;
+        int bank_lsb_at_onset = 0;
+        bool pending_pedal_release = false;
+    inline wauvio::music::Dynamics velocity_to_dynamics_u8(uint8_t v)
+inline MidiMusic load_midi(const std::string&amp; path, const LoadOptions&amp; opts = LoadOptions())</code></pre>
+</section>
+<section class="file" id="wauvio-midi-track-render-hpp"><h3><code>wauvio/midi/track/render.hpp</code></h3>
+<h4 id="wauvio-midi-track-render-hpp-wauvio-midi-track-detail-free-functions-constants-and-aliases"><span class="ns">wauvio::midi::track::detail::</span>Free functions, constants and aliases</h4>
+<pre><code>inline std::string sanitize_filename(const std::string&amp; name)</code></pre>
+<h4 id="wauvio-midi-track-render-hpp-wauvio-midi-track-free-functions-constants-and-aliases1"><span class="ns">wauvio::midi::track::</span>Free functions, constants and aliases</h4>
+<pre><code>inline StereoBuffer render_to_buffer(const MidiMusic&amp; music, const RenderOptions&amp; opts = RenderOptions())
+inline std::vector&lt;std::string&gt; render_stems(const MidiMusic&amp; music, const std::string&amp; output_dir,
+                                              const RenderOptions&amp; opts = RenderOptions())
+</code></pre>
+<h4 id="wauvio-midi-track-render-hpp-wauvio-free-functions-constants-and-aliases2"><span class="ns">wauvio::</span>Free functions, constants and aliases</h4>
+<pre><code>inline void render(const midi::track::MidiMusic&amp; music, const std::string&amp; path, const RenderOptions&amp; opts = RenderOptions())</code></pre>
+</section>
+<section class="file" id="wauvio-midi-track-midi-writer-hpp"><h3><code>wauvio/midi/track/midi_writer.hpp</code></h3>
+<h4 id="wauvio-midi-track-midi-writer-hpp-wauvio-midi-track-writer-detail-free-functions-constants-and-aliases"><span class="ns">wauvio::midi::track::writer_detail::</span>Free functions, constants and aliases</h4>
+<pre><code>inline void write_vlq(std::vector&lt;uint8_t&gt;&amp; out, uint32_t value)
+inline void write_u32be(std::vector&lt;uint8_t&gt;&amp; out, uint32_t v)
+inline void write_u16be(std::vector&lt;uint8_t&gt;&amp; out, uint16_t v)</code></pre>
+<h4 id="wauvio-midi-track-midi-writer-hpp-wauvio-midi-track-writer-detail-rawevent"><span class="ns">wauvio::midi::track::writer_detail::</span>struct RawEvent</h4>
+<pre><code>struct RawEvent
+    uint64_t tick;
+    std::vector&lt;uint8_t&gt; bytes;</code></pre>
+<h4 id="wauvio-midi-track-midi-writer-hpp-wauvio-midi-track-writer-detail-miditrackbuilder"><span class="ns">wauvio::midi::track::writer_detail::</span>class MidiTrackBuilder</h4>
+<pre><code>class MidiTrackBuilder
+public:
+    void add(uint64_t tick, std::vector&lt;uint8_t&gt; bytes) { events_.push_back({tick, std::move(bytes)}); }
+    void add_track_name(uint64_t tick, const std::string&amp; name)
+    void add_tempo(uint64_t tick, uint32_t micros_per_quarter)
+    void add_program_change(uint64_t tick, int channel, int program)
+    void add_control_change(uint64_t tick, int channel, int controller, int value)
+    void add_note_on(uint64_t tick, int channel, int note, int velocity)
+    void add_note_off(uint64_t tick, int channel, int note)
+    std::vector&lt;uint8_t&gt; serialize() const
+inline void write_file(const std::string&amp; path, uint16_t format, uint16_t ntrks, uint16_t division,
+                        const std::vector&lt;std::vector&lt;uint8_t&gt;&gt;&amp; track_chunks)
+</code></pre>
+<h4 id="wauvio-midi-track-midi-writer-hpp-wauvio-midi-track-free-functions-constants-and-aliases1"><span class="ns">wauvio::midi::track::</span>Free functions, constants and aliases</h4>
+<pre><code>inline void save_midi(const wauvio::music::Arrangement&amp; arr, const std::string&amp; path, int ppq = 480)
+inline void save_midi(const MidiMusic&amp; music, const std::string&amp; path)</code></pre>
+</section>
+<section class="file" id="wauvio-midi-playback-hpp"><h3><code>wauvio/midi/playback.hpp</code></h3>
+<h4 id="wauvio-midi-playback-hpp-wauvio-free-functions-constants-and-aliases"><span class="ns">wauvio::</span>Free functions, constants and aliases</h4>
+<pre><code>inline void play(const midi::track::MidiMusic&amp; music, int sample_rate = 0)
+inline PlaybackHandle play_async(const midi::track::MidiMusic&amp; music, int sample_rate = 0)</code></pre>
+</section>
+<div class="pager"><a href="midi-resolution.html"><small>Previous</small>Instrument resolution and General MIDI map</a><a class="r" href="midi-genre.html"><small>Next</small>MIDI genre system</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

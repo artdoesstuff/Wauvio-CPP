@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Genre system · Wauvio Docs</title><meta name="description" content="Genre presets and style application.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Music layer (wauvio/ext)</div><h1>Genre system</h1>
+
+<p>Headers <code>ext/genre/genre_types.hpp</code>, <code>genre_apply.hpp</code>, <code>genre_presets.hpp</code>; namespace <code>wauvio::music::genre</code>. A genre preset is a bundle of per-role style rules that rewrite a melody and restyle an instrument.</p>
+<h2>Types</h2>
+<ul>
+<li><code>Role { Melodic, Bass, Percussion }</code>.</li>
+<li><code>RoleProfile</code> — the style rules for one role:</li></ul><table><thead><tr><th>Group</th><th>Fields</th></tr></thead><tbody><tr><td>Dynamics</td><td><code>velocity_scale</code>, <code>velocity_floor</code>, <code>velocity_variance</code>, <code>accent_pattern</code> (per-beat multipliers), <code>downbeat_deemphasis</code></td></tr><tr><td>Timing</td><td><code>swing_amount</code>, <code>timing_humanize_sec</code>, <code>quantize_grid_fraction</code>, <code>timing_offset_sec</code></td></tr><tr><td>Note shaping</td><td><code>thin_probability</code> (randomly drop soft notes), <code>register_shift_semitones</code>, <code>force_articulation</code> + <code>articulation</code>, <code>fallback_gate_ratio</code></td></tr><tr><td>Timbre</td><td><code>filter_cutoff_mult</code>, <code>detune_cents_delta</code>, <code>stereo_width_override</code>, <code>noise_mix_delta</code>, <code>wobble_amount</code></td></tr><tr><td>Effects</td><td><code>want_reverb</code> (+ room/wet/damping), <code>want_chorus</code> (+ rate/depth/wet), <code>want_delay</code> (+ time/feedback/wet), <code>want_distortion</code> (+ drive)</td></tr></tbody></table>
+<ul><li><code>GenrePreset</code> — <code>name</code>, <code>description</code>, <code>tempo_scale</code>, a <code>default_profile</code> and optional <code>bass_profile</code> / <code>percussion_profile</code> (<code>set_bass()</code>, <code>set_percussion()</code>); <code>profile_for(role)</code> falls back to the default. <code>GenrePresetPtr</code> is <code>shared_ptr&lt;const GenrePreset&gt;</code>.</li></ul>
+<h2>Applying a preset</h2>
+<ul>
+<li><code>apply_to_melody(melody, preset, role, instrument = nullptr, seed = 1)</code> mutates a <code>Melody</code> deterministically (hash-based randomness from <code>seed</code>): optionally thins soft notes, shifts register, forces an articulation (only if the instrument supports it), and scales each note's <code>expression</code> by the profile's velocity scale, accent pattern and variance, clamped between <code>velocity_floor</code> and 1. Timing fields (swing, humanize, quantize, offset) are not applied here; they are consumed by the MIDI layer — see <a href="midi-genre.html">MIDI genre</a>.</li>
+<li><code>style_instrument(instrument, preset, role)</code> applies the role's timbre and effect wants; <code>capture_style_baseline()</code> / <code>restore_style_baseline()</code> snapshot and restore the instrument's gain, pan, effects and recipe so a preset can be undone.</li>
+</ul>
+<h2>Built-in presets</h2><table><thead><tr><th>Factory</th><th>Name</th><th>Description</th><th>tempo_scale</th></tr></thead><tbody><tr><td><code>presets::classical()</code></td><td>Classical</td><td>Expressive human timing, legato phrasing, hall reverb.</td><td>1.0</td></tr><tr><td><code>presets::jazz()</code></td><td>Jazz</td><td>Swung eighths, backbeat accents, loose human timing.</td><td>1.0</td></tr><tr><td><code>presets::rock()</code></td><td>Rock</td><td>Straight rhythm, punchy backbeat accents, driven guitars.</td><td>1.0</td></tr><tr><td><code>presets::metal()</code></td><td>Metal</td><td>Tight/mechanical timing, heavy distortion, tightened low end.</td><td>1.05</td></tr><tr><td><code>presets::house()</code></td><td>House</td><td>Quantized four-on-the-floor groove, bright low end, light shuffle.</td><td>1.04</td></tr><tr><td><code>presets::techno()</code></td><td>Techno</td><td>Perfectly quantized, mechanical groove, driving and dark.</td><td>1.08</td></tr><tr><td><code>presets::drum_and_bass()</code></td><td>Drum &amp; Bass</td><td>Fast tempo, sub-register bass, shuffled breakbeat feel.</td><td>1.35</td></tr><tr><td><code>presets::chiptune()</code></td><td>Chiptune</td><td>Bright, quantized, dry 8-bit-style character.</td><td>1.0</td></tr><tr><td><code>presets::ambient()</code></td><td>Ambient</td><td>Sparse, slow, wide, and reverberant.</td><td>0.85</td></tr><tr><td><code>presets::touhou()</code></td><td>Touhou</td><td>Bright, fast, driving fusion feel (melodic+rock elements).</td><td>1.12</td></tr><tr><td><code>presets::funk()</code></td><td>Funk</td><td>Syncopated, dry, ghost-note-heavy groove that hits hard on beat one.</td><td>1.0</td></tr><tr><td><code>presets::blues()</code></td><td>Blues</td><td>Loose 12-bar-style shuffle feel, warm light overdrive, relaxed tempo.</td><td>0.95</td></tr><tr><td><code>presets::reggae()</code></td><td>Reggae</td><td>Off-beat skank emphasis and a bass that drags behind the beat.</td><td>0.92</td></tr><tr><td><code>presets::trance()</code></td><td>Trance</td><td>Uplifting, quantized, bright and wide, with slow filter movement.</td><td>1.06</td></tr><tr><td><code>presets::dubstep()</code></td><td>Dubstep</td><td>Heavy sub-bass wobble, sparse/spacious percussion, slower half-time feel.</td><td>0.78</td></tr><tr><td><code>presets::bossa_nova()</code></td><td>Bossa Nova</td><td>Gentle syncopation, soft dynamics, nylon-guitar-and-hand-percussion feel.</td><td>0.97</td></tr><tr><td><code>presets::hardcore()</code></td><td>Hardcore</td><td>Very fast, perfectly mechanical, distorted electronic aggression.</td><td>1.45</td></tr><tr><td><code>presets::speedcore()</code></td><td>Speedcore</td><td>Extreme tempo, hyper-mechanical quantization, maximal distortion.</td><td>2.1</td></tr></tbody></table><h2>Full API listing</h2><section class="file" id="wauvio-ext-genre-genre-types-hpp"><h3><code>wauvio/ext/genre/genre_types.hpp</code></h3>
+<h4 id="wauvio-ext-genre-genre-types-hpp-wauvio-music-genre-role"><span class="ns">wauvio::music::genre::</span>enum class Role</h4>
+<pre><code>enum class Role { Melodic, Bass, Percussion };</code></pre>
+<h4 id="wauvio-ext-genre-genre-types-hpp-wauvio-music-genre-roleprofile"><span class="ns">wauvio::music::genre::</span>struct RoleProfile</h4>
+<pre><code>struct RoleProfile
+    double velocity_scale    = 1.0;
+    double velocity_floor    = 0.0;
+    double velocity_variance = 0.0;
+    std::vector&lt;double&gt; accent_pattern;
+    double swing_amount             = 0.0;
+    double timing_humanize_sec      = 0.0;
+    double quantize_grid_fraction   = 0.0;
+    double timing_offset_sec = 0.0;
+    double downbeat_deemphasis = 0.0;
+    double thin_probability = 0.0;
+    int register_shift_semitones = 0;
+    bool               force_articulation = false;
+    wauvio::music::Articulation articulation      = wauvio::music::Articulation::Sustain;
+    double             fallback_gate_ratio = 1.0;
+    double filter_cutoff_mult    = 1.0;
+    double detune_cents_delta    = 0.0;
+    double stereo_width_override = -1.0;
+    double noise_mix_delta       = 0.0;
+    double wobble_amount         = 0.0;
+    bool  want_reverb = false;
+    float reverb_room = 0.5f, reverb_wet = 0.25f, reverb_damping = 0.5f;
+    bool   want_chorus = false;
+    double chorus_rate_hz = 0.5, chorus_depth_ms = 1.5;
+    float  chorus_wet = 0.3f;
+    bool   want_delay = false;
+    double delay_time_ms = 250.0;
+    float  delay_feedback = 0.3f, delay_wet = 0.25f;
+    bool  want_distortion = false;
+    float distortion_drive = 2.0f;</code></pre>
+<h4 id="wauvio-ext-genre-genre-types-hpp-wauvio-music-genre-genrepreset"><span class="ns">wauvio::music::genre::</span>class GenrePreset</h4>
+<pre><code>class GenrePreset
+public:
+    std::string name;
+    std::string description;
+    double tempo_scale = 1.0;
+    RoleProfile default_profile;
+    RoleProfile bass_profile;
+    bool        has_bass_profile = false;
+    RoleProfile percussion_profile;
+    bool        has_percussion_profile = false;
+    const RoleProfile&amp; profile_for(Role role) const noexcept
+    GenrePreset&amp; set_bass(RoleProfile p) { bass_profile = std::move(p); has_bass_profile = true; return *this; }
+    GenrePreset&amp; set_percussion(RoleProfile p) { percussion_profile = std::move(p); has_percussion_profile = true; return *this; }
+using GenrePresetPtr = std::shared_ptr&lt;const GenrePreset&gt;;
+    inline uint64_t splitmix64(uint64_t x) noexcept
+    inline uint64_t note_hash(uint64_t seed, double t, int midi_note, size_t index, uint64_t salt) noexcept
+    inline double unit(uint64_t h) noexcept
+    inline double signed_unit(uint64_t h) noexcept { return unit(h) * 2.0 - 1.0; }
+    inline int clampi(int v, int lo, int hi) noexcept { return std::max(lo, std::min(hi, v)); }
+    inline double clampd(double v, double lo, double hi) noexcept { return std::max(lo, std::min(hi, v)); }
+    inline double accent_multiplier(const std::vector&lt;double&gt;&amp; pattern, int beat_index)</code></pre>
+</section>
+<section class="file" id="wauvio-ext-genre-genre-apply-hpp"><h3><code>wauvio/ext/genre/genre_apply.hpp</code></h3>
+<h4 id="wauvio-ext-genre-genre-apply-hpp-wauvio-music-genre-free-functions-constants-and-aliases"><span class="ns">wauvio::music::genre::</span>Free functions, constants and aliases</h4>
+<pre><code>inline void apply_to_melody(wauvio::music::Melody&amp; melody, const GenrePreset&amp; preset, Role role,
+                             const wauvio::music::Instrument* instrument = nullptr, uint64_t seed = 1)
+</code></pre>
+<h4 id="wauvio-ext-genre-genre-apply-hpp-wauvio-music-genre-instrumentstylebaseline"><span class="ns">wauvio::music::genre::</span>struct InstrumentStyleBaseline</h4>
+<pre><code>struct InstrumentStyleBaseline
+    float gain = 1.0f, pan = 0.0f;
+    bool  reverb_on = false;     wauvio::fx::basic::Reverb       reverb_fx;
+    bool  chorus_on = false;     wauvio::fx::basic::Chorus       chorus_fx;
+    bool  delay_on = false;      wauvio::fx::basic::DelayLine    delay_fx;
+    bool  eq_on = false;         wauvio::filter::ParametricEQ eq_fx;
+    bool  distortion_on = false; float distortion_drive = 2.0f;
+    bool             has_recipe = false;
+    wauvio::music::TimbreRecipe recipe;
+inline InstrumentStyleBaseline capture_style_baseline(const wauvio::music::Instrument&amp; instrument)
+inline void restore_style_baseline(wauvio::music::Instrument&amp; instrument, const InstrumentStyleBaseline&amp; b)
+inline void style_instrument(wauvio::music::Instrument&amp; instrument, const GenrePreset&amp; preset, Role role)</code></pre>
+</section>
+<div class="pager"><a href="ext-render.html"><small>Previous</small>Rendering and WAV output</a><a class="r" href="ext-instruments.html"><small>Next</small>Instrument catalog</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>
