@@ -89,6 +89,9 @@ namespace wauvio {
                 Style& style() { return style_; }                 // defaults applied to notes added afterwards
                 const Style& style() const { return style_; }
                 ParseOptions& parse_options() { return popt_; }
+                // Kanji lyrics: this Singer's dictionary (starts as a copy of the built-in list; add or load your own).
+                KanjiDictionary& kanji_dictionary() { return kanji_; }
+                bool load_kanji_dictionary(const std::string& path, std::string* err = nullptr) { return kanji_.load_file(path, err); }
                 Singer& phrase_pitch_curve(const Curve& semitones_vs_seconds) { phrase_curve_ = semitones_vs_seconds; return *this; }
                 Singer& seed(uint32_t s) { seed_ = s; return *this; }
                 // V2 personas. These move the Singer's default look for notes added afterwards.
@@ -146,6 +149,7 @@ namespace wauvio {
                         else if (!n.morae.empty() && n.dur / double(n.morae.size()) < 0.045) d.push_back(at + "too many morae for its length (" + std::to_string(n.morae.size()) + " in " + std::to_string(n.dur).substr(0, 5) + "s)");
                         if (n.morae.empty() && n.event.empty()) d.push_back(at + "no lyric");
                     }
+                    d.insert(d.end(), kanji_issues_.begin(), kanji_issues_.end());
                     return d;
                 }
                 // V2: Singer-wide automation lane (absolute seconds). See NoteRef::lane for names.
@@ -176,18 +180,24 @@ namespace wauvio {
                     SynthNote n;
                     n.start = start_sec; n.dur = seconds; n.midi = midi; n.vel = velocity; n.style = style_;
                     if (is_event_tag(lyric)) n.event = lyric;           // expanded at render time (see events.hpp)
-                    else n.morae = parse_lyric(lyric, popt_);
+                    else {
+                        ParseOptions po = popt_; std::vector<std::string> kn;
+                        po.kanji_dictionary = &kanji_; po.kanji_notes = &kn;
+                        n.morae = parse_lyric(lyric, po);
+                        for (const std::string& m : kn) kanji_issues_.push_back("note " + std::to_string(notes_.size() + 1) + " @" + std::to_string(start_sec).substr(0, 5) + "s: " + m);
+                    }
                     notes_.push_back(std::move(n));
                     cursor_ = start_sec + seconds;
                     return NoteRef(notes_.back(), &profile_.personas);
                 }
 
-                void clear() { notes_.clear(); cursor_ = 0.0; phrase_curve_.clear(); lanes_.clear(); }
+                void clear() { notes_.clear(); kanji_issues_.clear(); cursor_ = 0.0; phrase_curve_.clear(); lanes_.clear(); }
                 size_t size() const { return notes_.size(); }
                 const std::vector<SynthNote>& notes() const { return notes_; }
                 double cursor() const { return cursor_; }
                 double ticks_to_sec(int ticks) const { return static_cast<double>(ticks) / ppq_ * 60.0 / bpm_; }
 
+                // Debug/listening hook: when set (tests/wavtap.hpp), every finished render is passed to it.
                 using TapFn = std::function<void(const Buffer&, int)>;
                 static TapFn& render_tap() { static TapFn f; return f; }
 
@@ -355,6 +365,8 @@ namespace wauvio {
                 VoiceModel voice_;
                 Style style_;
                 ParseOptions popt_;
+                KanjiDictionary kanji_ = KanjiDictionary::with_builtin();
+                std::vector<std::string> kanji_issues_;
                 std::vector<SynthNote> notes_;
                 Curve phrase_curve_;
                 std::vector<Lane> lanes_;

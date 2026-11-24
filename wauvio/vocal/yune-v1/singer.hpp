@@ -43,6 +43,11 @@ namespace wauvio {
                 Style& style() { return style_; }                 // defaults applied to notes added afterwards
                 const Style& style() const { return style_; }
                 ParseOptions& parse_options() { return popt_; }
+                // Kanji lyrics: this Singer's dictionary (starts as a copy of the built-in list; add or load your own).
+                KanjiDictionary& kanji_dictionary() { return kanji_; }
+                bool load_kanji_dictionary(const std::string& path, std::string* err = nullptr) { return kanji_.load_file(path, err); }
+                // Notes whose kanji could not be read, or were read piece by piece (empty = none).
+                const std::vector<std::string>& kanji_issues() const { return kanji_issues_; }
                 Singer& phrase_pitch_curve(const Curve& semitones_vs_seconds) { phrase_curve_ = semitones_vs_seconds; return *this; }
                 Singer& seed(uint32_t s) { seed_ = s; return *this; }
 
@@ -59,13 +64,16 @@ namespace wauvio {
                 NoteRef note_at(double start_sec, int midi, double seconds, const std::string& lyric, float velocity = 0.75f) {
                     SynthNote n;
                     n.start = start_sec; n.dur = seconds; n.midi = midi; n.vel = velocity; n.style = style_;
-                    n.morae = parse_lyric(lyric, popt_);
+                        ParseOptions po = popt_; std::vector<std::string> kn;
+                        po.kanji_dictionary = &kanji_; po.kanji_notes = &kn;
+                        n.morae = parse_lyric(lyric, po);
+                        for (const std::string& m : kn) kanji_issues_.push_back("note " + std::to_string(notes_.size() + 1) + " @" + std::to_string(start_sec).substr(0, 5) + "s: " + m);
                     notes_.push_back(std::move(n));
                     cursor_ = start_sec + seconds;
                     return NoteRef(notes_.back());
                 }
 
-                void clear() { notes_.clear(); cursor_ = 0.0; phrase_curve_.clear(); }
+                void clear() { notes_.clear(); kanji_issues_.clear(); cursor_ = 0.0; phrase_curve_.clear(); }
                 size_t size() const { return notes_.size(); }
                 const std::vector<SynthNote>& notes() const { return notes_; }
                 double cursor() const { return cursor_; }
@@ -186,6 +194,8 @@ namespace wauvio {
                 VoiceModel voice_;
                 Style style_;
                 ParseOptions popt_;
+                KanjiDictionary kanji_ = KanjiDictionary::with_builtin();
+                std::vector<std::string> kanji_issues_;
                 std::vector<SynthNote> notes_;
                 Curve phrase_curve_;
                 double cursor_ = 0.0, bpm_ = 120.0;
