@@ -3,9 +3,14 @@
 //   voice_tool export ID out.wvc       write a voice as an editable text file
 //   voice_tool check file.wvc          parse a .wvc file (typos are errors) and report
 //   voice_tool demo ID|file.wvc out.wav   a short phrase in that voice (default look, then 'soft')
+//   voice_tool gen [--check] [--force] [--root DIR]
+//        pair voicebanks/*.wvc with voices/voice-*.hpp by name, generate a header for any .wvc without one, and rebuild
+//        voices/voices_registry.hpp. --check only reports (exit 1 if anything is out of date); --force also replaces
+//        hand-written headers that have a .wvc. Rebuild after running it. --root defaults to this yune-vN folder.
 #include "../../v2.hpp"
 #include <cstdio>
 using namespace wauvio; using namespace wauvio::vocal::v2;
+#include "voice_gen.hpp"
 int main(int argc, char** argv) {
     const std::string cmd = argc > 1 ? argv[1] : "";
     if (cmd == "list") { for (auto& id : voice_ids()) { VoiceProfile p; make_voice(id, p); std::printf("%-10s %s - %s\n", id.c_str(), p.display.c_str(), p.notes.c_str()); } return 0; }
@@ -21,5 +26,16 @@ int main(int argc, char** argv) {
         for (auto& d : s.diagnostics()) std::fprintf(stderr, "warning: %s\n", d.c_str());
         Buffer buf = s.render(); normalize(buf, 0.9f); save_wav(buf, argv[3]); return 0;
     }
-    std::fprintf(stderr, "usage: voice_tool list | export ID out.wvc | check file.wvc | demo ID|file out.wav\n"); return 1;
+    if (cmd == "gen") {
+        voice_gen::Options o; o.ns = "v2";
+        o.root = voice_gen::fs::path(__FILE__).parent_path().parent_path();
+        for (int i = 2; i < argc; ++i) {
+            const std::string a = argv[i];
+            if (a == "--check") o.check = true; else if (a == "--force") o.force = true;
+            else if (a == "--root" && i + 1 < argc) o.root = argv[++i];
+            else { std::fprintf(stderr, "gen: unknown option %s\n", a.c_str()); return 2; }
+        }
+        return voice_gen::run(o);
+    }
+    std::fprintf(stderr, "usage: voice_tool list | export ID out.wvc | check file.wvc | demo ID|file out.wav | gen [--check] [--force] [--root DIR]\n"); return 1;
 }
