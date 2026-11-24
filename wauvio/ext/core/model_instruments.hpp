@@ -52,6 +52,11 @@ namespace wauvio {
             std::map<Articulation, double> art_filter_scale;
 
             std::vector<ModRoute> modulation;
+
+            struct Mode { double ratio; double amp; double t60; };
+            std::vector<Mode> modes;
+            double mode_decay_pitch_exp = 0.6;
+            double mode_vel_brightness  = 0.7;
         };
 
         inline StereoBuffer render_timbre(const TimbreRecipe& r, const Note& note, int sample_rate) {
@@ -122,6 +127,26 @@ namespace wauvio {
                 return sum;
             };
 
+            const bool modal = !r.modes.empty();
+            std::vector<double> m_ph, m_inc, m_amp, m_lvl, m_g;
+            double m_norm = 1.0;
+            if (modal) {
+                const double pitch_k = std::max(0.25, std::min(4.0, std::pow(261.6256 / std::max(20.0, base_freq), r.mode_decay_pitch_exp)));
+                double amp_sum = 0.0; int k = 0;
+                for (const auto& md : r.modes) {
+                    const double f = base_freq * md.ratio;
+                    if (f < 0.45 * sample_rate) {
+                        const double t60 = std::max(0.02, md.t60 * pitch_k * decay_scale);
+                        m_ph.push_back(0.0); m_inc.push_back(TWO_PI * f / sample_rate);
+                        m_amp.push_back(md.amp * std::pow(std::max(0.05, velocity), r.mode_vel_brightness * k));
+                        m_lvl.push_back(1.0); m_g.push_back(std::pow(10.0, -3.0 / (t60 * sample_rate)));
+                        amp_sum += m_amp.back();
+                    }
+                    ++k;
+                }
+                m_norm = 1.0 / std::max(1.0, amp_sum);
+            }
+
             wauvio::osc::Oscillator osc1(r.osc1_shape, base_freq, 1.0);
             wauvio::osc::Oscillator osc2(r.osc2_shape, base_freq * r.osc2_ratio * std::pow(2.0, r.detune_cents / 1200.0), 1.0);
             osc1.duty = 0.5; osc2.duty = 0.5;
@@ -175,6 +200,14 @@ namespace wauvio {
                 float sample;
                 if (art_click_only) {
                     sample = 0.0f;
+                } else if (modal) {
+                    double acc = 0.0;
+                    for (size_t k = 0; k < m_ph.size(); ++k) {
+                        acc += m_amp[k] * m_lvl[k] * std::sin(m_ph[k]);
+                        m_ph[k] += m_inc[k] * pitch_mult; if (m_ph[k] >= TWO_PI) m_ph[k] -= TWO_PI;
+                        m_lvl[k] *= m_g[k];
+                    }
+                    sample = static_cast<float>(acc * m_norm);
                 } else if (r.use_fm) {
                     float fm_val = static_cast<float>(std::sin(fm_cp + r.fm_index * std::sin(fm_mp)));
                     fm_cp += fm_c_inc * pitch_mult; fm_mp += fm_m_inc * pitch_mult;
@@ -244,6 +277,13 @@ namespace wauvio {
                 for (size_t i = 0; i < out.size(); ++i) {
                     out.R[i] = out.R[i] * static_cast<float>(1.0 - r.stereo_width) +
                             widened.R[i] * static_cast<float>(r.stereo_width);
+                }
+            }
+            {
+                const size_t f = std::min(out.L.size() / 4, static_cast<size_t>(0.006 * sample_rate));
+                for (size_t i = 0; i < f; ++i) {
+                    const float g = static_cast<float>(0.5 - 0.5 * std::cos(M_PI * static_cast<double>(i) / static_cast<double>(std::max<size_t>(1, f))));
+                    out.L[out.L.size() - 1 - i] *= g; out.R[out.R.size() - 1 - i] *= g;
                 }
             }
             return out;
