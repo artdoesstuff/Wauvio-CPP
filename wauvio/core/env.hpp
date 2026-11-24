@@ -109,7 +109,9 @@ namespace wauvio {
                 if (sample_rate <= 0) sample_rate = global_config().sample_rate;
                 const double sr = sample_rate;
                 const size_t n  = buf.size();
-                if (note_off < 0.0) note_off = total_seconds - release;
+                // default note-off = release before the end, but never earlier than half the note: a release longer than the note
+                // would otherwise start at 0 and silence it
+                if (note_off < 0.0) note_off = std::max(total_seconds - release, 0.5 * total_seconds);
                 note_off = std::max(0.0, note_off);
 
                 const size_t d_end   = static_cast<size_t>(pre_delay * sr);
@@ -119,14 +121,21 @@ namespace wauvio {
                 const size_t r_start = static_cast<size_t>(note_off * sr);
                 const size_t r_end   = r_start + static_cast<size_t>(release * sr);
 
+                // level before the release: follows the stages up to note-off. A note-off that arrives while the attack or decay is
+                // still running releases from the level it had reached (it used to jump straight to the release curve).
+                auto stage_level = [&](size_t i) -> double {
+                    if      (i < d_end)   return 0.0;
+                    else if (i < a_end)   return a_end > d_end ? (double)(i-d_end)/(a_end-d_end) : 1.0;
+                    else if (i < h_end)   return 1.0;
+                    else if (i < dec_end) return 1.0 - (double)(i-h_end)/(dec_end-h_end)*(1.0-sustain);
+                    return sustain;
+                };
+                const double release_from = stage_level(r_start);
+
                 for (size_t i = 0; i < n; ++i) {
                     double env;
-                    if      (i < d_end)   env = 0.0;
-                    else if (i < a_end)   env = a_end > d_end ? (double)(i-d_end)/(a_end-d_end) : 1.0;
-                    else if (i < h_end)   env = 1.0;
-                    else if (i < dec_end) env = 1.0 - (double)(i-h_end)/(dec_end-h_end)*(1.0-sustain);
-                    else if (i < r_start) env = sustain;
-                    else if (i < r_end)   env = sustain*(1.0-(double)(i-r_start)/(r_end-r_start+1));
+                    if      (i < r_start) env = stage_level(i);
+                    else if (i < r_end)   env = release_from*(1.0-(double)(i-r_start)/(r_end-r_start+1));
                     else                  env = 0.0;
                     buf[i] *= static_cast<float>(env);
                 }
@@ -174,5 +183,5 @@ namespace wauvio {
                 return static_cast<float>(st.value);
             }
         };
-    }
-}
+    } // namespace env
+} // namespace wauvio
