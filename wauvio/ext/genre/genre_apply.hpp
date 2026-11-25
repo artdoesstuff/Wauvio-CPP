@@ -9,8 +9,76 @@ namespace wauvio {
     namespace music {
         namespace genre {
 
+            // Feel that depends on tempo (swing, quantize, groove, humanize, gate, downbeat weight, velocity groove and compression).
+            // A Melody has no tempo of its own, so this runs only when apply_to_melody is given a bpm. Notes keep their order and the
+            // melody keeps its total length: each note now lasts from its new onset to the next one.
+            inline void apply_timing_to_melody(wauvio::music::Melody& melody, const RoleProfile& prof, double bpm, uint64_t seed)
+            {
+                const bool timing = prof.swing_amount > 0.0 || prof.timing_humanize_sec > 0.0 || prof.quantize_grid_fraction > 0.0 ||
+                                    prof.timing_offset_sec != 0.0 || !prof.groove_timing.empty() || prof.gate_ratio < 1.0;
+                const bool velocity = !prof.groove_velocity.empty() || prof.velocity_compress > 0.0 || prof.downbeat_deemphasis > 0.0;
+                if (bpm <= 0.0 || melody.empty() || (!timing && !velocity)) return;
+                const double beat = 60.0 / bpm, step = beat / 4.0;
+                const size_t n = melody.size();
+                std::vector<double> t0(n), t1(n);
+                double t = 0.0;
+                for (size_t i = 0; i < n; ++i) { t0[i] = t; t += melody[i].duration; }
+                const double total = t;
+                const int sub = std::max(2, prof.swing_subdivision);
+                const double pair = beat * 2.0 / sub;
+
+                for (size_t i = 0; i < n; ++i) {
+                    wauvio::music::Note& nt = melody[i];
+                    double tt = t0[i];
+                    if (prof.quantize_grid_fraction > 0.0) { const double grid = beat * prof.quantize_grid_fraction; tt = std::round(tt / grid) * grid; }
+                    bool off = false;
+                    if (prof.swing_amount > 0.0 || prof.downbeat_deemphasis > 0.0) {
+                        double pos = std::fmod(tt, pair); if (pos < 0.0) pos += pair;
+                        off = pos > pair * 0.25 && pos < pair * 0.75;
+                    }
+                    const double tt_grid = tt;
+                    if (prof.swing_amount > 0.0 && off) tt += (pair / 2.0) * prof.swing_amount * 0.66;
+                    long gi = 0;
+                    if (!prof.groove_timing.empty() || !prof.groove_velocity.empty()) gi = std::llround(tt_grid / step);
+                    if (!prof.groove_timing.empty()) {
+                        long k = gi % static_cast<long>(prof.groove_timing.size()); if (k < 0) k += static_cast<long>(prof.groove_timing.size());
+                        tt += prof.groove_timing[static_cast<size_t>(k)] * step;
+                    }
+                    tt += prof.timing_offset_sec;
+                    if (prof.timing_humanize_sec > 0.0 && !nt.is_rest())
+                        tt += detail::signed_unit(detail::note_hash(seed, t0[i], nt.midi_note, i, 4)) * prof.timing_humanize_sec;
+                    t1[i] = std::max(0.0, tt);
+
+                    if (!nt.is_rest() && velocity) {
+                        double mult = 1.0;
+                        if (prof.downbeat_deemphasis > 0.0 && !off) mult *= (1.0 - prof.downbeat_deemphasis);
+                        if (!prof.groove_velocity.empty()) {
+                            long k = gi % static_cast<long>(prof.groove_velocity.size()); if (k < 0) k += static_cast<long>(prof.groove_velocity.size());
+                            mult *= prof.groove_velocity[static_cast<size_t>(k)];
+                        }
+                        double e = nt.expression * mult;
+                        if (prof.velocity_compress > 0.0) e = 0.85 + (e - 0.85) * (1.0 - prof.velocity_compress);
+                        nt.expression = detail::clampd(e, prof.velocity_floor, 1.0);
+                    }
+                }
+                for (size_t i = 1; i < n; ++i) t1[i] = std::max(t1[i], t1[i - 1] + 0.001);
+
+                wauvio::music::Melody out; out.reserve(n + n / 2);
+                for (size_t i = 0; i < n; ++i) {
+                    wauvio::music::Note nt = melody[i];
+                    const double next = (i + 1 < n) ? t1[i + 1] : std::max(total, t1[i] + 0.01);
+                    const double d = std::max(0.005, next - t1[i]);
+                    if (!nt.is_rest() && prof.gate_ratio < 1.0 && d * (1.0 - prof.gate_ratio) > 0.005) {
+                        nt.duration = std::max(0.005, d * prof.gate_ratio); out.push_back(nt);
+                        out.push_back(wauvio::music::rest(d - nt.duration));
+                    } else { nt.duration = d; out.push_back(nt); }
+                }
+                melody.swap(out);
+            }
+
+            // bpm > 0 also applies the tempo-dependent feel above; bpm = 0 (the default) keeps the original behaviour.
             inline void apply_to_melody(wauvio::music::Melody& melody, const GenrePreset& preset, Role role,
-                                         const wauvio::music::Instrument* instrument = nullptr, uint64_t seed = 1)
+                                         const wauvio::music::Instrument* instrument = nullptr, uint64_t seed = 1, double bpm = 0.0)
             {
                 const RoleProfile& prof = preset.profile_for(role);
 
@@ -43,6 +111,7 @@ namespace wauvio {
                     double new_expr = n.expression * mult;
                     n.expression = detail::clampd(new_expr, prof.velocity_floor, 1.0);
                 }
+                apply_timing_to_melody(melody, prof, bpm, seed);
             }
 
             struct InstrumentStyleBaseline {
@@ -85,6 +154,20 @@ namespace wauvio {
                 }
             }
 
+            inline Family instrument_family(const wauvio::music::Instrument& in) {
+                using namespace wauvio::music;
+                if (dynamic_cast<const GuitarInstrument*>(&in)) return Family::Guitar;
+                if (dynamic_cast<const KeyboardInstrument*>(&in)) return Family::Keys;
+                if (dynamic_cast<const BowedStringInstrument*>(&in)) return Family::Strings;
+                if (dynamic_cast<const WoodwindInstrument*>(&in) || dynamic_cast<const SaxophoneInstrument*>(&in)) return Family::Winds;
+                if (dynamic_cast<const BrassInstrument*>(&in)) return Family::Brass;
+                if (dynamic_cast<const SynthInstrument*>(&in)) return Family::Synth;
+                if (dynamic_cast<const MalletInstrument*>(&in)) return Family::Mallet;
+                if (dynamic_cast<const VocalInstrument*>(&in)) return Family::Vocal;
+                if (dynamic_cast<const WorldInstrument*>(&in)) return Family::World;
+                return Family::Any;
+            }
+
             inline void style_instrument(wauvio::music::Instrument& instrument, const GenrePreset& preset, Role role) {
                 const RoleProfile& prof = preset.profile_for(role);
 
@@ -110,7 +193,8 @@ namespace wauvio {
                     instrument.chorus(prof.chorus_rate_hz, prof.chorus_depth_ms, prof.chorus_wet);
                 if (prof.want_delay && !instrument.delay_on)
                     instrument.delay(prof.delay_time_ms, prof.delay_feedback, prof.delay_wet);
-                if (prof.want_distortion && !instrument.distortion_on)
+                if (prof.want_distortion && !instrument.distortion_on &&
+                    (prof.distortion_family == Family::Any || prof.distortion_family == instrument_family(instrument)))
                     instrument.distortion(prof.distortion_drive);
             }
 

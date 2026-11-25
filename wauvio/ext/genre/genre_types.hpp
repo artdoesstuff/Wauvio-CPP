@@ -15,6 +15,8 @@ namespace wauvio {
 
             enum class Role { Melodic, Bass, Percussion };
 
+            enum class Family { Any, Guitar, Keys, Strings, Winds, Brass, Synth, Mallet, World, Vocal };
+
             struct RoleProfile {
                 double velocity_scale    = 1.0;
                 double velocity_floor    = 0.0;
@@ -57,12 +59,28 @@ namespace wauvio {
 
                 bool  want_distortion = false;
                 float distortion_drive = 2.0f;
+
+                // timing and feel (all default to "off", so older presets behave exactly as before)
+                int    swing_subdivision = 2;            // 2 = swing the eighths, 4 = swing the sixteenths
+                std::vector<double> groove_timing;       // per 16th step (repeats): shift in fractions of a 16th, + = late
+                std::vector<double> groove_velocity;     // per 16th step (repeats): velocity multiplier
+                double velocity_compress = 0.0;          // 0..1: pulls velocities toward a common level (pop/EDM loudness)
+                double gate_ratio        = 1.0;          // < 1 shortens every note (the remainder becomes silence)
+
+                // Restricts want_distortion to one instrument family (e.g. Guitar), so a rock preset no longer
+                // distorts the strings and keys. Any = every instrument, the old behaviour.
+                Family distortion_family = Family::Any;
             };
 
             class GenrePreset {
             public:
                 std::string name;
                 std::string description;
+
+                // metadata for the registry (genre_registry.hpp)
+                std::string family;                      // "Rock", "Electronic", "Jazz & Blues", "World", "Orchestral" ...
+                std::vector<std::string> aliases;        // other spellings and nicknames, matched by find()
+                double bpm_min = 0.0, bpm_max = 0.0;     // typical tempo range; 0 = unknown
 
                 double tempo_scale = 1.0;
 
