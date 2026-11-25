@@ -183,5 +183,5 @@ namespace wauvio {
                 return static_cast<float>(st.value);
             }
         };
-    } // namespace env
-} // namespace wauvio
+    }
+}

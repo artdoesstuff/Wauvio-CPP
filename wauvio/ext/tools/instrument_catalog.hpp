@@ -152,6 +152,13 @@
     X(percussion, LoFiKit, DrumKit) \
     X(percussion, Kit808, DrumKit) \
     X(percussion, Kit909, DrumKit) \
+    X(percussion, TrapKit, DrumKit) \
+    X(percussion, LatinKit, DrumKit) \
+    X(percussion, SambaKit, DrumKit) \
+    X(percussion, FolkKit, DrumKit) \
+    X(percussion, IndianKit, DrumKit) \
+    X(percussion, AfroKit, DrumKit) \
+    X(percussion, MarchingKit, DrumKit) \
     X(percussion, Surdo, PercussionInstrument) \
     X(percussion, Repinique, PercussionInstrument) \
     X(percussion, Timbales, PercussionInstrument) \
