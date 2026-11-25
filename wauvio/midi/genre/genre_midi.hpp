@@ -78,6 +78,8 @@ namespace wauvio {
                     }
                     if (prof.fallback_gate_ratio < 1.0 && !articulation_supported)
                         n.dur = std::max(0.01, n.dur * prof.fallback_gate_ratio);
+                    if (prof.gate_ratio < 1.0)
+                        n.dur = std::max(0.01, n.dur * prof.gate_ratio);
 
                     double t = orig_t;
                     if (prof.quantize_grid_fraction > 0.0 && beat_seconds > 0.0) {
@@ -85,14 +87,24 @@ namespace wauvio {
                         if (grid > 0.0) t = std::round(t / grid) * grid;
                     }
                     bool is_offbeat_eighth = false;
+                    // swing_subdivision 2 swings the eighths, 4 the sixteenths: `pair` is the length of one swung pair
+                    const double pair = beat_seconds * 2.0 / std::max(2, prof.swing_subdivision);
                     if (beat_seconds > 0.0 && (prof.swing_amount > 0.0 || prof.downbeat_deemphasis > 0.0)) {
-                        double eighth = beat_seconds / 2.0;
-                        double pos = std::fmod(t, beat_seconds);
-                        if (pos < 0.0) pos += beat_seconds;
-                        is_offbeat_eighth = (pos > eighth * 0.5 && pos < eighth * 1.5);
+                        double pos = std::fmod(t, pair);
+                        if (pos < 0.0) pos += pair;
+                        is_offbeat_eighth = (pos > pair * 0.25 && pos < pair * 0.75);
                     }
+                    const double t_grid = t;
                     if (prof.swing_amount > 0.0 && beat_seconds > 0.0 && is_offbeat_eighth)
-                        t += (beat_seconds / 2.0) * prof.swing_amount * 0.66;
+                        t += (pair / 2.0) * prof.swing_amount * 0.66;
+                    long groove_index = 0;
+                    if (beat_seconds > 0.0 && (!prof.groove_timing.empty() || !prof.groove_velocity.empty()))
+                        groove_index = std::llround(t_grid / (beat_seconds / 4.0));
+                    if (!prof.groove_timing.empty() && beat_seconds > 0.0) {
+                        long k = groove_index % static_cast<long>(prof.groove_timing.size());
+                        if (k < 0) k += static_cast<long>(prof.groove_timing.size());
+                        t += prof.groove_timing[static_cast<size_t>(k)] * (beat_seconds / 4.0);
+                    }
                     if (prof.timing_offset_sec != 0.0)
                         t += prof.timing_offset_sec;
                     if (prof.timing_humanize_sec > 0.0) {
@@ -113,7 +125,14 @@ namespace wauvio {
                         double r = signed_unit(note_hash(seed, orig_t, orig_note, i, 3));
                         mult *= (1.0 + r * prof.velocity_variance);
                     }
+                    if (!prof.groove_velocity.empty()) {
+                        long k = groove_index % static_cast<long>(prof.groove_velocity.size());
+                        if (k < 0) k += static_cast<long>(prof.groove_velocity.size());
+                        mult *= prof.groove_velocity[static_cast<size_t>(k)];
+                    }
                     n.expression = clampd(n.expression * mult, prof.velocity_floor, 1.0);
+                    if (prof.velocity_compress > 0.0)
+                        n.expression = clampd(0.85 + (n.expression - 0.85) * (1.0 - prof.velocity_compress), prof.velocity_floor, 1.0);
                 }
             }
 
