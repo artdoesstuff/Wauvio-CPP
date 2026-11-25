@@ -49,6 +49,7 @@
   });
   html += '<div class="nores" id="nores">No matching pages.</div>';
   side.innerHTML = html;
+  function slug(k) { return k.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
   side.addEventListener('click', function (e) {
@@ -175,14 +176,14 @@
     var tags = {};
     cards.forEach(function (c) {
       var mine = [];
-      c.querySelectorAll('.tags span').forEach(function (t) { var k = t.textContent.trim().toLowerCase(); if (k) { mine.push(k); tags[k] = (tags[k] || 0) + 1; } });
+      c.querySelectorAll('.tags span').forEach(function (t) { var k = t.textContent.trim().toLowerCase(); if (k) { mine.push(k); tags[k] = (tags[k] || 0) + 1; t.setAttribute('data-tag', slug(k)); } });
       c.setAttribute('data-tags', '|' + mine.join('|') + '|');
     });
     var names = Object.keys(tags).sort();
     if (names.length < 2) return;
     var bar = document.createElement('div'); bar.className = 'filters';
     function chip(label, key) {
-      var b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('data-k', key);
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('data-k', key); if (key) b.setAttribute('data-tag', slug(key));
       if (key === '') b.className = 'on';
       b.addEventListener('click', function () {
         bar.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
