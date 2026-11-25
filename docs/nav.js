@@ -111,6 +111,7 @@
   var content = document.querySelector('.content');
   var heads = content ? content.querySelectorAll('h2[id], h3[id], h4[id]') : [];
   content && content.querySelectorAll('h2, h3, h4').forEach(function (h) {
+    if (h.closest('.showcase')) return;   // card titles are not page sections
     if (!h.id) h.id = h.textContent.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     var a = document.createElement('a'); a.className = 'anchor'; a.href = '#' + h.id; a.textContent = '#'; a.setAttribute('aria-label', 'Link to this section');
     h.insertBefore(a, h.firstChild);
@@ -168,7 +169,30 @@
     }
   });
   document.querySelectorAll('.showcase-grid').forEach(function (g) {
-    if (!g.querySelector('.showcase')) { var p = document.createElement('p'); p.className = 'showcase-empty'; p.textContent = 'Videos coming soon.'; g.parentNode.insertBefore(p, g.nextSibling); g.style.display = 'none'; }
+    var cards = Array.prototype.slice.call(g.querySelectorAll('.showcase'));
+    if (!cards.length) { var p = document.createElement('p'); p.className = 'showcase-empty'; p.textContent = 'Videos coming soon.'; g.parentNode.insertBefore(p, g.nextSibling); g.style.display = 'none'; return; }
+    /* tag filter built from the cards' tags (shown only when there is something to filter) */
+    var tags = {};
+    cards.forEach(function (c) {
+      var mine = [];
+      c.querySelectorAll('.tags span').forEach(function (t) { var k = t.textContent.trim().toLowerCase(); if (k) { mine.push(k); tags[k] = (tags[k] || 0) + 1; } });
+      c.setAttribute('data-tags', '|' + mine.join('|') + '|');
+    });
+    var names = Object.keys(tags).sort();
+    if (names.length < 2) return;
+    var bar = document.createElement('div'); bar.className = 'filters';
+    function chip(label, key) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.setAttribute('data-k', key);
+      if (key === '') b.className = 'on';
+      b.addEventListener('click', function () {
+        bar.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
+        cards.forEach(function (c) { c.style.display = (!key || c.getAttribute('data-tags').indexOf('|' + key + '|') >= 0) ? '' : 'none'; });
+      });
+      bar.appendChild(b);
+    }
+    chip('All', '');
+    names.forEach(function (n) { chip(n, n); });
+    g.parentNode.insertBefore(bar, g);
   });
   document.addEventListener('click', function (e) { if (e.target.closest('nav.side a')) document.body.classList.remove('menu'); });
 })();
