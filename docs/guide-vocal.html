@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vocal guide · Wauvio Docs</title><meta name="description" content="Task-based examples for singing, expression, speech, harmony, vocal effects, voices and score files.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Guides &amp; examples</div><h1>Vocal guide</h1>
+<p>The vocal engine synthesises a Japanese singing or speaking voice from notes and lyrics, with no recordings. Include <code>wauvio/vocal/v3.hpp</code> (or <code>v3_fx.hpp</code> for the effects chain). This guide uses <strong>v3</strong>, the current generation.</p><h2>Lyrics in 30 seconds</h2><ul><li>One syllable per note: hiragana (<code>さ</code>), katakana (<code>サ</code>) or romaji (<code>sa</code>).</li><li><code>ー</code> or an empty lyric continues the previous vowel.</li><li>For exact control write phonemes in braces: <code>{k a z e}</code>.</li><li>Notes are MIDI numbers; lengths are in ticks (480 = one quarter note) via <code>note()</code>, or in seconds via <code>note_sec()</code>.</li><li>Stay inside a voice’s range: Yune is comfortable around MIDI 52–88.</li></ul><p>Full details: <a href="vocal-lyrics.html">Lyric input</a>.</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="vocal_01_hello">1. Hello, singer</h2><p>Create a <code>Singer</code>, add notes with lyrics, save. The default voice is Yune.</p><pre><code>// The smallest singing program. Lyrics are Japanese kana (or romaji); each note carries one syllable.
+#include &quot;wauvio/vocal/v3.hpp&quot;
+using namespace wauvio::vocal::v3;
+
+int main() {
+    Singer s;                          // default voice: Yune
+    s.set_tempo(100);                  // timing is in ticks; 480 ticks = one quarter note
+
+    //       MIDI note, length in ticks, lyric
+    s.note(67, 480, &quot;こ&quot;);             // G4
+    s.note(69, 480, &quot;ん&quot;);
+    s.note(71, 480, &quot;に&quot;);
+    s.note(72, 480, &quot;ち&quot;);
+    s.note(74, 960, &quot;は&quot;);
+
+    s.save(&quot;vocal_01_hello.wav&quot;);      // mono render, normalised
+}</code></pre><p class="muted"><a href="examples/vocal_01_hello.cpp" download>Download vocal_01_hello.cpp</a></p><p><strong>Try this:</strong> change a lyric to romaji, e.g. <code>"ka"</code>.</p><h2 id="vocal_02_expressive">2. Make it expressive</h2><p><code>natural()</code> adds small human imperfections; <code>auto_expression()</code> adds rule-based vibrato and dynamics. <code>note()</code> returns a <code>NoteRef</code> for per-note control: vibrato, breathiness, ornaments, glides. A persona is a named vocal “look”, and lanes automate parameters over time.</p><pre><code>// Making it sound like a performance: vibrato, ornaments, per-note tweaks, a persona and automation lanes.
+#include &quot;wauvio/vocal/v3.hpp&quot;
+using namespace wauvio::vocal::v3;
+
+int main() {
+    Singer s;
+    s.set_tempo(80);
+    s.natural();                       // slight human imperfections (timing, pitch, tone), tuned for this voice
+    s.auto_expression();               // rule-based vibrato and dynamics; only fills fields you have not set
+    s.persona(&quot;soft&quot;, 0.8);            // a ready-made &quot;look&quot; (Yune ships: normal, soft)
+
+    // Note-level control: note() returns a NoteRef; every setter returns it again, so calls chain.
+    s.note(69, 480, &quot;さ&quot;);
+    s.note(72, 480, &quot;く&quot;).breathy(0.3);
+    s.note(76, 1440, &quot;ら&quot;).vibrato(0.45, 5.5, /*delay*/0.3, /*fade-in*/0.4).ornament(&quot;fall&quot;, 1.0);
+    s.rest(240);
+    s.note(74, 480, &quot;さ&quot;).glide_from(71);          // slide up into the note
+    s.note(72, 1920, &quot;く&quot;).portamento(0.08);
+
+    // Lanes: automation over time (absolute seconds). This one swells the volume then fades it.
+    s.lane(&quot;volume&quot;, {{0.0, 0.7}, {3.0, 1.0}, {6.0, 0.5}});
+
+    s.save(&quot;vocal_02_expressive.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/vocal_02_expressive.cpp" download>Download vocal_02_expressive.cpp</a></p><p><strong>Try this:</strong> change <code>ornament("fall")</code> to <code>"kobushi"</code> or <code>"turn"</code>; remove <code>natural()</code> to hear the difference.</p><h2 id="vocal_03_speech_events">3. Speech and non-lexical sounds</h2><p><code>say()</code> speaks with intonation (statement, question, flat…) and optional Tokyo pitch accent. Events like laughs and hums are produced by the same voice, either through <code>event()</code> or as <code>&lt;tags&gt;</code> inside a lyric. See <a href="vocal-v3-expression.html">Events</a>.</p><pre><code>// Speech and non-lexical sounds: say() for spoken lines, event() / &lt;tags&gt; for laughs, hums and more.
+#include &quot;wauvio/vocal/v3.hpp&quot;
+using namespace wauvio::vocal::v3;
+
+int main() {
+    Singer s;
+    s.natural();
+
+    s.say(&quot;こんにちは&quot;, 1.2, &quot;statement&quot;);
+    s.rest_sec(0.2);
+    s.say(&quot;げんき&quot;, 0.9, &quot;question&quot;);               // rising intonation
+    s.rest_sec(0.3);
+    s.say(&quot;はし&quot;, 0.7, &quot;statement&quot;, 69, 0.75, /*accent nucleus*/ 1);   // Tokyo accent: HIGH-low (箸, chopsticks)
+    s.rest_sec(0.5);
+
+    s.event(&quot;laugh&quot;, 72, 1.0, /*intensity*/ 0.7);
+    s.rest_sec(0.3);
+    s.note_sec(72, 1.0, &quot;&lt;hum&gt;&quot;);                   // the same thing written as a lyric tag
+
+    s.save(&quot;vocal_03_speech_events.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/vocal_03_speech_events.cpp" download>Download vocal_03_speech_events.cpp</a></p><p><strong>Try this:</strong> try the kinds <code>giggle</code>, <code>sob</code> and <code>shout</code>.</p><h2 id="vocal_04_harmony">4. Harmonies and doubling</h2><p>An <code>Ensemble</code> mixes several singers to stereo. <code>add_harmony</code> copies the lead transposed by some semitones; <code>add_double</code> adds slightly different takes for a thicker lead. Harmonies can be sung by a different voice.</p><pre><code>// A lead voice with a harmony and double-tracked takes, mixed to stereo by an Ensemble.
+#include &quot;wauvio/vocal/v3.hpp&quot;
+using namespace wauvio::vocal::v3;
+
+int main() {
+    Singer lead;
+    lead.set_tempo(90); lead.natural();
+    for (auto [midi, ticks, syl] : { std::tuple&lt;int,int,const char*&gt;{67,480,&quot;ら&quot;}, {69,480,&quot;ら&quot;}, {71,480,&quot;ら&quot;}, {72,1440,&quot;あ&quot;} })
+        lead.note(midi, ticks, syl);
+
+    Ensemble choir;
+    choir.add(lead, &quot;lead&quot;);                                   // centre
+    choir.add_double(lead, /*copies=*/2);                      // two extra takes, slightly detuned and spread
+    choir.add_harmony(lead, +4, &quot;third&quot;, -0.5f, 0.6f);         // a major third above, panned left, quieter
+    choir.add_harmony(lead, -5, &quot;fourth below&quot;, 0.5f, 0.55f);  // a fourth below, panned right
+
+    wauvio::StereoBuffer mix = choir.render_stereo();
+    wauvio::normalize(mix, 0.9);
+    wauvio::save_wav_stereo(mix, &quot;vocal_04_harmony.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/vocal_04_harmony.cpp" download>Download vocal_04_harmony.cpp</a></p><p><strong>Try this:</strong> add a third harmony an octave up (<code>+12</code>).</p><h2 id="vocal_05_polish">5. Finish with mic and effects</h2><p><code>process_vocal</code> applies an optional mic model and a ready-made chain (EQ, compressor, delay, reverb, limiter). Presets: <code>natural</code>, <code>pop</code>, <code>intimate</code>, <code>hall</code>.</p><pre><code>// Finishing a vocal: mic model + the ready-made FX chain (EQ, compression, delay, reverb, limiter).
+#include &quot;wauvio/vocal/v3_fx.hpp&quot;
+using namespace wauvio::vocal::v3;
+
+int main() {
+    Singer s;
+    s.set_tempo(110); s.natural(); s.auto_expression();
+    s.note(72, 480, &quot;ひ&quot;); s.note(74, 480, &quot;か&quot;); s.note(76, 480, &quot;り&quot;); s.note(79, 1440, &quot;へ&quot;);
+
+    wauvio::Buffer dry = s.render();
+
+    MicModel mic;                       // optional &quot;recording&quot; colour
+    mic.proximity = 0.4; mic.air = 0.3; mic.de_ess = 0.5;
+
+    // Presets: natural, pop, intimate, hall. bpm &gt; 0 syncs the delay in &quot;pop&quot;.
+    wauvio::StereoBuffer finished = process_vocal(dry, &quot;pop&quot;, &amp;mic, 44100, 110);
+    wauvio::normalize(finished, 0.9);
+    wauvio::save_wav_stereo(finished, &quot;vocal_05_polish.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/vocal_05_polish.cpp" download>Download vocal_05_polish.cpp</a></p><p><strong>Try this:</strong> compare the four presets on the same line.</p><h2 id="vocal_06_voices">6. Compare the built-in voices</h2><p>Each voice has its own character and range. <code>voice_ids()</code> lists them, <code>make_voice</code> loads one (or a <code>.wvc</code> voicebank file). See <a href="vocal-v3-voices.html">Voices</a> for how to make your own.</p><pre><code>// Same melody, every built-in voice. Voices differ in tract (formants), range and default look.
+#include &quot;wauvio/vocal/v3.hpp&quot;
+#include &lt;cstdio&gt;
+using namespace wauvio::vocal::v3;
+
+int main() {
+    for (const std::string&amp; id : voice_ids()) {
+        VoiceProfile voice; std::string err;
+        if (!make_voice(id, voice, &amp;err)) { std::printf(&quot;skip %s: %s\n&quot;, id.c_str(), err.c_str()); continue; }
+
+        Singer s(voice);                        // or: s.set_profile(voice)
+        s.set_tempo(100);
+        s.natural();                            // uses this voice&#x27;s recommended strength
+        // Stay inside the voice&#x27;s comfortable range (voice.model.range_low / range_high).
+        int base = (voice.model.range_low + voice.model.range_high) / 2;
+        s.note(base, 480, &quot;あ&quot;); s.note(base + 2, 480, &quot;い&quot;); s.note(base + 4, 480, &quot;う&quot;); s.note(base + 5, 960, &quot;え&quot;);
+        s.save(&quot;vocal_06_voice_&quot; + id + &quot;.wav&quot;);
+        std::printf(&quot;%-9s %s\n&quot;, id.c_str(), voice.display.c_str());
+    }
+}</code></pre><p class="muted"><a href="examples/vocal_06_voices.cpp" download>Download vocal_06_voices.cpp</a></p><p><strong>Try this:</strong> combine voices in an <code>Ensemble</code> for a duet.</p><h2 id="vocal_07_midi_lyrics">7. Sing a MIDI karaoke file</h2><p>Notes plus lyric events in a MIDI file become a vocal line. Always set the voice before loading notes. <code>diagnostics()</code> reports problems like unreadable lyrics.</p><pre><code>// Sing a MIDI karaoke-style file: notes + Lyric meta events become a vocal line.
+// Usage: ./vocal_07_midi_lyrics song.mid [voice-id-or-file.wvc]
+#include &quot;wauvio/vocal/v3.hpp&quot;
+#include &lt;cstdio&gt;
+using namespace wauvio::vocal::v3;
+
+int main(int argc, char** argv) {
+    if (argc &lt; 2) { std::printf(&quot;usage: %s song.mid [voice]\n&quot;, argv[0]); return 0; }
+
+    VoiceProfile voice; std::string err;
+    Singer s;
+    if (argc &gt; 2 &amp;&amp; make_voice(argv[2], voice, &amp;err)) s.set_profile(voice);   // set the voice BEFORE adding notes
+
+    // track = -1: use the first track that has lyrics. Notes without a lyric continue the previous vowel.
+    int n = s.load_midi_file(argv[1], -1);
+    std::printf(&quot;loaded %d notes\n&quot;, n);
+    for (auto&amp; warning : s.diagnostics()) std::printf(&quot;warning: %s\n&quot;, warning.c_str());
+
+    s.natural(); s.auto_expression();
+    s.save(&quot;vocal_07_midi_lyrics.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/vocal_07_midi_lyrics.cpp" download>Download vocal_07_midi_lyrics.cpp</a></p><p><strong>Try this:</strong> use the optional second argument to choose a voice.</p><h2 id="vocal_08_score_file">8. Text score for the sing_score tool</h2><p>You can also write a score as plain text and render it with the <code>sing_score</code> tool, with no C++ needed beyond building the tool once: <code>sing_score vocal_08_score_file.txt out.wav</code>. Command reference: <a href="vocal-tools.html">Vocal tools</a>.</p><pre><code># A score for the sing_score tool:  sing_score vocal_08_score_file.txt out.wav
+# One command per line. &#x27;#&#x27; starts a comment.
+voice yune
+tempo 100
+natural
+auto_expression on
+persona soft 0.7
+
+#    midi ticks lyric  [options]
+note 67 480 さ
+note 69 480 く
+note 71 480 ら   vib=0.4,5.5,0.3
+note 72 960 さ   orn=fall,1.0
+rest 240
+note 74 480 {k a z e}     # phoneme input in braces
+event laugh 72 0.8 0.6    # kind midi seconds intensity
+
+# v3 extras: a harmony a third above, panned left, and the &quot;pop&quot; vocal chain
+harmony 4 -0.4 0.6
+chain pop</code></pre><p class="muted"><a href="examples/vocal_08_score_file.txt" download>Download vocal_08_score_file.txt</a></p><p><strong>Try this:</strong> add <code>double 2</code> for double-tracking.</p><h2>Earlier generations</h2><p>v1 and v2 are kept for compatibility: <a href="vocal-v1.html">v1</a>, <a href="vocal-v2.html">v2 — differences from v1</a>. New projects should use v3.</p>
+<div class="pager"><a href="guide-sfx.html"><small>Previous</small>SFX guide</a><a class="r" href="core.html"><small>Next</small>Core overview</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

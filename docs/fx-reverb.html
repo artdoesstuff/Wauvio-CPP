@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Reverb</h1>
-
+<div class="tryit"><strong>See it in action:</strong> <a href="guide-fx.html#fx_04_reverb_spaces">Reverb: algorithmic and convolution</a></div>
 <h2>FdnReverb</h2>
 <p>An 8-line feedback delay network reverb.</p><table><thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>decay_s</code></td><td>2.5</td><td>Low-frequency RT60, 0.1–30 s</td></tr><tr><td><code>predelay_ms</code></td><td>15</td><td></td></tr><tr><td><code>size</code></td><td>1.0</td><td>Scales delay lengths (0.4 small room … 2.5 huge hall)</td></tr><tr><td><code>damping_hz</code></td><td>6000</td><td>High frequencies decay faster above this; 0 = none</td></tr><tr><td><code>diffusion</code></td><td>0.6</td><td>0..1 input smearing</td></tr><tr><td><code>mod_depth_ms</code>, <code>mod_rate_hz</code></td><td>0.25, 0.35</td><td>Delay-length wobble against metallic ringing</td></tr><tr><td><code>width</code></td><td>1.0</td><td>Wet stereo width</td></tr><tr><td><code>lowcut_hz</code>, <code>highcut_hz</code></td><td>80, 12000</td><td>Wet filtering</td></tr><tr><td><code>mix</code></td><td>0.3</td><td></td></tr></tbody></table>
 <h2>Procedural impulse responses — <code>ir::</code></h2>

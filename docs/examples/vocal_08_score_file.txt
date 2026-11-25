@@ -1,0 +1,20 @@
+# A score for the sing_score tool:  sing_score vocal_08_score_file.txt out.wav
+# One command per line. '#' starts a comment.
+voice yune
+tempo 100
+natural
+auto_expression on
+persona soft 0.7
+
+#    midi ticks lyric  [options]
+note 67 480 さ
+note 69 480 く
+note 71 480 ら   vib=0.4,5.5,0.3
+note 72 960 さ   orn=fall,1.0
+rest 240
+note 74 480 {k a z e}     # phoneme input in braces
+event laugh 72 0.8 0.6    # kind midi seconds intensity
+
+# v3 extras: a harmony a third above, panned left, and the "pop" vocal chain
+harmony 4 -0.4 0.6
+chain pop

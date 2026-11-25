@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v3 — Voices, personas and voicebanks</h1>
-
+<div class="tryit"><strong>See it in action:</strong> <a href="guide-vocal.html#vocal_06_voices">Compare the built-in voices</a></div>
 <h2>VoiceModel</h2>
 <p>The identity of a voice: <code>name</code>, <code>tune</code> (engine gains), <code>range_low/high</code> (comfortable) and <code>hard_low/high</code> (absolute) as MIDI notes, five <code>VowelTarget</code>s (F1–F3, bandwidths, gain, F0-tracking amounts), fixed upper formants <code>f4–f6</code>/<code>b4–b6</code>, singer’s formant (<code>singer_formant_hz</code>/<code>_bw</code>), glottal source (<code>rd_base</code>, <code>aspiration</code>, <code>tilt_hz_min/max</code>), vibrato defaults, <code>synthetic</code> (0–1: tighter bandwidths, steadier source, brighter uppers), consonant <code>loci[4]</code> (labial, alveolar, palatal, velar; <code>F_locus = slope × F_vowel + intercept</code> for F2 and F3, intercepts scaled by <code>tract_scale()</code>), and nasal parameters (<code>nasal_zero_q</code>, <code>nasal_zero_depth</code>, <code>nasal_pole_hz</code>, <code>nasal_pole_gain</code>, <code>nasal_bw_widen</code>). <code>Tune</code> holds <code>out_scale</code> 0.65, <code>asp_gain</code> 3, <code>fric_gain</code> 0.3, <code>upper_gain</code> 4.4, <code>sing_gain</code> 2.4, <code>air_gain</code> 0.1, <code>pre_gain</code> 1, <code>f23_gain</code> 30. Each singer owns its model, so rendering is thread-safe and voices can be tuned independently.</p>
 <h2>VoiceProfile</h2>

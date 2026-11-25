@@ -7,7 +7,7 @@
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>io.hpp — WAV export and playback</h1>
 
-<p>Namespace <code>wauvio</code>.</p>
+<p>Namespace <code>wauvio</code>.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-core.html#core_01_first_tone">Your first tone</a></div>
 <h2>WAV export</h2>
 <p><code>save_wav(buf, path, sr)</code> writes 16-bit PCM mono; <code>save_wav_stereo(buf, path, sr)</code> writes interleaved stereo. Both throw <code>std::runtime_error</code> if the file cannot be opened. Samples are clamped to [-1, 1] on conversion.</p>
 <h2>Playback</h2>

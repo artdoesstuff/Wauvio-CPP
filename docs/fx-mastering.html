@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Loudness and mastering</h1>
-
+<div class="tryit"><strong>See it in action:</strong> <a href="guide-fx.html#fx_03_loudness">Measure and set loudness</a> &middot; <a href="guide-fx.html#fx_02_mixer_sidechain">Mixing: inserts, buses, sends, sidechain, mastering</a></div>
 <h2>Loudness measurement (<code>loudness.hpp</code>)</h2>
 <p><code>measure_loudness(buf, sr)</code> implements ITU-R BS.1770 / EBU R128-style metering with K-weighting (high shelf +4 dB at 1.68 kHz, then 38 Hz RLB high-pass) and returns <code>LoudnessReport</code>:</p><table><thead><tr><th>Field</th><th>Meaning</th></tr></thead><tbody><tr><td><code>valid</code></td><td>False if shorter than one 400 ms block or fully gated out</td></tr><tr><td><code>integrated_lufs</code></td><td>Gated programme loudness</td></tr><tr><td><code>momentary_max_lufs</code></td><td>Loudest 400 ms</td></tr><tr><td><code>short_term_max_lufs</code></td><td>Loudest 3 s</td></tr><tr><td><code>loudness_range_lu</code></td><td>LRA (10th–95th percentile of gated short-term values)</td></tr><tr><td><code>sample_peak_db</code></td><td>dBFS</td></tr><tr><td><code>true_peak_db</code></td><td>dBTP, 4× oversampled</td></tr></tbody></table>
 <p><code>normalize_loudness(buf, sr, target_lufs, ceiling_dbtp = −1, limit = true)</code> applies gain to reach the target; if the true peak would exceed the ceiling it uses a lookahead limiter (<code>limit = true</code>) or reduces the gain (<code>limit = false</code>). Length is unchanged; the post-processing report is returned.</p>

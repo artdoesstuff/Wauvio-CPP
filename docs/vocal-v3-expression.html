@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v3 — Expression, ornaments and events</h1>
-
+<div class="tryit"><strong>See it in action:</strong> <a href="guide-vocal.html#vocal_03_speech_events">Speech and non-lexical sounds</a> &middot; <a href="guide-vocal.html#vocal_02_expressive">Make it expressive</a></div>
 <h2>Ornaments</h2>
 <p><code>make_ornament(name, dur, depth)</code> returns a bend curve (semitones vs seconds from note start). Names: <code>fall, doit, shakuri, scoop_in, kobushi, turn, trill, mordent</code>. <code>depth</code> scales size; unknown names return an empty curve. Apply with <code>NoteRef::ornament()</code>.</p>
 <h2>Humanisation and auto-expression</h2>

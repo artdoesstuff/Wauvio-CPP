@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Music layer guide · Wauvio Docs</title><meta name="description" content="Task-based examples for melodies, arrangements, drum kits, custom and sampled instruments, genres and render options.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Guides &amp; examples</div><h1>Music layer guide</h1>
+<p>The music layer adds instruments you can write for like a composer: MIDI note numbers, dynamics (<code>p</code>, <code>mf</code>, <code>f</code>…), articulations and 300+ ready-made instruments in <code>wauvio::instruments</code>. Include <code>wauvio/ext.hpp</code>. Browse the <a href="ext-instruments.html">instrument catalog</a> for names.</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="music_01_melody">1. A melody</h2><p>A <code>Melody</code> is a list of notes <code>{midi, seconds, dynamics, articulation}</code>. Add it to an <code>Arrangement</code> with an instrument, and <code>render</code> writes the WAV. Effects like reverb attach to the instrument.</p><pre><code>// A melody with MIDI note numbers, dynamics and articulations.
+#include &quot;wauvio/ext.hpp&quot;
+using namespace wauvio;
+using music::Dynamics;
+using music::Articulation;
+
+int main() {
+    instruments::Flute flute;
+    flute.reverb(0.7, 0.25);                       // optional per-instrument effect
+
+    // A Note is {midi_note, duration_in_seconds, dynamics, articulation}.
+    // MIDI 60 = middle C, 69 = A440. Each +1 is one semitone.
+    music::Melody m = {
+        {67, 0.5, Dynamics::mp},
+        {69, 0.5, Dynamics::mf},
+        {72, 1.0, Dynamics::f, Articulation::Legato},
+        music::rest(0.5),
+        {71, 0.5, Dynamics::mp, Articulation::Staccato},
+        {67, 1.5, Dynamics::p},
+    };
+
+    music::Arrangement song;
+    song.add(flute, m);
+    render(song, &quot;music_01_melody.wav&quot;);           // 44.1 kHz stereo 16-bit by default
+}</code></pre><p class="muted"><a href="examples/music_01_melody.cpp" download>Download music_01_melody.cpp</a></p><p><strong>Try this:</strong> swap <code>Flute</code> for <code>Violin</code> or <code>Trumpet</code>; change the dynamics to hear the difference.</p><h2 id="music_02_chords_scales">2. Chords and scales</h2><p><code>music::scale::*</code> returns the notes of a scale as MIDI numbers, so you can loop over them. A <code>Track</code> holds notes and chords for one instrument and can be added to an arrangement with a start time.</p><pre><code>// Chords and scales: build harmony without computing note numbers by hand.
+#include &quot;wauvio/ext.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    instruments::Cello cello;
+    instruments::Harp  harp;
+
+    // scale::* return MIDI note numbers. build(root, steps, octaves) makes custom scales.
+    auto scale = music::scale::natural_minor(57 /*A3*/, 2);      // two octaves of A minor
+
+    music::Melody run;
+    for (int n : scale) run.push_back({n, 0.2, music::Dynamics::mf});
+
+    // A Chord is a list of notes played together.
+    music::Track chords(harp);
+    for (int root : {57, 53, 48, 55}) {                           // Am  F  C  G (roots)
+        // third = +3 (minor) or +4 (major) semitones; here we just stack a fifth and an octave for an open sound
+        chords.add_chord({{root, root + 7, root + 12, root + 16}, 1.5, music::Dynamics::mp});
+    }
+
+    music::Arrangement song;
+    song.add_track(chords);
+    song.add(cello, run, /*start_time=*/6.0);                      // enters after 6 seconds
+    song.master_reverb(0.7, 0.2);
+    render(song, &quot;music_02_chords_scales.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/music_02_chords_scales.cpp" download>Download music_02_chords_scales.cpp</a></p><p><strong>Try this:</strong> try <code>scale::blues</code> or <code>dorian</code>.</p><h2 id="music_03_arrangement">3. A small band</h2><p>Each instrument gets its own track with a start time and gain. Tempo helpers convert beats to seconds. <code>limiter()</code> prevents clipping on the master.</p><pre><code>// A small band: several instruments, each on its own track, with start offsets and gains.
+#include &quot;wauvio/ext.hpp&quot;
+using namespace wauvio;
+using music::Dynamics;
+
+int main() {
+    music::Arrangement band;
+    band.tempo = music::Tempo(100);
+    const double beat = band.tempo.beat_seconds();           // seconds per beat at 100 BPM
+
+    instruments::UprightBass bass;
+    instruments::AcousticGrandPiano piano;
+    instruments::Trumpet trumpet;  trumpet.reverb();
+
+    // Bass: root notes, one per bar (4 beats).
+    music::Melody bassline;
+    for (int n : {36, 41, 43, 36}) bassline.push_back({n, 4 * beat, Dynamics::mf});
+
+    // Piano: eighth-note pattern.
+    music::Melody comp;
+    for (int bar = 0; bar &lt; 4; ++bar)
+        for (int n : {60, 64, 67, 64, 60, 64, 67, 64}) comp.push_back({n, beat / 2, Dynamics::mp});
+
+    // Trumpet joins in bar 3.
+    music::Melody lead = {{72, 2 * beat, Dynamics::f}, {71, beat, Dynamics::mf}, {67, beat, Dynamics::mf}};
+
+    band.add(bass,    bassline, 0.0,        /*track_gain=*/0.9);
+    band.add(piano,   comp,     0.0,        0.7);
+    band.add(trumpet, lead,     8 * beat,   0.8);
+    band.limiter();                                         // keep the master from clipping
+    render(band, &quot;music_03_arrangement.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/music_03_arrangement.cpp" download>Download music_03_arrangement.cpp</a></p><p><strong>Try this:</strong> add a drum track using the kit from the next example.</p><h2 id="music_04_drum_kit">4. Drum kits</h2><p>A <code>DrumKit</code> maps MIDI note numbers (General MIDI: 36 kick, 38 snare, 42 closed hi-hat) to sounds. <code>render_pattern</code> takes (time, note) pairs, so any pattern you can compute, you can play.</p><pre><code>// Drum kits map MIDI note numbers (General MIDI) to drum sounds.
+#include &quot;wauvio/ext.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    instruments::Kit808 kit;                    // also: IndustrialKit, and others in the catalog
+    const int KICK = 36, SNARE = 38, HAT = 42;
+
+    // render_pattern takes (time in seconds, midi note) pairs.
+    std::vector&lt;std::pair&lt;double,int&gt;&gt; hits;
+    const double step = 0.125;                   // an eighth note at 120 BPM
+    for (int bar = 0; bar &lt; 4; ++bar)
+        for (int i = 0; i &lt; 8; ++i) {
+            double t = (bar * 8 + i) * step;
+            hits.push_back({t, HAT});
+            if (i % 4 == 0) hits.push_back({t, KICK});
+            if (i % 4 == 2) hits.push_back({t, SNARE});
+        }
+
+    StereoBuffer loop = kit.render_pattern(hits, 4.5, music::Dynamics::f);
+    normalize(loop);
+    save_wav_stereo(loop, &quot;music_04_drum_kit.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/music_04_drum_kit.cpp" download>Download music_04_drum_kit.cpp</a></p><p><strong>Try this:</strong> swap the kit for another one from the catalog’s “Drum kits” section.</p><h2 id="music_05_custom_instrument">5. Design your own instrument</h2><p>Modeled instruments are defined by a <code>TimbreRecipe</code>: oscillator shapes, envelope, filter, vibrato and more. Subclass a family (<code>SynthInstrument</code>, <code>KeyboardInstrument</code>…) and set fields in the constructor. See the <a href="ext-modeling.html">full field list</a>.</p><pre><code>// Design your own modeled instrument by changing its TimbreRecipe.
+#include &quot;wauvio/ext.hpp&quot;
+using namespace wauvio;
+
+// Start from an existing family class and adjust the recipe in the constructor.
+class GlassPad : public music::SynthInstrument {
+public:
+    GlassPad() : SynthInstrument(&quot;Glass Pad&quot;) {
+        recipe.osc1_shape    = osc::WaveShape::BL_Triangle;
+        recipe.osc2_shape    = osc::WaveShape::Sine;
+        recipe.osc2_ratio    = 3.0;               // a twelfth above: glassy overtone
+        recipe.osc_mix       = 0.45;
+        recipe.detune_cents  = 9;
+        recipe.envelope      = env::DAHDSR(0, 0.6, 0, 0.5, 0.8, 1.2);   // slow attack, long release
+        recipe.filter_cutoff = 4200;
+        recipe.vibrato_depth_cents = 6;
+        recipe.stereo_width  = 0.5;
+    }
+};
+
+int main() {
+    GlassPad pad;
+    pad.reverb(0.9, 0.35);
+    music::Track t(pad);
+    t.add_chord({{60, 64, 67, 71}, 4.0, music::Dynamics::mp});
+    t.add_chord({{58, 62, 65, 69}, 4.0, music::Dynamics::mp});
+    music::Arrangement a; a.add_track(t);
+    render(a, &quot;music_05_custom_instrument.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/music_05_custom_instrument.cpp" download>Download music_05_custom_instrument.cpp</a></p><p><strong>Try this:</strong> change <code>osc2_ratio</code> to 2.0 and lower <code>filter_cutoff</code> to 1500 for a warmer pad.</p><h2 id="music_06_sampled">6. Your own samples</h2><p>A <code>SampledInstrument</code> plays audio files, pitch-shifting them across a key range. Add several files with different root notes for realism; velocity layers and round-robin are supported on <a href="ext-sampling.html"><code>SampleZone</code></a>.</p><pre><code>// Use your own audio files as an instrument. (This example first makes a sample so it is self-contained.)
+#include &quot;wauvio/ext.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    // 1. Make a short sample: a plucked tone at middle C. In real use, point at any .wav file.
+    osc::Oscillator o; o.shape = osc::WaveShape::BL_Sawtooth; o.frequency = theory::midi_to_freq(60);
+    Buffer b = o.render(1.0, 44100);
+    env::ADSR(0.002, 0.3, 0.0, 0.3).apply(b, 1.0, 0.1);
+    save_wav(b, &quot;music_06_sample_c4.wav&quot;);
+
+    // 2. Tell the instrument which MIDI note the sample was recorded at (root) and the range it covers.
+    music::SampledInstrument inst;
+    inst.name = &quot;My Sample&quot;;
+    inst.load_sample_file(&quot;music_06_sample_c4.wav&quot;, /*root=*/60, /*low=*/36, /*high=*/84);
+
+    // 3. Play it. Other notes are made by pitch-shifting the sample.
+    music::Melody m = {{60, 0.5}, {64, 0.5}, {67, 0.5}, {72, 1.0}, {55, 1.0}};
+    music::Arrangement a; a.add(inst, m);
+    render(a, &quot;music_06_sampled.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/music_06_sampled.cpp" download>Download music_06_sampled.cpp</a></p><p><strong>Try this:</strong> record a real instrument note, point <code>load_sample_file</code> at it and set its root note.</p><h2 id="music_07_genre">7. Genre styling</h2><p>A genre preset rewrites dynamics, register and articulation, then restyles the instrument. The same melody comes out differently for jazz, metal or ambient. The seed makes the variation repeatable. All presets are listed in the <a href="ext-genre.html">genre reference</a>.</p><pre><code>// Genre presets restyle a melody (dynamics, register, articulation) and its instrument (timbre, effects).
+#include &quot;wauvio/ext.hpp&quot;
+using namespace wauvio;
+namespace gn = wauvio::music::genre;
+
+int main() {
+    music::Melody m;
+    for (int n : {60, 62, 64, 65, 67, 69, 71, 72}) m.push_back({n, 0.25, music::Dynamics::mf});
+
+    for (auto preset : { gn::presets::jazz(), gn::presets::metal(), gn::presets::ambient() }) {
+        instruments::CleanElectricGuitar gtr;                  // a fresh instrument per style
+        music::Melody styled = m;
+        gn::apply_to_melody(styled, *preset, gn::Role::Melodic, &amp;gtr, /*seed=*/7);
+        gn::style_instrument(gtr, *preset, gn::Role::Melodic);  // timbre + effect wishes
+
+        music::Arrangement a; a.add(gtr, styled);
+        render(a, &quot;music_07_genre_&quot; + preset-&gt;name + &quot;.wav&quot;);
+    }
+}</code></pre><p class="muted"><a href="examples/music_07_genre.cpp" download>Download music_07_genre.cpp</a></p><p><strong>Try this:</strong> pass a different <code>seed</code>; try <code>presets::chiptune()</code>.</p><h2 id="music_08_render_options">8. Output options</h2><p><code>RenderOptions</code> control the file: bit depth, normalisation, extra time for reverb tails, looping and dithering.</p><pre><code>// RenderOptions control the output file: bit depth, loudness, reverb tails, looping.
+#include &quot;wauvio/ext.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    instruments::Marimba marimba;
+    marimba.reverb(0.8, 0.4);
+    music::Arrangement a;
+    a.add(marimba, {{60, 0.25}, {64, 0.25}, {67, 0.25}, {72, 0.75}});
+
+    RenderOptions opt;
+    opt.bit_depth        = 24;                 // 16, 24 or 32 (float)
+    opt.normalize        = true;               // scale the loudest peak ...
+    opt.normalize_peak   = 0.9;                // ... to this level
+    opt.render_tail_sec  = 2.0;                // extra silence so the reverb is not cut off
+    opt.loop_count       = 2;                  // repeat the result
+    opt.dither           = DitherType::Triangular;
+    opt.deterministic_seed_enabled = true;     // reproducible dither noise
+    render(a, &quot;music_08_render_options.wav&quot;, opt);
+}</code></pre><p class="muted"><a href="examples/music_08_render_options.cpp" download>Download music_08_render_options.cpp</a></p><p><strong>Try this:</strong> set <code>bit_depth = 32</code> to write floating-point audio.</p><h2>Next</h2><p>Polish and mix these results in the <a href="guide-fx.html">FX guide</a>, or play a MIDI file in the <a href="guide-midi.html">MIDI guide</a>.</p>
+<div class="pager"><a href="guide-core.html"><small>Previous</small>Core guide</a><a class="r" href="guide-fx.html"><small>Next</small>FX guide</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

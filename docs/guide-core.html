@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Core guide · Wauvio Docs</title><meta name="description" content="Task-based examples for oscillators, envelopes, filters, FM, voices, sequencing and basic effects.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Guides &amp; examples</div><h1>Core guide</h1>
+<p>The core is the lowest layer: you build sound from oscillators, shape it with envelopes and filters, and write it to a WAV file. These examples start with a single beep and work up to a drum loop. New to audio terms? Read <a href="guide-concepts.html">Concepts</a> first.</p><p><strong>Build and run any example:</strong></p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><p class="muted">Each example writes a <code>.wav</code> file into the current folder.</p><h2 id="core_01_first_tone">1. Your first tone</h2><p>An oscillator generates a waveform; an ADSR envelope turns it into a note with a start and an end; <code>save_wav</code> writes the file. Almost every other example is a variation on these three steps.</p><pre><code>// Your first sound: one sine note with a volume envelope, saved as a WAV file.
+#include &quot;wauvio.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    // 1. An oscillator makes the raw waveform.
+    osc::Oscillator tone;
+    tone.shape     = osc::WaveShape::Sine;
+    tone.frequency = 440.0;          // Hz (concert A)
+    tone.amplitude = 0.8;            // 0..1
+
+    // 2. render(seconds, sample_rate) gives you a Buffer: a vector of float samples.
+    Buffer sound = tone.render(2.0, 44100);
+
+    // 3. An ADSR envelope shapes the volume: fade in, settle, then fade out.
+    //    ADSR(attack, decay, sustain level, release)
+    env::ADSR adsr(0.02, 0.10, 0.6, 0.5);
+    adsr.apply(sound, /*total_seconds=*/2.0, /*note_off at*/ 1.5);
+
+    // 4. Save it. save_wav writes 16-bit mono PCM.
+    save_wav(sound, &quot;core_01_first_tone.wav&quot;, 44100);
+}</code></pre><p class="muted"><a href="examples/core_01_first_tone.cpp" download>Download core_01_first_tone.cpp</a></p><p><strong>Try this:</strong> change <code>WaveShape::Sine</code> to <code>Square</code>, <code>Triangle</code> or <code>BL_Sawtooth</code> and listen to the difference; make the attack 0.5 s for a swell.</p><h2 id="core_02_filter_sweep">2. A filter sweep with automation</h2><p>A sawtooth is bright and buzzy; a low-pass filter removes the highs. Automation is a list of (time, value) points, here controlling the cutoff, giving the classic “opening filter” sound.</p><pre><code>// A classic synth sound: a sawtooth whose filter opens over time (automation).
+#include &quot;wauvio.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    osc::Oscillator saw;
+    saw.shape     = osc::WaveShape::BL_Sawtooth;   // BL_ = band-limited, less aliasing
+    saw.frequency = theory::notes::A2;
+    Buffer raw = saw.render(4.0, 44100);
+
+    // Automation = a list of (time in seconds, value) points; values between them are interpolated.
+    std::vector&lt;mod::AutoPoint&gt; cutoff = {
+        {0.0, 200.0},     // start dark
+        {3.0, 6000.0},    // open up
+        {4.0, 800.0},     // close again
+    };
+
+    // Run the buffer through a low-pass filter whose cutoff follows the curve.
+    Buffer swept = mod::apply_filter_automation(raw, cutoff, /*Q=*/3.0,
+                                                filter::SVFilter::Mode::LowPass, 44100);
+    normalize(swept, 0.8);
+    save_wav(swept, &quot;core_02_filter_sweep.wav&quot;, 44100);
+}</code></pre><p class="muted"><a href="examples/core_02_filter_sweep.cpp" download>Download core_02_filter_sweep.cpp</a></p><p><strong>Try this:</strong> raise <code>Q</code> to 8 for a sharper, whistling sweep.</p><h2 id="core_03_fm_bell">3. FM synthesis</h2><p>Frequency modulation makes rich, bell-like or metallic tones from just two sine waves. The ratio between the two frequencies decides the character, and <code>mod_index</code> controls brightness.</p><pre><code>// FM synthesis: one oscillator (the modulator) wobbles the pitch of another (the carrier).
+#include &quot;wauvio.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    synth::FMSynth fm;
+    fm.carrier_freq   = 440.0;
+    fm.modulator_freq = 440.0 * 3.5;   // non-integer ratio = inharmonic, bell-like
+    fm.mod_index      = 4.0;           // higher = brighter, more complex
+    fm.amplitude      = 0.7;
+
+    Buffer bell = fm.render(3.0);
+
+    // A fast attack and long release makes it ring like a bell.
+    env::ADSR ring(0.002, 1.0, 0.0, 1.5);
+    ring.apply(bell, 3.0, 0.05);
+
+    normalize(bell);
+    save_wav(bell, &quot;core_03_fm_bell.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/core_03_fm_bell.cpp" download>Download core_03_fm_bell.cpp</a></p><p><strong>Try this:</strong> set the ratio to exactly 2.0 for a more “musical” tone, or the index to 0.5 for a gentle sound.</p><h2 id="core_04_chord_voices">4. Chords with VoiceManager</h2><p><code>VoiceManager</code> gives you up to 16 voices with a shared patch: two detuned oscillators, an envelope and a filter per voice. Use it for any polyphonic synth sound.</p><pre><code>// Polyphony: VoiceManager plays several notes at once with a shared sound design.
+#include &quot;wauvio.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    synth::VoiceManager vm;
+    vm.shape1   = osc::WaveShape::Sawtooth;   // two oscillators per voice...
+    vm.shape2   = osc::WaveShape::Square;
+    vm.detune_hz = 3.0;                       // ...slightly detuned for width
+    vm.adsr     = env::ADSR(0.05, 0.2, 0.6, 0.6);
+
+    // C major chord. Notes are given as frequencies; midi_to_freq converts note numbers.
+    vm.note_on(theory::midi_to_freq(60), 0.8);   // C4
+    vm.note_on(theory::midi_to_freq(64), 0.8);   // E4
+    vm.note_on(theory::midi_to_freq(67), 0.8);   // G4
+
+    Buffer chord = vm.render(3.0);
+    normalize(chord);
+    save_wav(chord, &quot;core_04_chord_voices.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/core_04_chord_voices.cpp" download>Download core_04_chord_voices.cpp</a></p><p><strong>Try this:</strong> add a fourth note, or call <code>note_off</code> on one of the frequencies halfway through.</p><h2 id="core_05_melody_track">5. Melodies, chords and arpeggios</h2><p><code>seq::Track</code> plays notes in order. <code>render_chord</code> and <code>render_arpeggio</code> build harmony. <code>MasterBus</code> places buffers on a timeline and mixes them to stereo.</p><pre><code>// Sequencing with seq::Track, plus helpers for chords and arpeggios.
+#include &quot;wauvio.hpp&quot;
+using namespace wauvio;
+using namespace wauvio::theory::notes;
+
+int main() {
+    seq::Instrument lead;
+    lead.shape    = osc::WaveShape::BL_Square;
+    lead.envelope = env::ADSR(0.01, 0.08, 0.5, 0.1);
+    lead.use_lpf  = true;           // gentle one-pole low-pass
+    lead.lpf_cutoff = 3500;
+
+    // A Track plays notes one after another. REST is silence.
+    seq::Track melody;
+    melody.instrument = lead;
+    melody.add(C5, 0.25).add(E5, 0.25).add(G5, 0.25).add(C6, 0.5)
+          .rest(0.25)
+          .add(G5, 0.25).add(E5, 0.25).add(C5, 0.75);
+    Buffer tune = melody.render();
+
+    // A chord (all notes together) and an arpeggio (notes in a cycle).
+    Buffer chord = seq::render_chord({C4, E4, G4}, 2.0, lead);
+    Buffer arp   = seq::render_arpeggio({C4, E4, G4, C5}, 0.125, 4, lead);
+
+    // Place them on a timeline with MasterBus: schedule(buffer, start_seconds, gain).
+    seq::MasterBus bus;
+    bus.schedule(tune,  0.0, 0.6);
+    bus.schedule(chord, 0.0, 0.3);
+    bus.schedule(arp,   2.5, 0.5);
+    StereoBuffer mix = bus.mix_stereo();
+    normalize(mix);
+    save_wav_stereo(mix, &quot;core_05_melody_track.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/core_05_melody_track.cpp" download>Download core_05_melody_track.cpp</a></p><p><strong>Try this:</strong> change the chord notes to <code>{C4, Ds4, G4}</code> to hear minor instead of major.</p><h2 id="core_06_drums">6. A drum loop</h2><p>The sequencer only does timing: you provide each drum sound as a function returning a <code>Buffer</code>, here a synthesised kick (a sine whose pitch drops quickly) and a noise hi-hat. Patterns are one bool per step.</p><pre><code>// A drum loop. You supply the drum sounds as functions; the sequencer handles the timing.
+#include &quot;wauvio.hpp&quot;
+#include &lt;cmath&gt;
+using namespace wauvio;
+
+// Each &quot;sound&quot; is a function that returns one hit as a Buffer.
+Buffer kick(int sr) {
+    Buffer b(int(0.25 * sr));
+    double phase = 0;
+    for (size_t i = 0; i &lt; b.size(); ++i) {
+        double t = double(i) / sr;
+        double freq = 50 + 120 * std::exp(-t * 30);       // pitch drops fast: the &quot;thump&quot;
+        phase += TWO_PI * freq / sr;
+        b[i] = float(std::sin(phase) * std::exp(-t * 12));
+    }
+    return b;
+}
+Buffer hat(int sr) {
+    osc::NoiseGenerator n;                                // deterministic: seeded
+    Buffer b = n.render(0.05);
+    for (size_t i = 0; i &lt; b.size(); ++i) b[i] *= float(std::exp(-double(i) / sr * 90)) * 0.4f;
+    return b;
+}
+
+int main() {
+    seq::DrumSequencer drums;
+    drums.bpm = 120;
+    drums.steps_per_bar = 16;
+
+    // One bool per step (16 steps = one bar of sixteenth notes). true = hit.
+    drums.add_pattern({1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0}, kick, 1.0f);
+    drums.add_pattern({0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0}, hat,  0.6f);
+
+    Buffer loop = drums.render(/*bars=*/4);
+    normalize(loop);
+    save_wav(loop, &quot;core_06_drums.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/core_06_drums.cpp" download>Download core_06_drums.cpp</a></p><p><strong>Try this:</strong> add a snare pattern, or change <code>bpm</code> to 140.</p><h2 id="core_07_basic_fx">7. Delay and reverb</h2><p>The effects in <code>fx::basic</code> all follow the same recipe: set parameters, call <code>init(sample_rate)</code>, then <code>process(buffer)</code>. Leave extra silence at the end of the buffer so the tail has room.</p><pre><code>// Adding effects. Every effect follows the same recipe: set parameters -&gt; init(sample_rate) -&gt; process(buffer).
+#include &quot;wauvio.hpp&quot;
+using namespace wauvio;
+using namespace wauvio::theory::notes;
+
+int main() {
+    seq::Instrument pluck;
+    pluck.shape = osc::WaveShape::BL_Triangle;
+    pluck.envelope = env::ADSR(0.005, 0.15, 0.2, 0.2);
+    seq::Track t; t.instrument = pluck;
+    t.add(E4, 0.3).add(G4, 0.3).add(B4, 0.3).add(E5, 0.6);
+    Buffer dry = t.render();
+    dry.resize(dry.size() + 44100 * 3, 0.0f);     // leave room for the echo/reverb tail
+
+    fx::basic::DelayLine echo;
+    echo.time_ms = 375; echo.feedback = 0.45; echo.wet = 0.4;
+    echo.init(44100);
+    echo.process(dry);
+
+    fx::basic::Reverb room;
+    room.room_size = 0.85; room.wet = 0.35;
+    room.init(44100);
+    room.process(dry);
+
+    normalize(dry);
+    save_wav(dry, &quot;core_07_basic_fx.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/core_07_basic_fx.cpp" download>Download core_07_basic_fx.cpp</a></p><p><strong>Try this:</strong> increase <code>feedback</code> toward 0.8 for long repeating echoes. For a fuller effects toolkit see the <a href="guide-fx.html">FX guide</a>.</p><h2 id="core_08_sample_by_sample">8. Under the hood: sample by sample</h2><p>Everything above renders whole buffers. Underneath, oscillators, LFOs and filters work one sample at a time with <code>tick()</code>. Use this when you want to modulate one thing with another, like vibrato.</p><pre><code>// Under the hood: generate audio one sample at a time with tick().
+// Here an LFO wobbles the pitch of an oscillator (vibrato) and a filter smooths it.
+#include &quot;wauvio.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    const int sr = 44100;
+    osc::Oscillator o;  o.shape = osc::WaveShape::BL_Sawtooth;
+    mod::LFO vib;       vib.shape = mod::LFOShape::Sine; vib.rate_hz = 5.5; vib.depth = 1.0;
+    filter::SVFilter lp; lp.mode = filter::SVFilter::Mode::LowPass; lp.cutoff = 2500; lp.Q = 1.0;
+    lp.update_coeffs(sr);                          // call after changing cutoff / Q
+
+    Buffer out(sr * 3);
+    for (size_t i = 0; i &lt; out.size(); ++i) {
+        double wobble = vib.tick(sr);                       // -1..1
+        o.frequency = 330.0 * (1.0 + 0.015 * wobble);       // +-1.5% pitch
+        out[i] = lp.tick(o.tick(sr) * 0.5f, sr);
+    }
+    save_wav(out, &quot;core_08_sample_by_sample.wav&quot;, sr);
+}</code></pre><p class="muted"><a href="examples/core_08_sample_by_sample.cpp" download>Download core_08_sample_by_sample.cpp</a></p><p><strong>Try this:</strong> change the LFO shape to <code>Triangle</code> or raise the depth to 0.03 for a wider wobble.</p><h2>Playing sound instead of saving it</h2><p><code>play(buffer)</code> plays and blocks until finished; <code>play_async(buffer)</code> returns a <a href="core-io.html"><code>PlaybackHandle</code></a> you can pause, stop, or seek. On Linux this needs FFmpeg installed.</p><pre><code>auto handle = play_async(sound, 44100);
+handle.set_volume(0.5f);
+handle.wait();          // or handle.stop();</code></pre><h2>Next</h2><p>Ready for real instrument sounds? Continue to the <a href="guide-music.html">Music layer guide</a>.</p>
+<div class="pager"><a href="guide-concepts.html"><small>Previous</small>Concepts for beginners</a><a class="r" href="guide-music.html"><small>Next</small>Music layer guide</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

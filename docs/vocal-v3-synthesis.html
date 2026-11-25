@@ -7,7 +7,7 @@
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v3 — Synthesis pipeline</h1>
 
-<p>Header <code>yune-v3/synth.hpp</code> (the engine core). You normally never call it directly — <code>Singer</code> does — but it is public and usable for tooling.</p>
+<p>Header <code>yune-v3/synth.hpp</code> (the engine core). You normally never call it directly — <code>Singer</code> does — but it is public and usable for tooling.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-vocal.html#vocal_01_hello">Hello, singer</a></div>
 <h2>Pipeline</h2>
 <ol>
 <li><strong>Notes → events.</strong> <code>Singer::prepare_notes()</code> sorts notes, expands event tags into ordinary notes (per-event deterministic seeds) and applies humanisation, auto-expression and pressure. <code>SynthNote</code> holds <code>start</code>, <code>dur</code>, <code>midi</code>, <code>vel</code>, <code>style</code>, <code>morae</code>, <code>art</code>, <code>bend</code>, <code>glide_from</code>, <code>lanes</code>, <code>event</code>.</li>

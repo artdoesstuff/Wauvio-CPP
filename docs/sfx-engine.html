@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">SFX engine (wauvio/sfx)</div><h1>Render engine</h1>
-
+<div class="tryit"><strong>See it in action:</strong> <a href="guide-sfx.html#sfx_01_find_and_tweak">Find a preset and tweak it</a></div>
 <h2>Rendering</h2>
 <p><code>render(const Recipe&amp;, uint64_t seed = 1, const RenderSettings&amp; = {})</code> validates the recipe and settings (<code>validate_recipe</code>, <code>validate_settings</code>), renders every layer with a seed derived from the master seed, mixes, optionally reverses the whole mix, applies fades and a DC blocker, and normalises.</p>
 <h3>RenderSettings</h3><table><thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>sample_rate</code></td><td>44100</td><td>8000–192000</td></tr><tr><td><code>channels</code></td><td>2</td><td>1 or 2</td></tr><tr><td><code>normalize</code></td><td>true</td><td>Scale so the peak equals <code>peak_db</code></td></tr><tr><td><code>peak_db</code></td><td>−1.0</td><td>≤ 0 dBFS</td></tr><tr><td><code>max_seconds</code></td><td>120</td><td>Refuse longer renders (memory guard)</td></tr><tr><td><code>dc_cutoff_hz</code></td><td>12</td><td>DC blocker; 0 = off</td></tr></tbody></table>

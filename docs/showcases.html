@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Showcases · Wauvio Docs</title><meta name="description" content="Listen to what Wauvio can do.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Overview</div><h1>Showcases</h1>
+<p>Press play to hear what Wauvio can do. Each entry says which parts of the library were used, with links to the guides that show how.</p>
+<!--
+  HOW TO ADD A VIDEO
+  1. Find the 11-character ID in the YouTube URL:  youtube.com/watch?v=THIS_PART  (or youtu.be/THIS_PART).
+  2. In the section that fits, paste an <article class="showcase" data-yt="THIS_PART"> block (a template is in each section).
+  3. Optional: add data-start="45" (seconds) to begin partway through.
+  4. nav.js builds the embed (privacy-friendly youtube-nocookie.com, lazy-loaded) and a "Watch on YouTube" link.
+  Serve the docs over http(s): YouTube refuses to play embeds on pages opened from file://.
+-->
+<h2 id="music">Music &amp; arrangements</h2>
+<p>Composed for the <a href="guide-music.html">music layer</a>: modeled instruments, dynamics and articulations.</p>
+<div class="showcase-grid" id="grid-music">
+<!-- ADD VIDEOS HERE: copy the block below, paste it inside this div, and fill it in.
+<article class="showcase" data-yt="YOUTUBE_VIDEO_ID">
+  <div class="info">
+    <h3>Title of the piece</h3>
+    <p>One or two sentences: what it is and how it was made.</p>
+    <div class="tags"><span>music layer</span><span>fx</span></div>
+  </div>
+</article>
+-->
+</div><h2 id="midi">MIDI &amp; SoundFonts</h2>
+<p>MIDI files performed by Wauvio’s instruments or a SoundFont, optionally restyled by a genre preset. See the <a href="guide-midi.html">MIDI guide</a>.</p>
+<div class="showcase-grid" id="grid-midi">
+<!-- ADD VIDEOS HERE: copy the block below, paste it inside this div, and fill it in.
+<article class="showcase" data-yt="YOUTUBE_VIDEO_ID">
+  <div class="info">
+    <h3>Title of the piece</h3>
+    <p>One or two sentences: what it is and how it was made.</p>
+    <div class="tags"><span>music layer</span><span>fx</span></div>
+  </div>
+</article>
+-->
+</div><h2 id="mix">Mixing &amp; mastering</h2>
+<p>Productions using the <a href="guide-fx.html">FX suite</a>: buses, sidechain, loudness-targeted mastering.</p>
+<div class="showcase-grid" id="grid-mix">
+<!-- ADD VIDEOS HERE: copy the block below, paste it inside this div, and fill it in.
+<article class="showcase" data-yt="YOUTUBE_VIDEO_ID">
+  <div class="info">
+    <h3>Title of the piece</h3>
+    <p>One or two sentences: what it is and how it was made.</p>
+    <div class="tags"><span>music layer</span><span>fx</span></div>
+  </div>
+</article>
+-->
+</div><h2 id="sfx">Sound effects</h2>
+<p>Risers, impacts, glitches and textures from the <a href="guide-sfx.html">SFX engine</a>.</p>
+<div class="showcase-grid" id="grid-sfx">
+<!-- ADD VIDEOS HERE: copy the block below, paste it inside this div, and fill it in.
+<article class="showcase" data-yt="YOUTUBE_VIDEO_ID">
+  <div class="info">
+    <h3>Title of the piece</h3>
+    <p>One or two sentences: what it is and how it was made.</p>
+    <div class="tags"><span>music layer</span><span>fx</span></div>
+  </div>
+</article>
+-->
+</div><h2 id="vocal">Vocals</h2>
+<p>Singing and speech from the <a href="guide-vocal.html">vocal engine</a>.</p>
+<div class="showcase-grid" id="grid-vocal">
+<!-- ADD VIDEOS HERE: copy the block below, paste it inside this div, and fill it in.
+<article class="showcase" data-yt="YOUTUBE_VIDEO_ID">
+  <div class="info">
+    <h3>Title of the piece</h3>
+    <p>One or two sentences: what it is and how it was made.</p>
+    <div class="tags"><span>music layer</span><span>fx</span></div>
+  </div>
+</article>
+-->
+</div>
+<div class="pager"><a href="architecture.html"><small>Previous</small>Architecture</a><a class="r" href="guide-concepts.html"><small>Next</small>Concepts for beginners</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

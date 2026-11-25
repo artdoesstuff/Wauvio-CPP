@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FX guide · Wauvio Docs</title><meta name="description" content="Task-based examples for effect chains, mixing with sends and sidechain, loudness, reverb and creative effects.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Guides &amp; examples</div><h1>FX guide</h1>
+<p>The FX suite processes finished audio. The core idea is the <code>Chain</code>: add effects in order, then <code>process()</code> a stereo buffer. Include <code>wauvio/fx/ext.hpp</code> (this also gives you the music layer, so you can process instrument output directly).</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="fx_01_effect_chain">1. An effect chain</h2><p><code>chain.add&lt;Effect&gt;()</code> creates the effect in place and returns a reference, so you can set parameters right away. The chain removes latency (e.g. limiter lookahead) so audio stays in time, and extends the buffer to keep reverb tails.</p><pre><code>// Build an effect chain: effects run in the order you add them.
+#include &quot;wauvio/fx/ext.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    // Make some audio to process (a chord on an instrument from the music layer).
+    instruments::Wurlitzer200A keys;
+    music::Arrangement a;
+    a.add_track([&amp;]{ music::Track t(keys); t.add_chord({{57, 60, 64, 67}, 2.0}); t.add_chord({{53, 57, 60, 64}, 2.0}); return t; }());
+    StereoBuffer audio = a.render();
+
+    fx::Chain chain;
+    chain.add&lt;fx::EQ&gt;().highpass(80).peak(250, -2.0, 1.0).high_shelf(8000, 2.0);   // clean up lows, add air
+
+    auto&amp; comp = chain.add&lt;fx::Compressor&gt;();                                        // keep a reference to tweak settings
+    comp.threshold_db = -22; comp.ratio = 3.0; comp.attack_ms = 15; comp.release_ms = 120;
+
+    auto&amp; sat = chain.add&lt;fx::Saturator&gt;();
+    sat.mode = fx::Saturator::Mode::Tape; sat.drive_db = 6; sat.mix = 0.6;
+
+    chain.add&lt;fx::StereoChorus&gt;().mix = 0.3;
+    auto&amp; verb = chain.add&lt;fx::FdnReverb&gt;(); verb.decay_s = 2.2; verb.mix = 0.2;
+
+    // process() removes latency so the result stays in time, and keeps reverb tails by lengthening the buffer.
+    chain.process(audio, 44100);
+
+    fx::write_wav(audio, &quot;fx_01_effect_chain.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/fx_01_effect_chain.cpp" download>Download fx_01_effect_chain.cpp</a></p><p><strong>Try this:</strong> move the reverb before the compressor and listen to how the sound changes: order matters.</p><h2 id="fx_02_mixer_sidechain">2. Mixing: inserts, buses, sends, sidechain, mastering</h2><p>The <code>Mixer</code> combines tracks. An <em>insert</em> processes one track, a <em>bus</em> is a shared channel (here a reverb), a <em>send</em> feeds some of a track into it, and the <em>sidechain</em> makes the kick duck the pad. <code>set_mastering</code> finishes with loudness-targeted mastering.</p><pre><code>// A mini mix: sources, per-source inserts, a reverb bus with sends, sidechain &quot;pumping&quot;, and mastering.
+#include &quot;wauvio/fx/ext.hpp&quot;
+using namespace wauvio;
+
+static StereoBuffer play(music::Instrument&amp; i, music::Melody m) {
+    music::Track t(i); t.add(m); return t.render();
+}
+
+int main() {
+    instruments::Kit808 kit; instruments::SynthLead lead_i; instruments::SynthPad pad_i;
+    StereoBuffer kick, pad, lead;
+
+    // Four-on-the-floor kick (note 36) for 8 beats at 120 BPM, as one buffer.
+    std::vector&lt;std::pair&lt;double,int&gt;&gt; hits;
+    for (int b = 0; b &lt; 16; ++b) hits.push_back({b * 0.5, 36});
+    kick = kit.render_pattern(hits, 8.0, music::Dynamics::f);
+
+    pad  = play(pad_i,  {{57, 8.0, music::Dynamics::mp}});
+    lead = play(lead_i, {{69, 0.5}, {72, 0.5}, {76, 1.0}, {74, 0.5}, {72, 0.5}, {69, 1.0}, music::rest(4.0)});
+
+    fx::Mixer mix(44100);
+    int iKick = mix.add_source({&quot;kick&quot;, kick, 0.0, 1.0});
+    int iPad  = mix.add_source({&quot;pad&quot;,  pad,  0.0, 0.7});
+    int iLead = mix.add_source({&quot;lead&quot;, lead, 0.0, 0.6});
+
+    mix.insert(iPad).add&lt;fx::EQ&gt;().highpass(120);                 // per-source insert effects
+    int verbBus = mix.add_bus(&quot;reverb&quot;);
+    mix.bus(verbBus).add&lt;fx::FdnReverb&gt;().mix = 1.0;               // 100% wet: the bus is the reverb
+    mix.send(iLead, verbBus, 0.35);                                // send some lead to it
+    mix.send(iPad,  verbBus, 0.25);
+
+    fx::SidechainSettings sc; sc.threshold_db = -35; sc.ratio = 8; sc.release_ms = 180;
+    mix.sidechain(iPad, iKick, sc);                                // kick ducks the pad
+
+    mix.set_mastering(fx::master_for_genre(&quot;house&quot;));              // loudness target, EQ, glue, limiter
+    StereoBuffer out = mix.render();
+    fx::write_wav(out, &quot;fx_02_mixer_sidechain.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/fx_02_mixer_sidechain.cpp" download>Download fx_02_mixer_sidechain.cpp</a></p><p><strong>Try this:</strong> change the genre string to <code>"jazz"</code> or <code>"metal"</code> to hear different mastering targets.</p><h2 id="fx_03_loudness">3. Measure and set loudness</h2><p><code>measure_loudness</code> reports integrated LUFS and true peak; <code>normalize_loudness</code> brings audio to a target without exceeding a peak ceiling, using a limiter if needed.</p><pre><code>// Measure and set loudness (LUFS), the way streaming platforms do.
+#include &quot;wauvio/fx/ext.hpp&quot;
+#include &lt;cstdio&gt;
+using namespace wauvio;
+
+int main() {
+    instruments::Trumpet t; music::Arrangement a;
+    a.add(t, {{67, 1.0, music::Dynamics::mf}, {72, 1.0, music::Dynamics::f}, {71, 2.0, music::Dynamics::mp}});
+    StereoBuffer audio = a.render();
+
+    fx::LoudnessReport before = fx::measure_loudness(audio, 44100);
+    std::printf(&quot;before: %.1f LUFS integrated, true peak %.1f dBTP\n&quot;, before.integrated_lufs, before.true_peak_db);
+
+    // Gain (and a limiter if needed) to reach -14 LUFS without exceeding -1 dBTP.
+    fx::LoudnessReport after = fx::normalize_loudness(audio, 44100, -14.0, -1.0);
+    std::printf(&quot;after:  %.1f LUFS integrated, true peak %.1f dBTP\n&quot;, after.integrated_lufs, after.true_peak_db);
+
+    fx::write_wav(audio, &quot;fx_03_loudness.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/fx_03_loudness.cpp" download>Download fx_03_loudness.cpp</a></p><p><strong>Try this:</strong> try a target of −9 for a loud master and see how the peak behaves.</p><h2 id="fx_04_reverb_spaces">4. Reverb: algorithmic and convolution</h2><p><code>FdnReverb</code> is a flexible algorithmic reverb. <code>ConvolutionReverb</code> imitates a real space from an impulse response, generated here from presets (room, chamber, hall, cathedral, plate) or loaded from your own WAV with <code>load_ir</code>.</p><pre><code>// Reverb two ways: algorithmic (FdnReverb) and convolution with a generated room impulse response.
+#include &quot;wauvio/fx/ext.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    // A short percussive sound is the best test signal for a reverb.
+    instruments::Woodblock wb; music::Arrangement a;
+    a.add(wb, {{72, 0.3}, {72, 0.3}, {79, 0.6}});
+    StereoBuffer dry = a.render();
+
+    // 1. Algorithmic reverb.
+    StereoBuffer algo = dry;
+    fx::Chain c1; auto&amp; v = c1.add&lt;fx::FdnReverb&gt;(); v.decay_s = 3.0; v.size = 1.4; v.mix = 0.4;
+    c1.process(algo, 44100);
+    fx::write_wav(algo, &quot;fx_04_reverb_algorithmic.wav&quot;);
+
+    // 2. Convolution: set_ir(ir::Params) generates an impulse response. Presets: room, chamber, hall, cathedral, plate.
+    for (auto [name, params] : { std::pair&lt;const char*, fx::ir::Params&gt;{&quot;room&quot;, fx::ir::room()},
+                                 {&quot;cathedral&quot;, fx::ir::cathedral()} }) {
+        StereoBuffer wet = dry;
+        fx::Chain c2; auto&amp; conv = c2.add&lt;fx::ConvolutionReverb&gt;();
+        conv.set_ir(params); conv.mix = 0.4;
+        c2.process(wet, 44100);
+        fx::write_wav(wet, std::string(&quot;fx_04_reverb_conv_&quot;) + name + &quot;.wav&quot;);
+    }
+    // To use a real recorded space instead: conv.load_ir(&quot;my_hall.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/fx_04_reverb_spaces.cpp" download>Download fx_04_reverb_spaces.cpp</a></p><p><strong>Try this:</strong> compare the room and cathedral outputs on a short percussive sound.</p><h2 id="fx_05_creative">5. Creative effects</h2><p>Tempo-synced ping-pong delay, tremolo, auto-pan and bit-crushing. Most time-based effects can lock to a tempo (<code>sync_bpm</code>).</p><pre><code>// Creative effects: tempo-synced ping-pong delay, tremolo, auto-pan and bitcrushing.
+#include &quot;wauvio/fx/ext.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    instruments::SynthLead lead; music::Arrangement a;
+    a.add(lead, {{69, 0.25}, music::rest(0.25), {72, 0.25}, music::rest(0.25), {76, 0.5}});
+    StereoBuffer audio = a.render();
+
+    fx::Chain c;
+    auto&amp; d = c.add&lt;fx::StereoDelay&gt;();
+    d.sync_bpm = 120; d.sync_beats_left = 0.75;     // dotted eighth, locked to 120 BPM
+    d.ping_pong = true; d.feedback = 0.5; d.highcut_hz = 4500; d.mix = 0.4;
+
+    auto&amp; t = c.add&lt;fx::Tremolo&gt;(); t.rate_hz = 6; t.depth = 0.3;
+    auto&amp; p = c.add&lt;fx::AutoPan&gt;(); p.rate_hz = 0.4; p.depth = 0.6;
+    auto&amp; b = c.add&lt;fx::Bitcrusher&gt;(); b.bits = 10; b.downsample = 2; b.mix = 0.25;
+
+    c.process(audio, 44100);
+    fx::write_wav(audio, &quot;fx_05_creative.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/fx_05_creative.cpp" download>Download fx_05_creative.cpp</a></p><p><strong>Try this:</strong> set the bitcrusher to 6 bits for a lo-fi sound.</p><h2>Next</h2><p>See every effect’s parameters in the <a href="fx.html">FX reference</a>.</p>
+<div class="pager"><a href="guide-music.html"><small>Previous</small>Music layer guide</a><a class="r" href="guide-midi.html"><small>Next</small>MIDI &amp; SoundFont guide</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

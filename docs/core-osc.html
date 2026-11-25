@@ -7,7 +7,7 @@
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>osc.hpp — oscillators and noise</h1>
 
-<p>Namespace <code>wauvio::osc</code>. Waveform generators, from stateless functions up to a wavetable oscillator.</p>
+<p>Namespace <code>wauvio::osc</code>. Waveform generators, from stateless functions up to a wavetable oscillator.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-core.html#core_01_first_tone">Your first tone</a> &middot; <a href="guide-core.html#core_08_sample_by_sample">Under the hood: sample by sample</a></div>
 <h2>Waveform functions</h2>
 <p><code>osc::wave</code> provides naive waveforms (<code>sine</code>, <code>square</code>, <code>triangle</code>, <code>sawtooth</code>, <code>pulse(p, duty)</code>) of a phase in [0, 2π). <code>osc::wave_bl</code> provides band-limited versions using PolyBLEP: <code>polyblep(t, dt)</code>, <code>sawtooth(phase, dt)</code>, <code>square</code>, <code>pulse</code>, and <code>triangle(phase, dt, prev)</code> which needs one float of caller-owned state. Here <code>dt = frequency / sample_rate</code>.</p>
 <h2>WaveShape</h2>

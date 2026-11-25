@@ -7,7 +7,7 @@
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>mod.hpp — LFO and automation</h1>
 
-<p>Namespace <code>wauvio::mod</code>.</p>
+<p>Namespace <code>wauvio::mod</code>.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-core.html#core_02_filter_sweep">A filter sweep with automation</a> &middot; <a href="guide-core.html#core_08_sample_by_sample">Under the hood: sample by sample</a></div>
 <h2>LFO</h2>
 <p>Enums: <code>LFOShape { Sine, Triangle, Square, SampleHold }</code> and <code>LFOTarget { Pitch, Amplitude, FilterCutoff, Pan }</code>. Fields: <code>shape</code>, <code>target</code>, <code>rate_hz</code> (4), <code>depth</code> (0.5), <code>phase_off</code>. <code>tick(sample_rate)</code> returns a value in [-1, 1]; <code>modulate(sample_rate)</code> returns it scaled by <code>depth</code>. <code>SampleHold</code> picks a new random value each phase wrap using a fixed internal seed, so it is deterministic. The <code>target</code> field is a label for the caller: the LFO does not itself modify any other object.</p>
 <h2>Automation</h2>

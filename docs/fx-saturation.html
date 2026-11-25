@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Saturation and bitcrushing</h1>
-
+<div class="tryit"><strong>See it in action:</strong> <a href="guide-fx.html#fx_01_effect_chain">An effect chain</a></div>
 <h2>Oversampler1</h2>
 <p>Single-channel 1×/2×/4×/8× oversampler built from 97-tap Kaiser-windowed half-band stages (≈90 dB stop-band). <code>prepare(factor)</code>, <code>process(in, out, n, fn)</code> up-samples, runs <code>fn</code> at the high rate, then down-samples; <code>latency()</code> and the static <code>latency_for(factor)</code> give the integer round-trip delay.</p>
 <h2>Saturator</h2><table><thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>mode</code></td><td>Soft</td><td><code>Soft, Tube, Tape, Hard, Fold, Asymmetric</code></td></tr><tr><td><code>drive_db</code></td><td>12</td><td>Input gain into the shaper</td></tr><tr><td><code>bias</code></td><td>0</td><td>−1..1; adds even harmonics (Tube/Asymmetric)</td></tr><tr><td><code>tone_hz</code></td><td>0</td><td>Post low-pass; 0 = off</td></tr><tr><td><code>mix</code></td><td>1</td><td></td></tr><tr><td><code>output_db</code></td><td>0</td><td></td></tr><tr><td><code>oversample</code></td><td>2</td><td>1, 2, 4 or 8; reported via <code>latency_samples()</code></td></tr></tbody></table>

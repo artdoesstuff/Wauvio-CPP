@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SFX guide · Wauvio Docs</title><meta name="description" content="Task-based examples for finding and tuning SFX presets, layering, custom recipes, variations and the CLI.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Guides &amp; examples</div><h1>SFX guide</h1>
+<p>The SFX engine produces sound effects (risers, impacts, glitches, textures, bass FX, percussion, and more) from <strong>190 presets</strong>. You pick a preset, tweak parameters, and render. Include <code>wauvio/sfx.hpp</code>. The whole catalog is in the <a href="sfx-catalog.html">preset catalog</a>.</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="sfx_01_find_and_tweak">1. Find a preset and tweak it</h2><p>Search the catalog, read a preset’s parameters and ranges, set values, and render. Values outside a range throw an error that explains the problem. A fixed seed makes the audio repeatable.</p><pre><code>// Find a preset, see what it can do, change its parameters, render it.
+#include &quot;wauvio/sfx.hpp&quot;
+#include &lt;cstdio&gt;
+namespace sfx = wauvio::sfx;
+
+int main() {
+    // 1. Search the catalog (ids, names, tags and descriptions are searched).
+    for (const sfx::Preset* p : sfx::search(&quot;riser&quot;))
+        std::printf(&quot;%-22s %s\n&quot;, p-&gt;id.c_str(), p-&gt;name.c_str());
+
+    // 2. find() looks at a preset&#x27;s metadata: every parameter with its default and allowed range.
+    const sfx::Preset* info = sfx::find(&quot;noise_riser&quot;);
+    for (const sfx::ParamSpec&amp; s : info-&gt;params)
+        std::printf(&quot;  %-12s default %-6g range %g..%g  %s\n&quot;, s.name.c_str(), s.def, s.min, s.max, s.description.c_str());
+
+    //    make() gives you an Effect: the preset plus its current parameter values, ready to tweak and render.
+    sfx::Effect e = sfx::make(&quot;noise_riser&quot;);
+
+    // 3. set() validates: a value outside the allowed range throws sfx::Error (nothing is silently clamped).
+    e.set(&quot;duration&quot;, 4.0).set(&quot;intensity&quot;, 0.8).set(&quot;brightness&quot;, 0.5);
+    e.seed(2024);                    // same seed = same audio every time
+    try { e.set(&quot;intensity&quot;, 5.0); } catch (const sfx::Error&amp; err) { std::printf(&quot;rejected: %s\n&quot;, err.what()); }
+
+    // 4. Render and save. Output is stereo 44.1 kHz, peak-normalised to -1 dBFS unless you change RenderSettings.
+    sfx::Rendered audio = e.render();
+    std::printf(&quot;%.2f s, peak %.1f dB\n&quot;, audio.seconds(), audio.stats().peak_db());
+    audio.save(&quot;sfx_01_find_and_tweak.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/sfx_01_find_and_tweak.cpp" download>Download sfx_01_find_and_tweak.cpp</a></p><p><strong>Try this:</strong> replace <code>riser</code> with <code>impact</code> or <code>glitch</code> and explore.</p><h2 id="sfx_02_layering">2. Layer effects on a timeline</h2><p><code>Layered</code> mixes several presets: position them in seconds or beats, set relative gain, transpose, pan, or reverse. This builds a riser that lands exactly on an impact.</p><pre><code>// Layered: combine several effects on a timeline (riser into impact, with a reversed tail).
+#include &quot;wauvio/sfx.hpp&quot;
+namespace sfx = wauvio::sfx;
+
+int main() {
+    sfx::Layered fx;
+    fx.tempo(120).seed(99);
+
+    // Riser builds for 4 beats (2 s at 120 BPM)...
+    fx.add(&quot;noise_riser&quot;, sfx::LayerOpts().dur(2.0).gain(-3));
+    // ...impact lands exactly on beat 4, a bit louder and an octave lower...
+    fx.add(&quot;cinematic_impact&quot;, sfx::LayerOpts().at_beats(4).transpose(-12).gain(0));
+    // ...and a reversed version of the same impact leads into it, panned left.
+    fx.add(&quot;cinematic_impact&quot;, sfx::LayerOpts().at_beats(2).flip().gain(-9).place(-0.6).with_seed(5));
+
+    sfx::Rendered out = fx.render();
+    out.save(&quot;sfx_02_layering.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/sfx_02_layering.cpp" download>Download sfx_02_layering.cpp</a></p><p><strong>Try this:</strong> change the tempo and see everything stay locked to the beat grid.</p><h2 id="sfx_03_custom_recipe">3. Build a sound from scratch</h2><p>When no preset fits, write a <code>Recipe</code>: layers, each with one source (oscillator, noise, modal, grain…) and a chain of processors. <code>Traj</code> describes how a value changes over a layer’s length. See the <a href="sfx-recipes.html">recipe reference</a> for every source and processor.</p><pre><code>// Build a sound from scratch with the recipe language: a laser &quot;zap&quot;.
+// A Recipe has layers; each layer = one source -&gt; envelope -&gt; processors -&gt; level/pan.
+#include &quot;wauvio/sfx.hpp&quot;
+namespace sfx = wauvio::sfx;
+using sfx::Traj;
+
+int main() {
+    sfx::Recipe r;
+    r.name = &quot;zap&quot;;
+    r.duration = 0.6;
+    r.tail = 0.4;                                       // extra time for reverb/echo to ring out
+
+    // Layer 1: a sawtooth sweeping from 2 kHz down to 120 Hz (Traj describes change over the layer&#x27;s length).
+    auto&amp; body = r.add(&quot;body&quot;);
+    body.osc(sfx::Wave::Saw, Traj::pitch_hz(2000, 120, sfx::Interp::Exp))
+        .shape(Traj::decay(0.001))                      // fast exponential fade-out
+        .lp(Traj::linear(9000, 600), 2.0)               // filter closes as it falls
+        .drive(0.4)
+        .gain(0.8);
+
+    // Layer 2: a quick burst of noise for the &quot;crack&quot; at the start.
+    auto&amp; crack = r.add(&quot;crack&quot;);
+    crack.noise(sfx::NoiseColor::White)
+         .shape(Traj::ar(0.02, 1.0, 0.0))
+         .len(0.08)
+         .hp(Traj(3000.0))
+         .gain(0.4);
+
+    r.layers[0].echo(0.12, 0.35, 0.25).reverb(0.8, 0.5, 0.2);   // processors apply in the order written
+
+    sfx::Rendered out = sfx::render(r, /*seed=*/1);
+    out.save(&quot;sfx_03_custom_recipe.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/sfx_03_custom_recipe.cpp" download>Download sfx_03_custom_recipe.cpp</a></p><p><strong>Try this:</strong> change <code>Wave::Saw</code> to <code>Square</code>, or lengthen the pitch sweep.</p><h2 id="sfx_04_variations">4. Variations from seeds</h2><p>The same preset with different seeds yields a family of similar-but-different sounds, handy for game audio where repetition is noticeable.</p><pre><code>// Same preset, different seeds = a family of related-but-different sounds (great for games: no two footsteps alike).
+#include &quot;wauvio/sfx.hpp&quot;
+#include &lt;string&gt;
+namespace sfx = wauvio::sfx;
+
+int main() {
+    for (int i = 0; i &lt; 5; ++i) {
+        sfx::Effect e = sfx::make(&quot;cinematic_impact&quot;);
+        e.set(&quot;duration&quot;, 1.0).seed(1000 + i);
+        e.render().save(&quot;sfx_04_variation_&quot; + std::to_string(i) + &quot;.wav&quot;);
+    }
+}</code></pre><p class="muted"><a href="examples/sfx_04_variations.cpp" download>Download sfx_04_variations.cpp</a></p><p><strong>Try this:</strong> vary a parameter and the seed together for even more variety.</p><h2 id="sfx_05_batch_category">5. Render a whole category</h2><p>Loop over a category to audition or export it all. Error handling is per preset.</p><pre><code>// Render every preset in a category (like `wauvio_sfx_tool render-category risers`).
+#include &quot;wauvio/sfx.hpp&quot;
+#include &lt;cstdio&gt;
+#include &lt;cstdlib&gt;
+namespace sfx = wauvio::sfx;
+
+int main() {
+    std::system(&quot;mkdir -p sfx_risers&quot;);
+    for (const sfx::Preset* p : sfx::presets_in(sfx::Category::Risers)) {
+        try {
+            sfx::make(p-&gt;id).render().save(&quot;sfx_risers/&quot; + p-&gt;id + &quot;.wav&quot;);
+            std::printf(&quot;ok   %s\n&quot;, p-&gt;id.c_str());
+        } catch (const sfx::Error&amp; e) {
+            std::printf(&quot;FAIL %s: %s\n&quot;, p-&gt;id.c_str(), e.what());
+        }
+    }
+}</code></pre><p class="muted"><a href="examples/sfx_05_batch_category.cpp" download>Download sfx_05_batch_category.cpp</a></p><p><strong>Try this:</strong> use <code>Category::Impacts</code> or list all with <code>sfx::all_presets()</code>.</p><h2>No code? Use the command-line tool</h2><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo wauvio/sfx/tools/wauvio_sfx_tool.cpp -o wauvio_sfx_tool
+
+./wauvio_sfx_tool search riser
+./wauvio_sfx_tool info noise_riser
+./wauvio_sfx_tool render noise_riser --duration 4 --set intensity=0.8 --out my_sfx
+./wauvio_sfx_tool render-category impacts --out my_sfx</code></pre><p>Details: <a href="sfx-tool.html">tool reference</a>. More complete programs: <a href="sfx-examples.html">the eight bundled examples</a>.</p>
+<div class="pager"><a href="guide-midi.html"><small>Previous</small>MIDI &amp; SoundFont guide</a><a class="r" href="guide-vocal.html"><small>Next</small>Vocal guide</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

@@ -7,7 +7,7 @@
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">MIDI layer (wauvio/midi)</div><h1>MIDI file model</h1>
 
-<p>Headers in <code>wauvio/midi/core/</code>, namespace <code>wauvio::midi</code>.</p>
+<p>Headers in <code>wauvio/midi/core/</code>, namespace <code>wauvio::midi</code>.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-midi.html#midi_01_load_and_render">Load and render a MIDI file</a></div>
 <ul>
 <li><code>ByteReader</code> — bounds-checked big-endian reader over a byte array: <code>u8</code>, <code>u16be</code>, <code>u32be</code>, <code>read_vlq</code> (variable-length quantity), <code>skip</code>, <code>seek</code>, <code>eof</code>, <code>remaining</code>, <code>position</code>, <code>ptr</code>. Reading past the end throws <code>MidiParseError</code> (derives <code>std::runtime_error</code>).</li>
 <li><code>MidiEventType</code> — <code>NoteOff, NoteOn, PolyAftertouch, ControlChange, ProgramChange, ChannelAftertouch, PitchBend, Meta, SysEx, Other</code>.</li>

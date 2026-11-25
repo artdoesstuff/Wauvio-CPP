@@ -115,3 +115,17 @@ aside.toc a.act{border-left-color:var(--accent);color:var(--accent);font-weight:
 @media print{.topbar,nav.side,aside.toc,.pager,.copy{display:none}.layout{padding:0}main{padding:0}}
 
 .pp{white-space:nowrap}
+
+.tryit{background:var(--accent-soft);border-left:4px solid var(--accent);padding:10px 16px;border-radius:8px;margin:1.1em 0;font-size:14.5px}
+/* showcases */
+.showcase-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:22px;margin:1.2em 0 2em}
+.showcase{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--bg-soft);box-shadow:var(--shadow);display:flex;flex-direction:column}
+.showcase .video{position:relative;aspect-ratio:16/9;background:#000}
+.showcase .video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.showcase .info{padding:14px 16px 16px}
+.showcase h3{margin:0 0 .3em;font-size:1.05rem}
+.showcase p{margin:.3em 0;font-size:14.5px;color:var(--fg-soft)}
+.showcase .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:.7em}
+.showcase .tags span{font-size:11.5px;padding:2px 9px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+.showcase .watch{font-size:13px;margin-top:.5em}
+.showcase-empty{color:var(--muted);font-style:italic;margin:1em 0 2em}

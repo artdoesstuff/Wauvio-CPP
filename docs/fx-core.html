@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">FX suite (wauvio/fx)</div><h1>Effect, Chain and DSP utilities</h1>
-
+<div class="tryit"><strong>See it in action:</strong> <a href="guide-fx.html#fx_01_effect_chain">An effect chain</a></div>
 <h2>Effect (abstract base)</h2>
 <p>Header <code>fx/core/fx_effect.hpp</code>. Pure virtuals: <code>name()</code>, <code>reset()</code>, <code>process(float* L, float* R, size_t n)</code> (in place, streaming). Overridable: <code>tail_seconds()</code> (how long the output rings after silence), <code>latency_samples()</code> (lookahead delay), <code>on_prepare()</code>.</p>
 <ul>

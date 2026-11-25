@@ -7,7 +7,7 @@
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Core engine (wauvio/core)</div><h1>filter.hpp — filters and EQ</h1>
 
-<p>Namespace <code>wauvio::filter</code>.</p>
+<p>Namespace <code>wauvio::filter</code>.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-core.html#core_02_filter_sweep">A filter sweep with automation</a> &middot; <a href="guide-core.html#core_08_sample_by_sample">Under the hood: sample by sample</a></div>
 <h2>SVFilter</h2>
 <p>Topology-preserving-transform state-variable filter. <code>Mode { LowPass, HighPass, BandPass }</code>, fields <code>mode</code>, <code>cutoff</code> (Hz), <code>Q</code> (0.707 default; higher resonates). After changing <code>cutoff</code> or <code>Q</code> call <code>update_coeffs(sample_rate)</code> (or use <code>set_params(fc, q, sr)</code>). <code>tick(x, sample_rate)</code> processes one sample; <code>process(buf)</code> a buffer; <code>reset()</code> clears state.</p>
 <h2>One-pole filters</h2>

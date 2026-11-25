@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>v3 — Ensemble, FX chain and mic</h1>
-
+<div class="tryit"><strong>See it in action:</strong> <a href="guide-vocal.html#vocal_04_harmony">Harmonies and doubling</a> &middot; <a href="guide-vocal.html#vocal_05_polish">Finish with mic and effects</a></div>
 <h2>Ensemble</h2>
 <p>Header <code>ensemble.hpp</code>. Several <code>Singer</code>s rendered together and mixed to stereo — harmonies, doubled leads, small choirs, duets. Every part is an independent monophonic singer, so each keeps its own coarticulation, pitch tracker and voice. Parts are mixed with constant-power panning; <strong>no normalisation is applied</strong> by <code>render_stereo()</code> (<code>save()</code> normalises to a 0.9 peak).</p>
 <pre><code>Singer lead; /* … add notes … */

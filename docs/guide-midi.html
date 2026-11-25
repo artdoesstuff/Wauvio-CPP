@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MIDI &amp; SoundFont guide · Wauvio Docs</title><meta name="description" content="Task-based examples for loading MIDI, choosing instruments, genre restyling, stems and SoundFonts.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Guides &amp; examples</div><h1>MIDI &amp; SoundFont guide</h1>
+<p>Wauvio reads Standard MIDI Files and plays each part with an instrument chosen from the General MIDI program number. You can override any choice, restyle the whole piece with a genre preset, export stems, or use a SoundFont. Include <code>wauvio/midi.hpp</code>.</p><p>The examples first write a tiny MIDI file so they run on their own; replace that with your own <code>.mid</code>.</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="midi_01_load_and_render">1. Load and render a MIDI file</h2><p><code>load_midi</code> returns a <code>MidiMusic</code> containing one part per track or channel. Each part already has an instrument; <code>render</code> mixes them to a WAV.</p><pre><code>// Load a MIDI file, render it with Wauvio&#x27;s built-in General MIDI instruments, and save a WAV.
+#include &quot;wauvio/midi.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    // (Self-contained demo: first write a small MIDI file. Skip this part if you have your own .mid.)
+    {
+        music::Arrangement a;
+        instruments::Trumpet tp; instruments::UprightBass bs;
+        a.add(tp, {{72, 0.5}, {74, 0.5}, {76, 1.0}, {72, 1.0}});
+        a.add(bs, {{48, 1.0}, {43, 1.0}, {48, 1.0}});
+        midi::track::save_midi(a, &quot;demo.mid&quot;);
+    }
+
+    // load_midi gives you a MidiMusic: one &quot;part&quot; per track/channel, each with an instrument picked from its
+    // General MIDI program number. (This demo file stores program 0 = piano for every part; real files vary.)
+    midi::track::MidiMusic song = midi::track::load_midi(&quot;demo.mid&quot;);
+    std::printf(&quot;%zu parts, %.1f seconds, %.0f BPM\n&quot;, song.part_count(), song.duration_seconds, song.initial_bpm);
+    for (size_t i = 0; i &lt; song.part_count(); ++i)
+        std::printf(&quot;  part %zu: %s (GM program %d)\n&quot;, i, song.part(i).name.c_str(), song.part(i).gm_program);
+
+    render(song, &quot;midi_01_load_and_render.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/midi_01_load_and_render.cpp" download>Download midi_01_load_and_render.cpp</a></p><p><strong>Try this:</strong> inspect <code>song.part(i).notes</code> to see the resolved notes.</p><h2 id="midi_02_choose_instruments">2. Choose the instruments</h2><p>Assign instruments before loading with the resolver (by channel, program, or bank), or after loading with <code>set_instrument</code>. Pinning a part protects it from later genre changes.</p><pre><code>// Choose which instruments play. Three ways: before loading (resolver), after loading (set_instrument), or per channel.
+#include &quot;wauvio/midi.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    { music::Arrangement a; instruments::Trumpet t; instruments::UprightBass b;
+      a.add(t, {{72, 0.5}, {74, 0.5}, {76, 1.0}}); a.add(b, {{48, 1.0}, {43, 1.0}});
+      midi::track::save_midi(a, &quot;demo2.mid&quot;); }
+
+    // (Note: save_midi writes every track as GM program 0 = piano, so without the rules below both parts would be piano.)
+
+    // 1. Before loading: tell the resolver what to use. Rules are checked in a fixed priority order:
+    //    channel override &gt; bank/program override &gt; bank provider (SF2) &gt; program override &gt; built-in GM.
+    //    Here we assign by MIDI channel (0-based; the demo file uses channel 0 and 1).
+    midi::track::LoadOptions opts;
+    opts.resolver.override_channel(0, [] { return std::make_shared&lt;instruments::Trumpet&gt;(); });
+    opts.resolver.override_channel(1, [] { return std::make_shared&lt;instruments::UprightBass&gt;(); });
+    //   Other rules:  override_program(gm_program, factory), override_bank_program(msb, lsb, program, factory),
+    //                 override_percussion_note(note, factory)
+
+    midi::track::MidiMusic song = midi::track::load_midi(&quot;demo2.mid&quot;, opts);
+
+    // 2. After loading: swap a part by index (any music::Instrument works).
+    song.set_instrument&lt;instruments::Harp&gt;(1);
+    song.pin_instrument(1);          // pinned parts are never changed by a genre preset later
+
+    render(song, &quot;midi_02_choose_instruments.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/midi_02_choose_instruments.cpp" download>Download midi_02_choose_instruments.cpp</a></p><p><strong>Try this:</strong> use <code>override_percussion_note</code> to replace a single drum sound.</p><h2 id="midi_03_genre">3. Restyle with a genre</h2><p><code>setGenre</code> re-performs the file in a genre’s style: timing (swing, humanise), dynamics, articulations, and optionally instruments. It is reversible: <code>clearGenre()</code> restores the original, and calling it twice never compounds.</p><pre><code>// Restyle a whole MIDI file with a genre preset. It is reversible, and deterministic for a given seed.
+#include &quot;wauvio/midi.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    { music::Arrangement a; instruments::ElectricPiano ep; instruments::BassGuitar bg;
+      music::Melody m; for (int n : {60, 64, 67, 72, 67, 64, 60, 55}) m.push_back({n, 0.25});
+      a.add(ep, m); a.add(bg, {{36, 1.0}, {41, 1.0}});
+      midi::track::save_midi(a, &quot;demo3.mid&quot;); }
+
+    midi::track::MidiMusic song = midi::track::load_midi(&quot;demo3.mid&quot;);
+
+    midi::genre::GenreApplyOptions go;
+    go.allow_instrumentation = true;        // let the preset swap in genre-typical instruments
+    go.seed = 3;                            // different seed = different (but repeatable) humanisation
+
+    song.setGenre(midi::genre::presets::jazz(), go);
+    render(song, &quot;midi_03_genre_jazz.wav&quot;);
+
+    song.setGenre(midi::genre::presets::metal(), go);   // starts again from the original, not from the jazz version
+    render(song, &quot;midi_03_genre_metal.wav&quot;);
+
+    song.clearGenre();                                  // back to the file as loaded
+    render(song, &quot;midi_03_genre_original.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/midi_03_genre.cpp" download>Download midi_03_genre.cpp</a></p><p><strong>Try this:</strong> set <code>allow_instrumentation = false</code> to keep your instruments and change only the performance.</p><h2 id="midi_04_stems_and_export">4. Stems and writing MIDI</h2><p><code>render_stems</code> writes one WAV per part for mixing elsewhere (or feed parts to the <a href="fx-mixer.html"><code>Mixer</code></a> with <code>mixer_from_midi</code>). <code>save_midi</code> writes the score back out.</p><pre><code>// Export one WAV per part (stems) for use in a DAW, and write the (possibly edited) score back out as MIDI.
+#include &quot;wauvio/midi.hpp&quot;
+using namespace wauvio;
+
+int main() {
+    { music::Arrangement a; instruments::Flute f; instruments::Cello c;
+      a.add(f, {{76, 0.5}, {79, 0.5}, {83, 1.0}}); a.add(c, {{52, 1.0}, {55, 1.0}});
+      midi::track::save_midi(a, &quot;demo4.mid&quot;); }
+
+    midi::track::MidiMusic song = midi::track::load_midi(&quot;demo4.mid&quot;);
+
+    RenderOptions opt;
+    opt.bit_depth = 24;
+    opt.normalize = false;                       // keep each stem&#x27;s relative level
+
+    // render_stems writes &lt;dir&gt;/&lt;part name&gt;.wav for every part and returns the paths.
+    // (The directory must exist.)
+    std::system(&quot;mkdir -p stems&quot;);
+    auto files = midi::track::render_stems(song, &quot;stems&quot;, opt);
+    for (auto&amp; f : files) std::printf(&quot;wrote %s\n&quot;, f.c_str());
+
+    midi::track::save_midi(song, &quot;demo4_out.mid&quot;);
+}</code></pre><p class="muted"><a href="examples/midi_04_stems_and_export.cpp" download>Download midi_04_stems_and_export.cpp</a></p><p><strong>Try this:</strong> set <code>opt.normalize = true</code> to normalise each stem separately.</p><h2 id="midi_05_soundfont">5. Use a SoundFont</h2><p>A <code>SoundFont</code> is a bank provider: plug it into the resolver and SF2 presets win over the built-in instruments. Pass any <code>.sf2</code> file and a MIDI file on the command line. (This example needs your own SF2, so it exits politely without arguments.)</p><pre><code>// Use a SoundFont (.sf2) as the instrument source for a MIDI file.
+// Pass the path to any SF2 on the command line:  ./midi_05_soundfont GeneralUser.sf2 song.mid
+#include &quot;wauvio/sf2.hpp&quot;
+#include &quot;wauvio/midi.hpp&quot;
+using namespace wauvio;
+
+int main(int argc, char** argv) {
+    if (argc &lt; 3) { std::printf(&quot;usage: %s soundfont.sf2 song.mid\n&quot;, argv[0]); return 0; }
+
+    auto sf = std::make_shared&lt;sf2::SoundFont&gt;(argv[1]);        // throws sf2::Sf2ParseError on a bad file
+    std::printf(&quot;loaded &#x27;%s&#x27; with %zu presets\n&quot;, sf-&gt;name().c_str(), sf-&gt;list_presets().size());
+
+    midi::track::LoadOptions opts;
+    opts.resolver.set_bank_provider(sf);                         // SF2 presets now win over the built-in instruments
+    auto song = midi::track::load_midi(argv[2], opts);
+    render(song, &quot;midi_05_soundfont.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/midi_05_soundfont.cpp" download>Download midi_05_soundfont.cpp</a></p><p><strong>Try this:</strong> combine with <code>override_channel</code> to keep one part on a built-in instrument. More on the format: <a href="sf2.html">SoundFont reference</a>.</p><h2>Next</h2><p>Process the result in the <a href="guide-fx.html">FX guide</a>, or add a sung vocal line from the <a href="guide-vocal.html">Vocal guide</a>.</p>
+<div class="pager"><a href="guide-fx.html"><small>Previous</small>FX guide</a><a class="r" href="guide-sfx.html"><small>Next</small>SFX guide</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

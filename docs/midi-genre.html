@@ -7,7 +7,7 @@
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">MIDI layer (wauvio/midi)</div><h1>MIDI genre system</h1>
 
-<p>Headers <code>midi/genre/genre_midi.hpp</code> and <code>genre_midi_presets.hpp</code>, namespace <code>wauvio::midi::genre</code>. It wraps the <a href="ext-genre.html">music-layer genre presets</a> and applies them to a loaded <code>MidiMusic</code>.</p>
+<p>Headers <code>midi/genre/genre_midi.hpp</code> and <code>genre_midi_presets.hpp</code>, namespace <code>wauvio::midi::genre</code>. It wraps the <a href="ext-genre.html">music-layer genre presets</a> and applies them to a loaded <code>MidiMusic</code>.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-midi.html#midi_03_genre">Restyle with a genre</a></div>
 <h2>Types</h2>
 <ul>
 <li><code>MidiGenrePreset</code> — wraps a base <code>GenrePresetPtr</code> and adds <code>melodic_program_overrides</code> (GM program → factory) and an optional <code>percussion_kit</code> factory. <code>name()</code> returns the base name. <code>MidiGenrePresetPtr</code> is <code>shared_ptr&lt;const MidiGenrePreset&gt;</code>.</li>
