@@ -11,6 +11,8 @@
 #include "midi/track/midi_music.hpp"
 #include "midi/genre/genre_midi.hpp"
 #include "midi/genre/genre_midi_presets.hpp"
+#include "midi/genre/genre_midi_presets_extra.hpp"
+#include "midi/genre/genre_midi_registry.hpp"
 #include "midi/track/loader.hpp"
 #include "midi/track/render.hpp"
 #include "midi/track/midi_writer.hpp"
