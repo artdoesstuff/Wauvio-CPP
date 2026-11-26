@@ -1,0 +1,26 @@
+# Lo-Fi Hip-Hop / Chillhop Pack
+name Lo-Fi Late Night
+author Wauvio Compose
+key Eb major
+bpm 78
+meter 4/4
+
+progression "Rainy Window"
+  tags lofi, chill, jazz
+  chords | ii9:4 | V9:4 | Imaj9:4 | vi9:4 |
+end
+
+progression "Dusty Tape"
+  tags lofi, nostalgic, warm
+  chords | IVmaj7:4 | iv7:4 | iii7:4 | vi7:4 | ii9:4 | V7:4 | Imaj9:8 |
+end
+
+motif "Sleepy Rhodes"
+  tags sparse, chill, lyrical
+  notes c2:1.5@mp 4:0.5 3:1.0@p r:1.0 2:1.5@mp 0:1.5@p r:1.0
+end
+
+motif "Tape Pluck"
+  tags lofi, syncopated
+  notes r:0.5 2:0.75@mp 4:0.75 3:1.0 1:0.5 0:0.5@p
+end

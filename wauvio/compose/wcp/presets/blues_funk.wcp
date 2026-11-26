@@ -1,0 +1,27 @@
+# Blues & Funk Pack
+name Blues & Funk Grooves
+author Wauvio Compose
+key G blues
+bpm 104
+meter 4/4
+
+progression "Twelve Bar"
+  tags blues, classic
+  chords | I7:4 | IV7:4 | I7:4 | I7:4 | IV7:4 | IV7:4 | I7:4 | I7:4 | V7:4 | IV7:4 | I7:4 | V7:4 |
+end
+
+progression "Dorian Funk Vamp"
+  tags funk, groove, dorian
+  minor true
+  chords | i7:4 | IV7:4 | i7:4 | IV9:4 |
+end
+
+motif "Blues Lick"
+  tags blues, expressive
+  notes 0:0.5@mf 1:0.5 2:0.5 3:0.75@f 2:0.25 1:0.5 0:1.0@mf
+end
+
+motif "Funk Stab"
+  tags funk, syncopated, tight
+  notes c0:0.25@f r:0.25 c1:0.25@mf r:0.25 c2:0.5@ff 2:0.5 1:0.5 0:0.5@mf r:1.0
+end

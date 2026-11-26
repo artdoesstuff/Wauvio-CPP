@@ -1,0 +1,27 @@
+# Ambient & Film Score Pack
+name Wide Horizons
+author Wauvio Compose
+key Ab lydian
+bpm 72
+meter 4/4
+
+progression "Lydian Wonder"
+  tags ambient, cinematic, uplifting
+  chords | Imaj7:8 | II:8 | vi7:8 | Vsus4:4 V:4 |
+end
+
+progression "Distant Horizon"
+  tags cinematic, emotional, minor
+  minor true
+  chords | i:8 | bVIadd9:8 | iv9:8 | Vsus4:8 |
+end
+
+motif "Glass Call"
+  tags ambient, sparse, wide
+  notes 0:2.0@p 4:2.0@mp 3:1.5@p r:2.5
+end
+
+motif "Horn Swell"
+  tags cinematic, epic
+  notes 0:1.5@mp 2:1.5@mf 4:3.0@f 3:2.0@mp
+end

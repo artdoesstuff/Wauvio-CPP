@@ -1,0 +1,22 @@
+# Reggae & Ska Pack
+name Island Offbeat
+author Wauvio Compose
+key Bb major
+bpm 86
+meter 4/4
+
+progression "Roots One Drop"
+  tags reggae, chill, bright
+  chords | I:4 | V:4 | vi:4 | IV:4 |
+end
+
+progression "Minor Dub"
+  tags reggae, dub, minor
+  minor true
+  chords | i:4 | iv:4 | bVII:4 | i:4 |
+end
+
+motif "Dub Melody"
+  tags reggae, syncopated, laidback
+  notes r:0.5 2:0.75@mf 4:0.75 2:0.5 1:0.5@mp 0:1.0
+end

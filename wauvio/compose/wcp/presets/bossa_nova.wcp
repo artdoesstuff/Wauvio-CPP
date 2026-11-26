@@ -1,0 +1,26 @@
+# Bossa Nova Pack
+name Bossa Nova Standards
+author Wauvio Compose
+key F major
+bpm 130
+meter 4/4
+
+progression "Ipanema Drift"
+  tags bossa, jazz, smooth
+  chords | Imaj7:4 | Imaj7:4 | II7:4 | II7:4 | ii7:4 | bII7:4 | Imaj7:4 | V7:4 |
+end
+
+progression "Quiet Sunset"
+  tags bossa, warm
+  chords | Imaj7:4 | vi7:4 | ii7:4 | V7:4 | iv7:4 | bVII7:4 | Imaj7:4 | V7/ii:4 |
+end
+
+motif "Jobim Sigh"
+  tags lyrical, syncopated, smooth
+  notes r:0.5 4:1.0 3:0.5 2:1.5@mp 1:0.5 2:1.0 0:1.5@p r:1.5
+end
+
+motif "Nylon Sway"
+  tags bossa, gentle
+  notes c1:0.75 c2:0.75 4:0.5 3:1.0 2:0.5 0:0.5
+end
