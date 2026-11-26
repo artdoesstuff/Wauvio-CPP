@@ -1,0 +1,28 @@
+# Touhou / Anime Rock Pack
+name Danmaku Melodies
+author Wauvio Compose
+key Bb natural_minor
+bpm 172
+meter 4/4
+
+progression "Spellcard Chase"
+  tags touhou, anime, dramatic, minor
+  minor true
+  chords | i:4 | bVI:4 | bIII:4 | bVII:4 |
+end
+
+progression "Final Stage"
+  tags touhou, epic, minor
+  minor true
+  chords | bVI:4 | bVII:4 | v:4 | i:4 | iv7:4 | bVII7:4 | bIIImaj7:4 | V7:4 |
+end
+
+motif "Trumpet Lead"
+  tags soaring, energetic, fast
+  notes 0:0.5@f 2:0.5 4:0.5 5:0.5@ff 4:0.5 3:0.5 4:1.0@f 6:0.5@ff 5:0.5 4:0.5 2:0.5 3:1.0 2:0.5 0:0.5
+end
+
+motif "Piano Barrage"
+  tags fast, rhythmic
+  notes c0:0.25 c2:0.25 c1:0.25 c2:0.25 4:0.5 3:0.5 2:0.5 4:0.5 5:1.0@ff
+end

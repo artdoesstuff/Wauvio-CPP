@@ -1,0 +1,27 @@
+# Wauvio Compose Preset (.wcp)
+name Wauvio Compose (.wcp) Examples
+author artdoesstuff
+key A minor
+bpm 118
+meter 4/4
+
+progression "Verse"
+  tags minor, driving
+  minor true
+  chords | i:4 | bVI:4 | bIII:4 | bVII:4 |
+end
+
+progression "Chorus"
+  chords iv7:4 bVII:4 Imaj7:2 V7/vi:2 vi:4
+end
+
+motif "Hook"
+  tags hook, bright
+  notes 0:0.75 2:0.75 c2:0.5 4:1.0@f 3:0.5 2:0.5
+end
+
+motif "Answer"
+  steps 4 3 2 r 0
+  dur   0.5 0.5 1.0 0.5 1.5
+  dyn   mf mf mp mf p
+end

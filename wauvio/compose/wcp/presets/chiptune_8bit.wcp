@@ -1,0 +1,31 @@
+# 8-Bit / Chiptune Pack
+name Chiptune 8-Bit
+author Wauvio Compose
+key C major
+bpm 156
+meter 4/4
+
+progression "Overworld Run"
+  tags chiptune, bright, upbeat
+  chords | I:4 | V:4 | vi:4 | IV:4 |
+end
+
+progression "Boss Rush"
+  tags chiptune, driving, mixolydian
+  chords | I:2 bVII:2 | IV:4 | bVI:2 bVII:2 | I:4 |
+end
+
+progression "Stage Clear"
+  tags chiptune, jpop, uplifting
+  chords | IV:4 | V:4 | iii:4 | vi:4 |
+end
+
+motif "Chip Arpeggio"
+  tags bright, fast, arpeggio
+  notes c0:0.25 c1:0.25 c2:0.25 c3:0.25 c2:0.5 c1:0.5 c2:1.0@f r:1.0
+end
+
+motif "NES Bounce"
+  tags bouncy, retro, hook
+  notes 0:0.5 2:0.25 4:0.25 5:0.5 4:0.5 2:0.5 1:0.5 0:1.0
+end

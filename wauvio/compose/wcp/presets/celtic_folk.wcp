@@ -1,0 +1,17 @@
+# Celtic / Folk Pack
+name Highland Trail
+author Wauvio Compose
+key D dorian
+bpm 118
+meter 3/4
+
+progression "Dorian Reel"
+  tags celtic, folk, dorian
+  minor true
+  chords | i:3 | bVII:3 | i:3 | IV:3 | i:3 | bIII:3 | bVII:3 | i:3 |
+end
+
+motif "Whistle Air"
+  tags celtic, lyrical
+  notes 0:0.5@mp 1:0.5 2:1.0@mf 4:0.5 2:0.5 1:1.0@mp 0:1.5 r:0.5
+end
