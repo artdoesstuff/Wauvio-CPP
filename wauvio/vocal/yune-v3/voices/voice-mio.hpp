@@ -27,7 +27,8 @@ namespace wauvio {
                 m.rd_base = 1.02f; m.aspiration = 0.024f; m.tilt_hz_min = 2400.f; m.tilt_hz_max = 10000.f;
                 m.vib_depth_st = 0.30f; m.vib_rate_hz = 5.4f; m.vib_delay = 0.30f; m.vib_fade = 0.35f;
                 m.synthetic = 0.60f;
-                m.tune.out_scale = 0.67f;   // level-matched to Yune (measured unnormalised) m.tune.asp_gain = 3.10f; m.tune.fric_gain = 0.28f; m.tune.upper_gain = 4.400f;
+                m.tune.out_scale = 0.67f;   // level-matched to Yune (measured unnormalised)
+                m.tune.asp_gain = 3.10f; m.tune.fric_gain = 0.28f; m.tune.upper_gain = 4.400f;
                 m.tune.sing_gain = 2.200f; m.tune.air_gain = 0.12f; m.tune.pre_gain = 1.0f; m.tune.f23_gain = 30.0f;
 
                 // ---- default look ----
