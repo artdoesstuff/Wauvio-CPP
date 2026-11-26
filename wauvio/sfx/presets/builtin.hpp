@@ -11,6 +11,16 @@
 #include "experimental.hpp"
 #include "tonal.hpp"
 #include "reverses.hpp"
+#include "nature.hpp"
+#include "scifi.hpp"
+#include "game.hpp"
+#include "foley.hpp"
+#include "cinematic.hpp"
+#include "action.hpp"
+#include "machines.hpp"
+#include "magic.hpp"
+#include "cartoon.hpp"
+#include "ambience.hpp"
 
 namespace wauvio {
     namespace sfx {
@@ -27,6 +37,16 @@ namespace wauvio {
             presets::register_experimental(R);
             presets::register_tonal(R);
             presets::register_reverses(R);
+            presets::register_nature(R);
+            presets::register_scifi(R);
+            presets::register_game(R);
+            presets::register_foley(R);
+            presets::register_cinematic(R);
+            presets::register_action(R);
+            presets::register_machines(R);
+            presets::register_magic(R);
+            presets::register_cartoon(R);
+            presets::register_ambience(R);
         }
 
         inline const Registry& builtin_registry() {
