@@ -5,20 +5,24 @@
 
 namespace wauvio {
     namespace sfx {
-        enum class Category { Risers, Impacts, Glitch, Textures, Bass, EarCandy, Vocal, Rhythmic, Percussion, Experimental, Tonal, Reverses };
+        enum class Category { Risers, Impacts, Glitch, Textures, Bass, EarCandy, Vocal, Rhythmic, Percussion, Experimental, Tonal, Reverses,
+                              Nature, SciFi, Game, Foley, Cinematic, Action, Machines, Magic, Cartoon, Ambience };
 
         inline const std::vector<Category>& all_categories() {
             static const std::vector<Category> c = { Category::Risers, Category::Impacts, Category::Glitch, Category::Textures, Category::Bass, Category::EarCandy,
-                                                     Category::Vocal, Category::Rhythmic, Category::Percussion, Category::Experimental, Category::Tonal, Category::Reverses };
+                                                     Category::Vocal, Category::Rhythmic, Category::Percussion, Category::Experimental, Category::Tonal, Category::Reverses,
+                                                     Category::Nature, Category::SciFi, Category::Game, Category::Foley, Category::Cinematic, Category::Action, Category::Machines, Category::Magic, Category::Cartoon, Category::Ambience };
             return c;
         }
         inline const char* category_id(Category c) {
-            static const char* n[] = { "risers", "impacts", "glitch", "textures", "bass", "ear_candy", "vocal", "rhythmic", "percussion", "experimental", "tonal", "reverses" };
+            static const char* n[] = { "risers", "impacts", "glitch", "textures", "bass", "ear_candy", "vocal", "rhythmic", "percussion", "experimental", "tonal", "reverses",
+                                       "nature", "scifi", "game", "foley", "cinematic", "action", "machines", "magic", "cartoon", "ambience" };
             return n[static_cast<int>(c)];
         }
         inline const char* category_name(Category c) {
             static const char* n[] = { "Risers & Sweeps", "Impacts & Transitions", "Glitch & Digital", "Textures & Atmospheres", "Bass FX", "Ear Candy & Ornaments",
-                                       "Vocal Production FX", "Rhythmic FX", "Synthetic Percussion & Cymbals", "Experimental & Extreme", "Musical Motion & Tonal FX", "Reverses, Tails & Transitions" };
+                                       "Vocal Production FX", "Rhythmic FX", "Synthetic Percussion & Cymbals", "Experimental & Extreme", "Musical Motion & Tonal FX", "Reverses, Tails & Transitions",
+                                       "Nature & Weather", "Sci-Fi & Tech", "Game & UI Sounds", "Foley & Everyday Objects", "Cinematic & Horror", "Weapons & Action", "Machines & Vehicles", "Magic & Fantasy", "Cartoon & Comedy", "Ambience & Rooms" };
             return n[static_cast<int>(c)];
         }
         inline bool parse_category(std::string_view text, Category& out) {
