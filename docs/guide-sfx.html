@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Guides &amp; examples</div><h1>SFX guide</h1>
-<p>The SFX engine produces sound effects (risers, impacts, glitches, textures, bass FX, percussion, and more) from <strong>190 presets</strong>. You pick a preset, tweak parameters, and render. Include <code>wauvio/sfx.hpp</code>. The whole catalog is in the <a href="sfx-catalog.html">preset catalog</a>.</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="sfx_01_find_and_tweak">1. Find a preset and tweak it</h2><p>Search the catalog, read a preset’s parameters and ranges, set values, and render. Values outside a range throw an error that explains the problem. A fixed seed makes the audio repeatable.</p><pre><code>// Find a preset, see what it can do, change its parameters, render it.
+<p>The SFX engine produces sound effects (risers, impacts, glitches, textures, bass FX, percussion, and more) from <strong>369 presets</strong>. You pick a preset, tweak parameters, and render. Include <code>wauvio/sfx.hpp</code>. The whole catalog is in the <a href="sfx-catalog.html">preset catalog</a>.</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="sfx_01_find_and_tweak">1. Find a preset and tweak it</h2><p>Search the catalog, read a preset’s parameters and ranges, set values, and render. Values outside a range throw an error that explains the problem. A fixed seed makes the audio repeatable.</p><pre><code>// Find a preset, see what it can do, change its parameters, render it.
 #include &quot;wauvio/sfx.hpp&quot;
 #include &lt;cstdio&gt;
 namespace sfx = wauvio::sfx;
@@ -115,6 +115,6 @@ int main() {
 ./wauvio_sfx_tool info noise_riser
 ./wauvio_sfx_tool render noise_riser --duration 4 --set intensity=0.8 --out my_sfx
 ./wauvio_sfx_tool render-category impacts --out my_sfx</code></pre><p>Details: <a href="sfx-tool.html">tool reference</a>. More complete programs: <a href="sfx-examples.html">the eight bundled examples</a>.</p>
-<div class="pager"><a href="guide-midi.html"><small>Previous</small>MIDI &amp; SoundFont guide</a><a class="r" href="guide-vocal.html"><small>Next</small>Vocal guide</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+<div class="pager"><a href="guide-compose.html"><small>Previous</small>Compose guide</a><a class="r" href="guide-vocal.html"><small>Next</small>Vocal guide</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
 </div>
 <script src="nav.js"></script></body></html>

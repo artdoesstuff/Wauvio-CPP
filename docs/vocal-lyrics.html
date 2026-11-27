@@ -1,18 +1,31 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lyric input (kana, romaji, phonemes) · Wauvio Docs</title><meta name="description" content="Kana, romaji and phoneme lyric parsing.">
+<title>Lyric input (kana, romaji, phonemes) · Wauvio Docs</title><meta name="description" content="Kana, romaji, phoneme and kanji lyric parsing.">
 <script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <link rel="stylesheet" href="style.css"></head><body>
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Vocal engine (wauvio/vocal)</div><h1>Lyric input (kana, romaji, phonemes)</h1>
 
-<p>Header <code>yune-v3/japanese.hpp</code>. Lyrics are parsed into <code>Mora</code>s by <code>parse_lyric()</code>: UTF-8 kana first; plain ASCII is read as romaji; braces switch to phoneme mode.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-vocal.html#vocal_01_hello">Hello, singer</a> &middot; <a href="guide-vocal.html#vocal_08_score_file">Text score for the sing_score tool</a></div>
+<p>Header <code>yune-v3/japanese.hpp</code>. Lyrics are parsed into <code>Mora</code>s by <code>parse_lyric()</code>: UTF-8 kana first; plain ASCII is read as romaji; braces switch to phoneme mode.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-vocal.html#vocal_01_hello">Hello, singer</a> &middot; <a href="guide-vocal.html#vocal_09_kanji">Kanji in lyrics</a> &middot; <a href="guide-vocal.html#vocal_08_score_file">Text score for the sing_score tool</a></div>
 <h2>Accepted notations</h2><table><thead><tr><th>Notation</th><th>Example</th><th>Notes</th></tr></thead><tbody><tr><td>Hiragana / katakana</td><td><code>さくら</code>, <code>サクラ</code></td><td>Katakana is folded to hiragana; <code>ー</code> continues the previous vowel; small ゃゅょ and small vowels form yo-on and foreign sounds (ふぁ, てぃ, つぁ …); <code>っ</code> geminate; <code>ん</code> moraic nasal</td></tr><tr><td>Romaji</td><td><code>ka ki kya shi chi tsu fu n xtu -</code></td><td>Hepburn/Kunrei style; doubled consonants give a geminate; write <code>n'</code> or <code>nn</code> for ん before a vowel/y</td></tr><tr><td>Phonemes (v2+)</td><td><code>{k a n a}</code>, <code>{N}</code>, <code>{Q}</code>, <code>{ng a}</code>, <code>{v a}</code></td><td>Space-separated romaji/IPA-like tokens in braces. Consonant + vowel tokens join. Capital <code>N</code> = ん, <code>Q</code> = っ. IPA symbols accepted (ɕ ʃ tɕ dʑ ʑ ɸ ɾ ɯ ŋ ɲ ç ɴ ː)</td></tr><tr><td>Per-phoneme overrides</td><td><code>{k*1.6 a@2 n@0.5}</code></td><td><code>*x</code> consonant strength, <code>@w</code> relative share of the note’s time</td></tr><tr><td>Time weights (v2+)</td><td><code>さ[0.7]ん[0.3]</code></td><td>Relative time per segment</td></tr><tr><td>Events</td><td><code>&lt;laugh&gt;</code></td><td>Lyric tags expanded into notes; see <a href="vocal-v3-expression.html">Events</a></td></tr></tbody></table>
+<h2 id="kanji">Kanji</h2>
+<p>The kana parser only knows sounds, so kanji are first converted to hiragana (<code>kanji.hpp</code>), and the result goes through the normal parser. Three ways to say how a kanji is read, in this order:</p>
+<ol>
+<li><strong>Ruby, written in the lyric</strong> — <code>漢字《かんじ》</code>: the reading belongs to the whole kanji run before <code>《</code>. <code>｜漢字《かんじ》</code> (<code>｜</code> marks where the base starts) also works for kana bases. Ruby <strong>always wins</strong>: use it for anything the dictionary reads wrongly (<code>行って</code>, <code>今日</code>, <code>人気</code> …).</li>
+<li><strong>The dictionary</strong> (longest match). Entries may carry okurigana, so <code>食べる</code>, <code>出す</code> or <code>行って</code> can be listed as words, and a plain stem entry (<code>食 → た</code>) lets <code>食べ</code> / <code>食べた</code> / <code>食べない</code> work with the kana left as written. The built-in list is small and favours readings common in song lyrics.</li>
+<li><strong>Nothing</strong> — a kanji without a reading is skipped and reported by <code>Singer::diagnostics()</code>. Compounds that could only be read piece by piece (<code>三人</code> → さん + ひと) are reported too, since that is usually the wrong reading.</li>
+</ol>
+<ul>
+<li><code>Singer::kanji_dictionary()</code> returns the singer’s own <code>KanjiDictionary</code> (a copy of the built-in list): <code>add(kanji, reading)</code> (reading in hiragana or katakana; returns false if either side is empty), <code>load_text</code>, <code>load_file</code>, <code>find</code>, <code>size</code>. <code>Singer::load_kanji_dictionary(path, &amp;err)</code> loads a file with one <code>kanji reading</code> per line (space or tab separated; blank lines and <code>#</code> comments ignored). Valid lines load even if others fail; the error names the first bad line.</li>
+<li><code>KanjiDictionary::builtin()</code> is the shared built-in list; <code>kanji_to_kana(text, dict, &amp;notes)</code> converts a string directly.</li>
+<li><strong>Not covered:</strong> choosing a reading from context (this is a dictionary, not a language analyser) and Shift-JIS kanji in MIDI lyric events (use UTF-8 lyrics for kanji). Kanji settings are not stored in <code>.wvc</code> voicebanks.</li>
+</ul>
 <h2>ParseOptions</h2>
 <ul>
 <li><code>merge_long_vowels</code> (true) — “おう/えい/ああ” inside one lyric become a single long vowel.</li>
 <li><code>cute</code> (false, v2+) — baby-talk softening: s/z/t/d/n/r palatalise.</li>
+<li><code>kanji</code> (true, v3), <code>kanji_dictionary</code> (null = the built-in list), <code>kanji_notes</code> (optional sink for “no reading” messages) — see <a href="#kanji">Kanji</a>. Set <code>kanji = false</code> to ignore kanji like any other unknown symbol.</li>
 <li><code>particles</code> (false, v3) — a trailing は/へ is read as わ/え. Independent of the flag, a trailing <code>^</code> marks a single は/へ as a particle anywhere (<code>は^</code>, <code>へ^</code>).</li>
 </ul>
 <h2>Model types</h2>
@@ -94,6 +107,11 @@ inline SurfaceMora surface(const Mora&amp; m)
     // ("わたしは" -&gt; wa-ta-shi-wa). Independent of this flag, a trailing '^' marks a single は / へ as a
     // particle anywhere ("は^", "へ^"), and "は" stays /ha/ otherwise.
     bool particles = false;
+    // V3: kanji in a lyric are converted to hiragana first (see kanji.hpp): ruby 漢字《かんじ》, then the
+    // dictionary. Not stored in .wvc banks. Off = kanji are ignored like any other unknown symbol.
+    bool kanji = true;
+    const KanjiDictionary* kanji_dictionary = nullptr;     // null = the built-in list
+    std::vector&lt;std::string&gt;* kanji_notes = nullptr;       // optional sink for "no reading" / "read piece by piece"
 // Kana (hiragana or katakana) -&gt; morae. Whitespace, '|', ',' and '/' are ignored.
 inline std::vector&lt;Mora&gt; parse_kana(const std::string&amp; text, const ParseOptions&amp; opt = {})
 // Hepburn/Kunrei-style romaji -&gt; morae.  "ka ki kya shi chi tsu fu n xtu(=っ) -"
@@ -115,6 +133,63 @@ inline std::vector&lt;Mora&gt; parse_lyric(const std::string&amp; text, const Pa
 // Minimal Shift-JIS kana decoder for MIDI karaoke files (kana, ー, ASCII only).
 // Returns UTF-8, or empty if the bytes are not decodable as UTF-8/ASCII/SJIS-kana.
 inline std::string decode_lyric_bytes(const std::vector&lt;uint8_t&gt;&amp; b)</code></pre>
+</section>
+<section class="file" id="wauvio-vocal-yune-v3-kanji-hpp"><h3><code>wauvio/vocal/yune-v3/kanji.hpp</code></h3>
+<h4 id="wauvio-vocal-yune-v3-kanji-hpp-free-functions-constants-and-aliases">Free functions, constants and aliases</h4>
+<pre><code>// Kanji in lyrics. The kana parser only knows sounds, so kanji are first turned into hiragana here and the result goes
+// through the normal parser. Three ways to say how a kanji is read, in this order:
+//
+//   1. Ruby, written in the lyric:   漢字《かんじ》     (the reading belongs to the whole kanji run before 《)
+//                                    ｜漢字《かんじ》    (｜ marks where the base starts; also works for kana bases)
+//      Always wins. Use it for anything the dictionary reads wrongly (行って, 今日, 人気 ...).
+//   2. The dictionary (longest match). Entries may carry okurigana, so 食べる / 出す / 行って can be listed as words,
+//      and a plain stem entry (食 -&gt; た) lets 食べ / 食べた / 食べない work with the kana left as written.
+//      The built-in list is small and favours the readings that are common in song lyrics; add your own with
+//      Singer::kanji_dictionary().add("漢字", "かんじ") or load_kanji_dictionary("my.txt") (one "kanji reading" per line).
+//   3. Nothing: a kanji without a reading is skipped and reported by Singer::diagnostics(). Compounds that were only
+//      readable piece by piece (三人 -&gt; さん + ひと) are reported too, because that is usually the wrong reading.
+//
+// Not covered: choosing a reading from context (this is a dictionary, not a morphological analyser) and Shift-JIS kanji in
+// MIDI lyric events (use UTF-8 lyrics for kanji).
+                inline bool next_cp(const std::string&amp; s, size_t&amp; i, uint32_t&amp; cp)
+                inline std::string put_cp(uint32_t cp)
+                inline std::vector&lt;uint32_t&gt; decode(const std::string&amp; s) { std::vector&lt;uint32_t&gt; v; size_t i = 0; uint32_t cp; while (next_cp(s, i, cp)) v.push_back(cp); return v; }
+                inline std::string encode(const std::vector&lt;uint32_t&gt;&amp; v, size_t a, size_t b) { std::string o; for (size_t i = a; i &lt; b; ++i) o += put_cp(v[i]); return o; }
+                // CJK ideographs plus the iteration mark 々
+                inline bool is_kanji(uint32_t cp)
+                inline uint32_t to_hira(uint32_t cp) { return (cp &gt;= 0x30A1 &amp;&amp; cp &lt;= 0x30F6) ? cp - 0x60 : cp; }
+                inline std::string hira_text(const std::vector&lt;uint32_t&gt;&amp; v, size_t a, size_t b)
+                constexpr uint32_t RUBY_OPEN = 0x300A, RUBY_CLOSE = 0x300B, RUBY_BASE = 0xFF5C;   // 《 》 ｜
+            inline bool has_kanji(const std::string&amp; text)
+            // True if the text has kanji or ruby marks (《 ｜), i.e. kanji_to_kana has something to do.
+            inline bool needs_kanji_pass(const std::string&amp; text)</code></pre>
+<h4 id="wauvio-vocal-yune-v3-kanji-hpp-wauvio-vocal-v3-kanjidictionary"><span class="ns">wauvio::vocal::v3::</span>class KanjiDictionary</h4>
+<pre><code>class KanjiDictionary
+public:
+    KanjiDictionary() = default;
+    // The built-in list (shared, built on first use) and a private copy of it to add to.
+    static const KanjiDictionary&amp; builtin();
+    static KanjiDictionary with_builtin() { return builtin(); }
+    // Adds or replaces one entry. The reading may be hiragana or katakana. Returns false if either side is empty.
+    bool add(const std::string&amp; key, const std::string&amp; reading)
+    // One entry per line: `key reading` (space or tab). Blank lines and lines starting with # are ignored.
+    // Valid lines are loaded even if others fail; returns false (with *err naming the first bad line) if any failed.
+    bool load_text(const std::string&amp; text, std::string* err = nullptr)
+    bool load_file(const std::string&amp; path, std::string* err = nullptr)
+    size_t size() const { return map_.size(); }
+    const std::string* find(const std::string&amp; key) const { auto it = map_.find(key); return it == map_.end() ? nullptr : &amp;it-&gt;second; }
+    // Longest entry that starts at cps[i]. On success: *len = codepoints used, *reading = its hiragana.
+    bool longest(const std::vector&lt;uint32_t&gt;&amp; cps, size_t i, size_t* len, const std::string** reading) const
+// Kanji -&gt; hiragana. Text without kanji is returned unchanged. `notes` (optional) receives short messages for
+// kanji without a reading and for compounds read piece by piece.
+inline std::string kanji_to_kana(const std::string&amp; text, const KanjiDictionary&amp; dict, std::vector&lt;std::string&gt;* notes = nullptr)
+    // Built-in readings: the common lyric vocabulary, plus kun stems that take okurigana (思 -&gt; おも keeps 思い / 思う).
+    // A stem used by itself next to another kanji is read piece by piece and reported (see above).
+    inline const char* seed_people() { return R"KJ(
+    inline const char* seed_nature() { return R"KJ(
+    inline const char* seed_abstract() { return R"KJ(
+    inline const char* seed_stems() { return R"KJ(
+inline const KanjiDictionary&amp; KanjiDictionary::builtin()</code></pre>
 </section>
 <div class="pager"><a href="vocal-v3-style.html"><small>Previous</small>v3 — Style, curves and lanes</a><a class="r" href="vocal-v3-expression.html"><small>Next</small>v3 — Expression, ornaments and events</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
 </div>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>What’s new · Wauvio Docs</title><meta name="description" content="Changes in the latest library update.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Overview</div><h1>What’s new</h1>
+
+<p>A summary of what changed in the library since the previous version of these docs, found by comparing the two source trees. The reference pages, guides and catalogs have all been regenerated from the new source.</p>
+<h2>New</h2><table><thead><tr><th>Area</th><th>Change</th><th>Docs</th></tr></thead><tbody><tr><td><strong>Compose engine</strong></td><td>A new module, <code>wauvio/compose.hpp</code>: a procedural composer (keys, chords, progressions, motifs, melody and countermelody generation, multi-section songs, moods and genre styling), the <code>.wcp</code> preset text format with 10 bundled packs, MIDI export and mastered render add-ons</td><td><a href="compose.html">Compose engine</a>, <a href="guide-compose.html">guide</a></td></tr><tr><td><strong>Genre system</strong></td><td>From 18 to <strong>96 genres</strong> in families, with a registry (<code>find</code>, <code>all</code>, <code>families</code>, <code>in_family</code>, <code>for_bpm</code>, <code>add</code>); blending (<code>blend</code>, <code>scaled</code>, <code>neutral</code>); new timing/feel fields (sixteenth swing, per-step groove, velocity compression, gate); distortion aimed at one instrument family; the music layer’s <code>apply_to_melody</code> can now apply timing when given a <code>bpm</code>; a MIDI registry with <code>find</code> / <code>with_strength</code></td><td><a href="ext-genre.html">Genre system</a>, <a href="midi-genre.html">MIDI genre</a></td></tr><tr><td><strong>Instruments</strong></td><td>Catalog grew from 319 to <strong>442 classes</strong> (new <code>*_extra.hpp</code> files for keyboards, strings, guitars, woodwinds, brass, world, synthesized and percussion, plus new drum kits). Tuned percussion now uses modal synthesis (<code>TimbreRecipe::modes</code>)</td><td><a href="ext-instruments.html">Catalog</a>, <a href="ext-modeling.html">Modeled instruments</a></td></tr><tr><td><strong>SFX</strong></td><td>From 190 to <strong>369 presets</strong> in <strong>22 categories</strong>: ten new categories (Nature &amp; Weather, Sci-Fi &amp; Tech, Game &amp; UI, Foley, Cinematic &amp; Horror, Weapons &amp; Action, Machines &amp; Vehicles, Magic &amp; Fantasy, Cartoon, Ambience)</td><td><a href="sfx-catalog.html">Catalog</a></td></tr><tr><td><strong>Vocal: kanji</strong></td><td>Kanji in lyrics (all three generations): ruby <code>漢字《かんじ》</code>, a built-in dictionary of common song vocabulary, your own entries or dictionary files (<code>kanji_dictionary()</code>, <code>load_kanji_dictionary</code>), and diagnostics for unreadable kanji</td><td><a href="vocal-lyrics.html#kanji">Lyric input</a></td></tr><tr><td><strong>Vocal: voice tooling</strong></td><td><code>voice_tool gen</code> pairs voicebank files with voice headers and regenerates the voice registry; <code>selfcheck</code> covers kanji</td><td><a href="vocal-v3-voices.html#adding-a-voice">Adding a voice</a></td></tr><tr><td><strong>Tools</strong></td><td><code>render_instruments</code>, <code>render_genres</code>, <code>gen_genres.py</code>, <code>gen_catalog.py</code></td><td><a href="tools.html">Tools</a></td></tr></tbody></table>
+<h2>Changed behaviour</h2>
+<ul>
+<li><strong><code>wauvio::vocal::current</code> now aliases v3</strong> (it used to alias v2).</li>
+<li><strong><code>env::DAHDSR::apply</code>:</strong> the default note-off is never earlier than half the note, and a note-off during the attack or decay releases from the level actually reached. See <a href="core-env.html">env</a>.</li>
+<li><strong>Genre timing in the music layer:</strong> <code>apply_to_melody</code> takes an optional <code>bpm</code> and then applies swing, groove and humanise itself (the MIDI layer already did).</li>
+<li><strong>Tuned percussion sounds differ</strong> (modal rather than FM), so renders using xylophone, vibraphone and similar instruments will sound different.</li>
+<li>The voice registry (<code>voices_registry.hpp</code>) is now generated; <code>voices.hpp</code> only includes it.</li>
+</ul>
+<h2>Notes</h2>
+<ul>
+<li>The additions are additive; the behaviour changes are listed above. All guide examples from the previous docs were re-run against the new source and still compile and produce audio.</li>
+<li>The new archive does not contain a <code>LICENSE</code> file; the earlier one did (GPL-3.0). Add it back to the repository.</li>
+</ul>
+
+<div class="pager"><a href="tools.html"><small>Previous</small>Tools</a><a class="r" href="guide-concepts.html"><small>Next</small>Concepts for beginners</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

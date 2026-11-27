@@ -160,7 +160,30 @@ event laugh 72 0.8 0.6    # kind midi seconds intensity
 
 # v3 extras: a harmony a third above, panned left, and the &quot;pop&quot; vocal chain
 harmony 4 -0.4 0.6
-chain pop</code></pre><p class="muted"><a href="examples/vocal_08_score_file.txt" download>Download vocal_08_score_file.txt</a></p><p><strong>Try this:</strong> add <code>double 2</code> for double-tracking.</p><h2>Earlier generations</h2><p>v1 and v2 are kept for compatibility: <a href="vocal-v1.html">v1</a>, <a href="vocal-v2.html">v2 — differences from v1</a>. New projects should use v3.</p>
+chain pop</code></pre><p class="muted"><a href="examples/vocal_08_score_file.txt" download>Download vocal_08_score_file.txt</a></p><p><strong>Try this:</strong> add <code>double 2</code> for double-tracking.</p><h2 id="vocal_09_kanji">9. Kanji in lyrics</h2><p>Write kanji directly. Wauvio converts them to kana before singing: ruby (<code>漢字《かんじ》</code>) always wins, then the dictionary (a built-in list of common song vocabulary plus your own entries), otherwise the kanji is skipped and <code>diagnostics()</code> says so. It is a dictionary, not a language model: it cannot pick a reading from context, so use ruby for words with several readings. See <a href="vocal-lyrics.html#kanji">Lyric input</a>.</p><pre><code>// Kanji in lyrics. They are converted to kana first, in this order of priority:
+//   1. ruby written in the lyric:  漢字《かんじ》   (always wins)
+//   2. the dictionary (a built-in list of common song vocabulary, plus your own entries)
+//   3. otherwise the kanji is skipped and reported by diagnostics()
+#include &quot;wauvio/vocal/v3.hpp&quot;
+#include &lt;cstdio&gt;
+using namespace wauvio::vocal::v3;
+
+int main() {
+    Singer s;
+    s.set_tempo(90);
+
+    s.kanji_dictionary().add(&quot;星空&quot;, &quot;ほしぞら&quot;);      // teach it a word it does not know (reading in hiragana)
+    // s.load_kanji_dictionary(&quot;my_words.txt&quot;);       // or a file with one &quot;kanji reading&quot; per line
+
+    s.note(67, 480, &quot;夢&quot;);                // from the built-in dictionary: ゆめ
+    s.note(69, 480, &quot;空&quot;);                // そら
+    s.note(71, 960, &quot;星空&quot;);              // from the entry we just added
+    s.note(72, 480, &quot;今日《きょう》&quot;);     // ruby: you choose the reading, overriding the dictionary
+    s.note(74, 960, &quot;鬱&quot;);                // unknown: skipped, and reported below
+
+    for (const std::string&amp; problem : s.diagnostics()) std::printf(&quot;diagnostic: %s\n&quot;, problem.c_str());
+    s.save(&quot;vocal_09_kanji.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/vocal_09_kanji.cpp" download>Download vocal_09_kanji.cpp</a></p><p><strong>Try this:</strong> add your own words with <code>kanji_dictionary().add()</code>.</p><h2>Earlier generations</h2><p>v1 and v2 are kept for compatibility: <a href="vocal-v1.html">v1</a>, <a href="vocal-v2.html">v2 — differences from v1</a>. New projects should use v3.</p>
 <div class="pager"><a href="guide-sfx.html"><small>Previous</small>SFX guide</a><a class="r" href="core.html"><small>Next</small>Core overview</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
 </div>
 <script src="nav.js"></script></body></html>

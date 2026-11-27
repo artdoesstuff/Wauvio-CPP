@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Compose guide · Wauvio Docs</title><meta name="description" content="Task-based examples for generating songs: quick drafts, the Composer, sections, .wcp files and building blocks.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Guides &amp; examples</div><h1>Compose guide</h1>
+<p>The compose engine writes music for you. You choose a key, tempo, mood and (optionally) a genre, progression and motif; it generates chords, a melody, bass and drums, plays them with instruments from the music layer, and gives you a <code>ComposedSong</code> you can save as WAV or MIDI. The same seed always gives the same song. Include <code>wauvio/compose.hpp</code> (and <code>compose/midi.hpp</code> or <code>compose/fx.hpp</code> for MIDI export or mastering). Reference: <a href="compose.html">Compose engine</a>.</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="compose_01_quick_draft">1. A quick draft</h2><p>One call produces a short multi-part draft. <code>summary()</code> prints what was generated, which is useful for learning how the pieces fit.</p><pre><code>// The fastest path to music: pick a key, tempo and mood, and Wauvio composes a short draft with
+// melody, chords, bass and drums, using a palette of instruments chosen for the mood.
+#include &quot;wauvio/compose.hpp&quot;
+#include &lt;iostream&gt;
+using namespace wauvio::compose;
+
+int main() {
+    //                           root            scale                     BPM   mood            bars  seed
+    ComposedSong draft = compose_draft(PitchClass::D, ScaleType::NaturalMinor, 124.0, Mood::Energetic, 8, 7);
+
+    draft.save(&quot;compose_01_quick_draft.wav&quot;);        // render + write WAV
+    std::cout &lt;&lt; draft.summary() &lt;&lt; &quot;\n&quot;;           // what was generated (sections, chords, ...)
+}</code></pre><p class="muted"><a href="examples/compose_01_quick_draft.cpp" download>Download compose_01_quick_draft.cpp</a></p><p><strong>Try this:</strong> change the <code>Mood</code> (Bright, Melancholic, Epic, Chill, Energetic, Jazzy, Ambient, Retro) and the seed.</p><h2 id="compose_02_composer">2. The Composer</h2><p>Chain settings, then <code>compose()</code>. Choosing a mood also chooses instruments and drums; a genre restyles them. <code>save_midi</code> exports the notes and <code>save_mastered</code> renders through the <a href="fx-mastering.html">mastering</a> chain.</p><pre><code>// The Composer: describe the song you want with chained settings, then compose().
+// The same seed always produces the same song; change it for a different one.
+#include &quot;wauvio/compose/midi.hpp&quot;       // compose::save_midi
+#include &quot;wauvio/compose/fx.hpp&quot;         // compose::save_mastered
+#include &lt;iostream&gt;
+using namespace wauvio::compose;
+
+int main() {
+    ComposedSong song = Composer()
+        .key(PitchClass::F, ScaleType::Major)
+        .tempo(112.0)
+        .meter(4, 4)
+        .mood(Mood::Jazzy)                    // also picks the default instruments and drum pattern
+        .genre(&quot;jazz&quot;, 0.75)                  // genre styling (see the Genre system); 0 = none, 1 = full
+        .progression(&quot;Jazz Turnaround&quot;)       // a built-in progression (see the Compose reference for the list)
+        .motif(&quot;Syncopated Hook&quot;)             // a built-in motif the melody is built from
+        .accompaniment(AccompanimentPattern::Alberti)
+        .bass_pattern(BassPattern::Walking)
+        .seed(101)
+        .compose();
+
+    song.save(&quot;compose_02_composer.wav&quot;);
+    save_midi(song, &quot;compose_02_composer.mid&quot;);                                       // export the notes
+    save_mastered(song, &quot;compose_02_composer_mastered.wav&quot;,
+                  wauvio::fx::master_for_genre(&quot;jazz&quot;));                              // loudness-targeted master
+    std::cout &lt;&lt; song.summary() &lt;&lt; &quot;\n&quot;;
+}</code></pre><p class="muted"><a href="examples/compose_02_composer.cpp" download>Download compose_02_composer.cpp</a></p><p><strong>Try this:</strong> swap <code>"jazz"</code> for <code>"drum and bass"</code> and raise the tempo.</p><h2 id="compose_03_sections">3. Song structure</h2><p>Provide your own sections, each with a role, length in bars, energy, and switches for melody, chords, bass, drums and countermelody.</p><pre><code>// Control the song structure yourself: an intro, verse, chorus and outro, each with its own
+// length, energy and which parts play.
+#include &quot;wauvio/compose.hpp&quot;
+using namespace wauvio::compose;
+
+static SectionSpec section(SectionRole role, const char* name, int bars, double energy,
+                           const char* progression, const char* motif) {
+    SectionSpec s;
+    s.role = role; s.name = name; s.bars = bars; s.energy = energy;       // energy 0..1: how busy/loud
+    s.progression = *find_progression(progression);                     // built-in names; returns nullptr if unknown
+    s.motif       = *find_motif(motif);
+    return s;
+}
+
+int main() {
+    Composer c;
+    c.key(PitchClass::A, ScaleType::NaturalMinor).tempo(104).mood(Mood::Melancholic).seed(5);
+
+    SectionSpec intro = section(SectionRole::Intro, &quot;Intro&quot;, 4, 0.3, &quot;Jazz Turnaround&quot;, &quot;Sigh Step&quot;);
+    intro.enable_drums = false; intro.enable_bass = false;               // just chords and melody
+    c.add_section(intro);
+    c.add_section(section(SectionRole::Verse,  &quot;Verse&quot;,  8, 0.55, &quot;Jazz Turnaround&quot;, &quot;Sigh Step&quot;));
+    c.add_section(section(SectionRole::Chorus, &quot;Chorus&quot;, 8, 0.9,  &quot;Jazz Turnaround&quot;, &quot;Rising Triad&quot;));
+    SectionSpec outro = section(SectionRole::Outro, &quot;Outro&quot;, 4, 0.25, &quot;Jazz Turnaround&quot;, &quot;Sigh Step&quot;);
+    outro.enable_drums = false;
+    c.add_section(outro);
+
+    c.compose().save(&quot;compose_03_sections.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/compose_03_sections.cpp" download>Download compose_03_sections.cpp</a></p><p><strong>Try this:</strong> add a Bridge with <code>enable_counter = true</code>.</p><h2 id="compose_04_wcp">4. Your own chords and motifs (.wcp)</h2><p>A <code>.wcp</code> file is a small text format for progressions (Roman numerals) and motifs (scale steps), so you can reuse your musical ideas. Ten example packs ship in <code>wauvio/compose/wcp/presets/</code>. Format: <a href="compose-wcp.html">WCP format</a>.</p><pre><code>// Bring your own harmony and motifs with a .wcp (Wauvio Compose Preset) text file.
+#include &quot;wauvio/compose.hpp&quot;
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+using namespace wauvio::compose;
+
+int main() {
+    // A .wcp file is plain text. Write one (or edit it by hand). &#x27;#&#x27; starts a comment.
+    std::ofstream(&quot;my_pack.wcp&quot;) &lt;&lt; R&quot;(# My pack
+name My Pack
+author me
+key E minor
+bpm 96
+meter 4/4
+
+progression &quot;Verse&quot;
+  tags minor, moody
+  chords | i:4 | VI:4 | III:4 | VII:4 |     # roman numerals; :N is the length in beats
+end
+
+motif &quot;Hook&quot;
+  tags hook
+  notes 0:0.75 2:0.75 c2:0.5 4:1.0@f r:0.5 3:0.5     # scale step:beats[@dynamic]; cN = Nth chord tone; r = rest
+end
+)&quot;;
+
+    WcpBank bank; std::string err;
+    if (!load_wcp(&quot;my_pack.wcp&quot;, bank, &amp;err)) { std::cout &lt;&lt; &quot;bad file: &quot; &lt;&lt; err &lt;&lt; &quot;\n&quot;; return 1; }
+    std::cout &lt;&lt; &quot;loaded &quot; &lt;&lt; bank.progressions.size() &lt;&lt; &quot; progression(s), &quot; &lt;&lt; bank.motifs.size() &lt;&lt; &quot; motif(s)\n&quot;;
+
+    ComposedSong song = Composer()
+        .key(bank.key.root, bank.key.scale).tempo(bank.bpm).mood(Mood::Melancholic)
+        .use_wcp(bank, &quot;Verse&quot;, &quot;Hook&quot;)          // use the pack&#x27;s progression and motif
+        .seed(3)
+        .compose();
+    song.save(&quot;compose_04_wcp.wav&quot;);
+
+    // Shortcut: one call from a file.
+    // compose_from_wcp(&quot;my_pack.wcp&quot;, &quot;Verse&quot;, &quot;Hook&quot;, Mood::Melancholic, 3).save(&quot;shortcut.wav&quot;);
+}</code></pre><p class="muted"><a href="examples/compose_04_wcp.cpp" download>Download compose_04_wcp.cpp</a></p><p><strong>Try this:</strong> introduce a mistake and read the error message from <code>load_wcp</code>.</p><h2 id="compose_05_building_blocks">5. The building blocks by hand</h2><p>Everything the Composer does is available piece by piece: generate or write a progression, make a motif and develop it (transpose, invert…), turn them into a melody and countermelody, and play them with any instruments.</p><pre><code>// The pieces under the Composer, used by hand: generate a progression, a motif and a melody,
+// then play them with instruments of your choice.
+#include &quot;wauvio/compose.hpp&quot;
+#include &lt;iostream&gt;
+using namespace wauvio;
+using namespace wauvio::compose;
+
+int main() {
+    Key key(PitchClass::A, ScaleType::NaturalMinor);
+
+    // 1. Harmony. Chords are Roman numerals resolved against a key.
+    ProgressionOptions po; po.bars = 4; po.seed = 3; po.cadence = CadenceType::Half;
+    ChordProgression prog = generate_progression(key, po);
+    for (const ChordSymbol&amp; c : prog.resolve(key)) std::cout &lt;&lt; c.name() &lt;&lt; &quot; &quot;;
+    std::cout &lt;&lt; &quot;\n&quot;;
+
+    // 2. A motif: a short idea described in scale steps (not fixed pitches), so it fits any key.
+    MotifOptions mo; mo.contour = Contour::Hook; mo.length_beats = 4; mo.seed = 5;
+    Motif hook = generate_motif(mo);
+    Motif answer = invert(transpose(hook, 2));          // classic development tricks: transpose, invert, retrograde, ...
+
+    // 3. A melody that follows the chords and develops the motif; plus a countermelody against it.
+    MelodyOptions mel; mel.bpm = 100; mel.seed = 11; mel.form = PhraseForm::ABAC;
+    music::Melody lead    = generate_melody(key, prog, hook, mel);
+    music::Melody counter = generate_countermelody(key, prog, lead, 100.0);
+
+    // 4. Play them like any other melody from the music layer.
+    music::Arrangement a;
+    instruments::SoloViolin violin; instruments::Flute flute; violin.reverb(); 
+    a.add(violin, lead);
+    a.add(flute, counter, 0.0, 0.6);
+    a.limiter();
+    render(a, &quot;compose_05_building_blocks.wav&quot;);
+    (void)answer;
+}</code></pre><p class="muted"><a href="examples/compose_05_building_blocks.cpp" download>Download compose_05_building_blocks.cpp</a></p><p><strong>Try this:</strong> use <code>retrograde(hook)</code> or <code>scale_rhythm(hook, 0.5)</code> to develop the motif further.</p><h2>Next</h2><p>Polish the result with the <a href="guide-fx.html">FX guide</a>, or restyle it with <a href="ext-genre.html">genres</a>.</p>
+<div class="pager"><a href="guide-midi.html"><small>Previous</small>MIDI &amp; SoundFont guide</a><a class="r" href="guide-sfx.html"><small>Next</small>SFX guide</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

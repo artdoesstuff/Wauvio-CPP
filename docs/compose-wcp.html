@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The .wcp format · Wauvio Docs</title><meta name="description" content="The .wcp text format.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Compose engine (wauvio/compose)</div><h1>The .wcp format</h1>
+
+<p>A <strong>Wauvio Compose Preset</strong> (<code>.wcp</code>) is a plain-text file of chord progressions and motifs. Use it to keep reusable harmonic and melodic ideas outside your code. Load with <code>load_wcp(path, bank, &amp;err)</code> (or <code>wcp_from_text</code>), then pass the <code>WcpBank</code> to <code>Composer::use_wcp(bank, progression_name, motif_name)</code>, or do it in one call with <code>compose_from_wcp(path, prog, motif, mood, seed)</code>. <code>save_wcp</code> / <code>wcp_to_text</code> write one back. Errors come back as <code>wcp line N: message</code> and loading returns <code>false</code>.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-compose.html#compose_04_wcp">Your own chords and motifs (.wcp)</a></div>
+<h2>Syntax</h2>
+<p>One directive per line. <code>#</code> starts a comment (to end of line). Blank lines and a UTF-8 BOM are ignored.</p>
+<h3>Header (top level)</h3><table><thead><tr><th>Line</th><th>Meaning</th></tr></thead><tbody><tr><td><code>name TEXT</code>, <code>author TEXT</code></td><td>Metadata (quotes optional)</td></tr><tr><td><code>key ROOT [SCALE]</code></td><td>e.g. <code>key A minor</code>, <code>key Bb major</code>, <code>key E phrygian</code>, <code>key G blues</code>. Root accepts sharps/flats. Scale names ignore case and punctuation: <code>major</code> (<code>maj</code>, <code>ionian</code>), <code>minor</code> (<code>min</code>, <code>natural_minor</code>, <code>aeolian</code>), <code>harmonic_minor</code>, <code>melodic_minor</code>, <code>dorian</code>, <code>phrygian</code>, <code>lydian</code>, <code>mixolydian</code> (<code>mixo</code>), <code>pentatonic_major</code>, <code>pentatonic_minor</code>, <code>blues</code>, <code>whole_tone</code></td></tr><tr><td><code>bpm N</code></td><td>Greater than 10 and at most 400</td></tr><tr><td><code>meter N/D</code></td><td>e.g. <code>4/4</code>, <code>3/4</code>. Sets the default chord length (one bar)</td></tr><tr><td><code>progression "NAME"</code> … <code>end</code></td><td>A progression block</td></tr><tr><td><code>motif "NAME"</code> … <code>end</code></td><td>A motif block</td></tr></tbody></table>
+<h3>Inside <code>progression</code></h3><table><thead><tr><th>Line</th><th>Meaning</th></tr></thead><tbody><tr><td><code>chords | I:4 | vi:4 | IV:2 V7:2 |</code></td><td>Roman-numeral tokens (<a href="compose-building-blocks.html#progressions">syntax</a>); <code>|</code> bar lines are optional; <code>:N</code> is beats, default one bar</td></tr><tr><td><code>tags a, b</code></td><td>Comma-separated</td></tr><tr><td><code>minor true</code></td><td>Marks a minor-leaning progression (<code>1</code>, <code>true</code> or <code>yes</code>)</td></tr><tr><td><code>description TEXT</code> (or <code>desc</code>)</td><td></td></tr></tbody></table>
+<h3>Inside <code>motif</code></h3>
+<p>Write the notes either on one <code>notes</code> line or as parallel <code>steps</code> / <code>dur</code> / <code>dyn</code> lists.</p><table><thead><tr><th>Line</th><th>Meaning</th></tr></thead><tbody><tr><td><code>notes 0:0.75 2:0.75 c2:0.5 4:1.0@f r:0.5</code></td><td>Each token is <code>STEP[:BEATS][@DYNAMIC]</code>. A number is a scale step (0 = tonic of the key); <code>cN</code> is the Nth chord tone (c0 = chord root); <code>r</code> (or <code>.</code>) is a rest</td></tr><tr><td><code>steps 4 3 2 r 0</code>, <code>dur 0.5 0.5 1.0 0.5 1.5</code>, <code>dyn mf mf mp mf p</code></td><td>The same information as separate lists (<code>durations</code> and <code>dynamics</code> are accepted too). If <code>dur</code> is shorter than <code>steps</code>, its last value repeats</td></tr><tr><td><code>tags</code>, <code>description</code></td><td></td></tr></tbody></table>
+<p>Dynamics are <code>ppp pp p mp mf f ff fff</code>. Durations must be greater than 0.</p>
+<h2>Complete example</h2>
+<pre><code># Wauvio Compose Preset (.wcp)
+name My Pack
+author me
+key A minor
+bpm 118
+meter 4/4
+
+progression "Verse"
+  tags minor, driving
+  minor true
+  chords | i:4 | bVI:4 | bIII:4 | bVII:4 |
+end
+
+motif "Hook"
+  tags hook, bright
+  notes 0:0.75 2:0.75 c2:0.5 4:1.0@f 3:0.5 2:0.5
+end
+
+motif "Answer"
+  steps 4 3 2 r 0
+  dur   0.5 0.5 1.0 0.5 1.5
+  dyn   mf mf mp mf p
+end</code></pre>
+<h2>Bundled packs</h2>
+<p>Ten packs ship in <code>wauvio/compose/wcp/presets/</code>, plus a small example, <code>wauvio/compose/examples/examples.wcp</code>:</p><table><thead><tr><th>File</th><th>Name</th><th>Key</th><th>BPM</th><th>Progressions</th><th>Motifs</th></tr></thead><tbody><tr><td><code>ambient_cinematic.wcp</code></td><td>Wide Horizons</td><td>Ab lydian</td><td>72</td><td>2</td><td>2</td></tr><tr><td><code>baroque_waltz.wcp</code></td><td>Classical Waltz &amp; Baroque</td><td>G major</td><td>108</td><td>2</td><td>2</td></tr><tr><td><code>blues_funk.wcp</code></td><td>Blues &amp; Funk Grooves</td><td>G blues</td><td>104</td><td>2</td><td>2</td></tr><tr><td><code>bossa_nova.wcp</code></td><td>Bossa Nova Standards</td><td>F major</td><td>130</td><td>2</td><td>2</td></tr><tr><td><code>celtic_folk.wcp</code></td><td>Highland Trail</td><td>D dorian</td><td>118</td><td>1</td><td>1</td></tr><tr><td><code>chiptune_8bit.wcp</code></td><td>Chiptune 8-Bit</td><td>C major</td><td>156</td><td>3</td><td>2</td></tr><tr><td><code>lofi_chill.wcp</code></td><td>Lo-Fi Late Night</td><td>Eb major</td><td>78</td><td>2</td><td>2</td></tr><tr><td><code>metal_dark.wcp</code></td><td>Dark Metal Riffs</td><td>E phrygian</td><td>168</td><td>3</td><td>2</td></tr><tr><td><code>reggae_ska.wcp</code></td><td>Island Offbeat</td><td>Bb major</td><td>86</td><td>2</td><td>1</td></tr><tr><td><code>touhou_danmaku.wcp</code></td><td>Danmaku Melodies</td><td>Bb natural_minor</td><td>172</td><td>2</td><td>2</td></tr></tbody></table><h2>Full API listing</h2><section class="file" id="wauvio-compose-wcp-wcp-format-hpp"><h3><code>wauvio/compose/wcp/wcp_format.hpp</code></h3>
+<h4 id="wauvio-compose-wcp-wcp-format-hpp-wauvio-compose-free-functions-constants-and-aliases"><span class="ns">wauvio::compose::</span>Free functions, constants and aliases</h4>
+<pre><code>inline constexpr const char* WCP_EXT = ".wcp";
+inline bool is_wcp_path(const std::string&amp; path)</code></pre>
+<h4 id="wauvio-compose-wcp-wcp-format-hpp-wauvio-compose-wcpbank"><span class="ns">wauvio::compose::</span>struct WcpBank</h4>
+<pre><code>struct WcpBank
+    std::string name;
+    std::string author;
+    Key         key   { PitchClass::C, ScaleType::Major };
+    double      bpm   = 120.0;
+    Meter       meter { 4, 4 };
+    std::vector&lt;ChordProgression&gt; progressions;
+    std::vector&lt;Motif&gt;            motifs;
+    const ChordProgression* find_progression(const std::string&amp; target) const
+    const Motif* find_motif(const std::string&amp; target) const
+    inline std::string trim(const std::string&amp; s)
+    inline std::string unquote(const std::string&amp; s)
+    inline std::vector&lt;std::string&gt; split_ws(const std::string&amp; s)
+    inline std::vector&lt;std::string&gt; split_csv(const std::string&amp; s)
+    inline bool parse_dyn(const std::string&amp; s, wauvio::music::Dynamics&amp; out)
+    inline const char* dyn_str(wauvio::music::Dynamics d)
+inline bool wcp_from_text(const std::string&amp; text, WcpBank&amp; out, std::string* err = nullptr)
+inline std::string wcp_to_text(const WcpBank&amp; bank)
+inline bool load_wcp(const std::string&amp; path, WcpBank&amp; out, std::string* err = nullptr)
+inline bool save_wcp(const WcpBank&amp; bank, const std::string&amp; path)</code></pre>
+</section>
+<div class="pager"><a href="compose-building-blocks.html"><small>Previous</small>Keys, chords, progressions, motifs and melodies</a><a class="r" href="compose-songs.html"><small>Next</small>Composer, sections and songs</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

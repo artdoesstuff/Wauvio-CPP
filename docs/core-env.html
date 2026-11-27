@@ -15,7 +15,11 @@
 <li><code>tick(State&amp;, sample_rate)</code> is the stateful per-sample form used by voices. <code>State</code> carries the phase (<code>ATTACK, DECAY, SUSTAIN, RELEASE, DONE</code>) and value; <code>note_off_trigger()</code> starts the release.</li>
 </ul>
 <h2>DAHDSR</h2>
-<p>Adds <code>pre_delay</code> (silence before attack) and <code>hold</code> (time at peak). Constructor order: <code>(pre_delay, attack, hold, decay, sustain, release)</code>. Offline <code>apply()</code> only; no stateful tick.</p>
+<p>Adds <code>pre_delay</code> (silence before attack) and <code>hold</code> (time at peak). Constructor order: <code>(pre_delay, attack, hold, decay, sustain, release)</code>. Offline <code>apply(buf, total_seconds, note_off = -1, sample_rate)</code> only; no stateful tick.</p>
+<ul>
+<li><strong>Default note-off.</strong> With <code>note_off &lt; 0</code> the release starts at <code>total_seconds − release</code>, but never earlier than half the note, so a release longer than the note no longer silences it from the very first sample.</li>
+<li><strong>Early note-off.</strong> If the note-off arrives while the attack or decay is still running, the release now starts from the level the envelope had actually reached, instead of jumping to the sustain level first.</li>
+</ul>
 <h2>LoopableEnvelope</h2>
 <p>Attack→decay cycle that repeats while <code>loop</code> is true, behaving as a shaped slow LFO; with <code>loop = false</code> it settles at <code>sustain</code>. Stateful <code>tick(State&amp;, sample_rate)</code> only.</p>
 <h2>Full API listing</h2><section class="file" id="wauvio-core-env-hpp"><h3><code>wauvio/core/env.hpp</code></h3>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MIDI export, mastering and the example · Wauvio Docs</title><meta name="description" content="compose MIDI export and mastered render.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Compose engine (wauvio/compose)</div><h1>MIDI export, mastering and the example</h1>
+<div class="tryit"><strong>See it in action:</strong> <a href="guide-compose.html#compose_02_composer">The Composer</a></div>
+<h2>MIDI export — <code>compose/midi.hpp</code></h2>
+<p><code>save_midi(song, path, ppq = 480)</code> writes the song as a Standard MIDI File: a tempo track, then one track per arrangement track, with names. The first four tracks use channels 0–3 with General MIDI programs piano (0), 4 (electric piano), 33 (fingered bass) and 48 (string ensemble); tracks five to eight go to channel 9 (the drum channel). Rests are skipped; chords become simultaneous notes. The instruments you used are not stored, so a MIDI player will use its own sounds, or use Wauvio’s <a href="midi.html">MIDI layer</a>.</p>
+<h2>Mastered render — <code>compose/fx.hpp</code></h2>
+<ul>
+<li><code>render_mastered(song, MasterSettings, MasterReport* report = nullptr, RenderOptions)</code> — builds a <a href="fx-mixer.html">mixer</a> from the arrangement, applies <a href="fx-mastering.html">mastering</a> and returns the stereo buffer.</li>
+<li><code>save_mastered(song, wav_path, MasterSettings, RenderOptions)</code> — the same, written to WAV with the level preserved (not renormalised).</li>
+<li>Pair with <code>fx::master_for_genre("jazz")</code> to get genre-appropriate loudness and tone.</li>
+</ul>
+<p>These two headers are separate because they pull in <code>fx</code> and <code>midi</code>, which many compose users do not need.</p>
+<h2>Example program</h2>
+<p><code>wauvio/compose/examples/compose.cpp</code> builds a quick draft, a full jazz song with MIDI export and mastering, and a song from <code>examples.wcp</code>; build it with <code>g++ -std=c++17 -O2 compose.cpp -o compose</code> from that folder.</p>
+<h2>Full API listing</h2><section class="file" id="wauvio-compose-midi-hpp"><h3><code>wauvio/compose/midi.hpp</code></h3>
+<h4 id="wauvio-compose-midi-hpp-wauvio-compose-free-functions-constants-and-aliases"><span class="ns">wauvio::compose::</span>Free functions, constants and aliases</h4>
+<pre><code>inline void save_midi(const ComposedSong&amp; song, const std::string&amp; path, int ppq = 480)</code></pre>
+</section>
+<section class="file" id="wauvio-compose-fx-hpp"><h3><code>wauvio/compose/fx.hpp</code></h3>
+<h4 id="wauvio-compose-fx-hpp-wauvio-compose-free-functions-constants-and-aliases"><span class="ns">wauvio::compose::</span>Free functions, constants and aliases</h4>
+<pre><code>inline StereoBuffer render_mastered(const ComposedSong&amp; song,
+                                    const wauvio::fx::MasterSettings&amp; settings = wauvio::fx::MasterSettings::for_preset(wauvio::fx::MasterPreset::Clean),
+                                    wauvio::fx::MasterReport* report_out = nullptr,
+                                    const RenderOptions&amp; opts = RenderOptions())
+
+inline void save_mastered(const ComposedSong&amp; song, const std::string&amp; wav_path,
+                         const wauvio::fx::MasterSettings&amp; settings = wauvio::fx::MasterSettings::for_preset(wauvio::fx::MasterPreset::Clean),
+                         const RenderOptions&amp; opts = RenderOptions())
+</code></pre>
+</section>
+<div class="pager"><a href="compose-songs.html"><small>Previous</small>Composer, sections and songs</a><a class="r" href="sfx.html"><small>Next</small>SFX engine overview</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

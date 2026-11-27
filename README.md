@@ -1,20 +1,21 @@
 # Wauvio
 
-A header-only C++17 audio engine: synthesis, a large instrument library, effects and mastering, MIDI and SoundFont playback, a sound-effect designer and a Japanese singing-voice synthesiser. No dependencies to build or link.
+A header-only C++17 audio engine: synthesis, a large instrument library, effects and mastering, MIDI and SoundFont playback, a procedural composer, a sound-effect designer and a Japanese singing-voice synthesiser. No dependencies to build or link.
 
-**Documentation: [GitHub Pages](http://artdoesstuff.github.io/Wauvio-CPP/)**
+**Documentation: [DOCS_LINK_HERE](DOCS_LINK_HERE)**
 
 ## What's inside
 
 | Module | Include | Purpose |
 |---|---|---|
 | Core | `wauvio.hpp` | Oscillators, envelopes, filters, FM and voices, sequencing, WAV export, playback |
-| Music layer | `wauvio/ext.hpp` | Notes, arrangements, 300+ modeled instruments, sampling, genre presets |
+| Music layer | `wauvio/ext.hpp` | Notes, arrangements, 440+ modeled instruments, sampling, 96 genre presets |
 | FX suite | `wauvio/fx.hpp` | EQ, dynamics, saturation, reverb, mixer, loudness mastering |
 | MIDI | `wauvio/midi.hpp` | Load, restyle, render and write MIDI files |
 | SoundFont | `wauvio/sf2.hpp` | Use `.sf2` files as instrument banks |
-| SFX | `wauvio/sfx.hpp` | Sound-effect engine with a 190-preset catalog and CLI |
-| Vocal | `wauvio/vocal/v3.hpp` | Singing and speech synthesis (Yune and other voices) |
+| Compose | `wauvio/compose.hpp` | Generate chords, melodies and full songs from a key, tempo and mood |
+| SFX | `wauvio/sfx.hpp` | Sound-effect engine with a 369-preset catalog and CLI |
+| Vocal | `wauvio/vocal/v3.hpp` | Singing and speech synthesis (Yune and other voices), kanji lyrics |
 
 ## Quick start
 

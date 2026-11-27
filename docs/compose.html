@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Compose engine overview · Wauvio Docs</title><meta name="description" content="Procedural composer overview.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Compose engine (wauvio/compose)</div><h1>Compose engine overview</h1>
+
+<p>The compose engine (<code>wauvio/compose.hpp</code>, directory <code>wauvio/compose/</code>, namespace <code>wauvio::compose</code>) <strong>writes music for you</strong>. You choose a key, tempo, mood and optionally a genre, chord progression and motif; it generates harmony, a melody, a countermelody, accompaniment, bass and drums, assigns instruments from the <a href="ext.html">music layer</a>, and returns a <code>ComposedSong</code> you can render to WAV, export to MIDI or master. It is deterministic: the same settings and seed always give the same song.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-compose.html#compose_01_quick_draft">A quick draft</a> &middot; <a href="guide-compose.html#compose_02_composer">The Composer</a></div>
+<h2>How it works</h2>
+<ol>
+<li><strong>Harmony</strong> — a <a href="compose-building-blocks.html#progressions">chord progression</a> in Roman numerals (built-in, generated, or from a <a href="compose-wcp.html"><code>.wcp</code> file</a>), resolved against a key.</li>
+<li><strong>Motif</strong> — a short melodic idea written in scale steps, so it fits any key.</li>
+<li><strong>Melody</strong> — a phrase generator develops the motif over the chords (phrase forms like AABA), with a climax point and a resolution on the tonic; a countermelody can answer it.</li>
+<li><strong>Arrangement</strong> — accompaniment, bass and drum patterns are generated per section, with instruments picked for the <a href="compose-songs.html#moods">mood</a>.</li>
+<li><strong>Genre (optional)</strong> — the <a href="ext-genre.html">genre system</a> restyles instruments at a chosen strength.</li>
+<li><strong>Output</strong> — a <code>ComposedSong</code> holding sections and a ready <code>music::Arrangement</code>.</li>
+</ol>
+<h2>Headers</h2><table><thead><tr><th>Header</th><th>Contents</th></tr></thead><tbody><tr><td><code>wauvio/compose.hpp</code></td><td>Everything below, plus the core and music layer</td></tr><tr><td><code>compose/core/compose_common.hpp</code></td><td><code>Rng</code>, <code>PitchClass</code>, <code>ScaleType</code>, <code>Key</code>, <code>Meter</code></td></tr><tr><td><code>compose/theory/harmony.hpp</code></td><td>Chord qualities, Roman-numeral chords, chord symbols, voice leading</td></tr><tr><td><code>compose/progression/progressions.hpp</code></td><td><code>ChordProgression</code>, generation, built-in progressions</td></tr><tr><td><code>compose/motif/motifs.hpp</code></td><td><code>Motif</code>, development operations, generation, built-in motifs</td></tr><tr><td><code>compose/melody/melody_gen.hpp</code></td><td>Melody and countermelody generation</td></tr><tr><td><code>compose/wcp/wcp_format.hpp</code></td><td>The <code>.wcp</code> text format</td></tr><tr><td><code>compose/arrangement/song.hpp</code></td><td><code>Composer</code>, <code>ComposeConfig</code>, sections, patterns, <code>ComposedSong</code></td></tr><tr><td><code>compose/midi.hpp</code> (optional)</td><td><code>save_midi(song, path)</code></td></tr><tr><td><code>compose/fx.hpp</code> (optional)</td><td><code>render_mastered</code>, <code>save_mastered</code></td></tr></tbody></table>
+<h2>Pages</h2>
+<ul><li><a href="compose-songs.html">Composer, sections and songs</a></li><li><a href="compose-building-blocks.html">Keys, chords, progressions, motifs, melodies</a></li><li><a href="compose-wcp.html">The .wcp format</a></li><li><a href="compose-tools.html">MIDI export, mastering and the example program</a></li><li><a href="guide-compose.html">Compose guide (examples)</a></li></ul>
+<h2>Minimal example</h2>
+<pre><code>#include "wauvio/compose.hpp"
+using namespace wauvio::compose;
+
+int main() {
+    auto song = compose_draft(PitchClass::D, ScaleType::NaturalMinor, 124.0, Mood::Energetic, 8, /*seed=*/7);
+    song.save("draft.wav");
+}</code></pre>
+<div class="note"><strong>Scope.</strong> The composer produces competent, structured, repeatable music from rules, not from a trained model. Expect idiomatic loops and phrases that you will usually want to edit, restyle (genre), or use as a starting point: its output is a normal <code>Arrangement</code>, so you can modify tracks before rendering.</div>
+
+<div class="pager"><a href="sf2.html"><small>Previous</small>SoundFont (SF2) support</a><a class="r" href="compose-building-blocks.html"><small>Next</small>Keys, chords, progressions, motifs and melodies</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

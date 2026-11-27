@@ -6,7 +6,7 @@
 <div class="layout">
 <nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
 <main><div class="content"><div class="crumbs">Guides &amp; examples</div><h1>Music layer guide</h1>
-<p>The music layer adds instruments you can write for like a composer: MIDI note numbers, dynamics (<code>p</code>, <code>mf</code>, <code>f</code>…), articulations and 300+ ready-made instruments in <code>wauvio::instruments</code>. Include <code>wauvio/ext.hpp</code>. Browse the <a href="ext-instruments.html">instrument catalog</a> for names.</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="music_01_melody">1. A melody</h2><p>A <code>Melody</code> is a list of notes <code>{midi, seconds, dynamics, articulation}</code>. Add it to an <code>Arrangement</code> with an instrument, and <code>render</code> writes the WAV. Effects like reverb attach to the instrument.</p><pre><code>// A melody with MIDI note numbers, dynamics and articulations.
+<p>The music layer adds instruments you can write for like a composer: MIDI note numbers, dynamics (<code>p</code>, <code>mf</code>, <code>f</code>…), articulations and 440+ ready-made instruments in <code>wauvio::instruments</code>. Include <code>wauvio/ext.hpp</code>. Browse the <a href="ext-instruments.html">instrument catalog</a> for names.</p><pre><code>g++ -std=c++17 -O2 -I/path/to/wauvio-repo NAME.cpp -o NAME &amp;&amp; ./NAME</code></pre><h2 id="music_01_melody">1. A melody</h2><p>A <code>Melody</code> is a list of notes <code>{midi, seconds, dynamics, articulation}</code>. Add it to an <code>Arrangement</code> with an instrument, and <code>render</code> writes the WAV. Effects like reverb attach to the instrument.</p><pre><code>// A melody with MIDI note numbers, dynamics and articulations.
 #include &quot;wauvio/ext.hpp&quot;
 using namespace wauvio;
 using music::Dynamics;
@@ -194,7 +194,39 @@ int main() {
     opt.dither           = DitherType::Triangular;
     opt.deterministic_seed_enabled = true;     // reproducible dither noise
     render(a, &quot;music_08_render_options.wav&quot;, opt);
-}</code></pre><p class="muted"><a href="examples/music_08_render_options.cpp" download>Download music_08_render_options.cpp</a></p><p><strong>Try this:</strong> set <code>bit_depth = 32</code> to write floating-point audio.</p><h2>Next</h2><p>Polish and mix these results in the <a href="guide-fx.html">FX guide</a>, or play a MIDI file in the <a href="guide-midi.html">MIDI guide</a>.</p>
+}</code></pre><p class="muted"><a href="examples/music_08_render_options.cpp" download>Download music_08_render_options.cpp</a></p><p><strong>Try this:</strong> set <code>bit_depth = 32</code> to write floating-point audio.</p><h2 id="music_09_genre_registry">9. Find, blend and weaken genres</h2><p>The genre registry has 96 genres in families. <code>find</code> matches names loosely, <code>for_bpm</code> suggests genres for a tempo, <code>blend</code> mixes two, and <code>scaled</code> applies one at reduced strength. Passing a <code>bpm</code> to <code>apply_to_melody</code> also applies the genre’s timing (swing, groove, humanise).</p><pre><code>// Look genres up by name, browse them by family or tempo, and blend or weaken them.
+#include &quot;wauvio/ext.hpp&quot;
+#include &lt;cstdio&gt;
+using namespace wauvio;
+namespace gn = wauvio::music::genre;
+
+int main() {
+    // Names are matched loosely: case, spaces and punctuation do not matter, and aliases work.
+    gn::GenrePresetPtr dnb = gn::find(&quot;drum and bass&quot;);
+    if (!dnb) return 1;
+    std::printf(&quot;%s (%s), typically %g-%g BPM\n&quot;, dnb-&gt;name.c_str(), dnb-&gt;family.c_str(), dnb-&gt;bpm_min, dnb-&gt;bpm_max);
+
+    for (const std::string&amp; f : gn::families()) std::printf(&quot;family: %s (%zu genres)\n&quot;, f.c_str(), gn::in_family(f).size());
+    for (auto&amp; g : gn::for_bpm(140)) std::printf(&quot;  fits 140 BPM: %s\n&quot;, g-&gt;name.c_str());
+
+    // Blend two genres (t = 0 is the first, 1 the second), or apply one at reduced strength.
+    gn::GenrePresetPtr mix  = gn::blend(*gn::find(&quot;jazz&quot;), *gn::find(&quot;metal&quot;), 0.35);
+    gn::GenrePresetPtr mild = gn::scaled(gn::find(&quot;rock&quot;), 0.5);
+
+    music::Melody m;
+    for (int n : {64, 67, 71, 72, 71, 67, 64, 62}) m.push_back({n, 0.25, music::Dynamics::mf});
+
+    int i = 0;
+    for (gn::GenrePresetPtr p : { mix, mild }) {
+        instruments::CleanElectricGuitar gtr;
+        music::Melody styled = m;
+        // Passing a tempo (last argument) also applies the genre&#x27;s TIMING: swing, groove, quantise, humanise.
+        gn::apply_to_melody(styled, *p, gn::Role::Melodic, &amp;gtr, /*seed=*/4, /*bpm=*/120.0);
+        gn::style_instrument(gtr, *p, gn::Role::Melodic);
+        music::Arrangement a; a.add(gtr, styled);
+        render(a, &quot;music_09_genre_registry_&quot; + std::to_string(i++) + &quot;.wav&quot;);
+    }
+}</code></pre><p class="muted"><a href="examples/music_09_genre_registry.cpp" download>Download music_09_genre_registry.cpp</a></p><p><strong>Try this:</strong> blend <code>"hip hop"</code> and <code>"jazz"</code> at 0.5; browse the <a href="ext-genre.html#built-in-genres">full list</a>.</p><h2>Next</h2><p>Polish and mix these results in the <a href="guide-fx.html">FX guide</a>, or play a MIDI file in the <a href="guide-midi.html">MIDI guide</a>.</p>
 <div class="pager"><a href="guide-core.html"><small>Previous</small>Core guide</a><a class="r" href="guide-fx.html"><small>Next</small>FX guide</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
 </div>
 <script src="nav.js"></script></body></html>

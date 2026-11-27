@@ -13,6 +13,7 @@
 <li><strong>Singer API.</strong> <code>set_voice</code>, <code>set_tempo</code>, <code>style()</code>, <code>parse_options()</code>, <code>phrase_pitch_curve</code>, <code>seed</code>, <code>note</code>/<code>note_sec</code>/<code>note_at</code>, <code>rest</code>/<code>rest_sec</code>, <code>load_midi_file</code>/<code>load_midi_track</code>, <code>render</code>, <code>render_stereo</code>, <code>save</code>.</li>
 <li><strong><code>NoteRef</code></strong> setters: <code>velocity</code>, <code>articulation</code>, <code>vibrato</code>, <code>no_vibrato</code>, <code>portamento</code>, <code>glide_from</code>, <code>bend</code>, <code>overshoot</code>, <code>scoop</code>, <code>style()</code>. A <code>NoteRef</code> is valid only until the next note is added to the same <code>Singer</code> (notes are stored in a <code>std::vector</code>).</li>
 <li><strong><code>SingerInstrument</code></strong> — one note, fixed lyric, with its own <code>style</code> and <code>voice_model</code>.</li>
+<li><strong>Kanji lyrics</strong> (<code>kanji.hpp</code>) are available here too: ruby and dictionary conversion before parsing, with <code>Singer::kanji_dictionary()</code> and diagnostics. See <a href="vocal-lyrics.html#kanji">Kanji</a>.</li>
 <li><strong>Style</strong> contains the voice, pitch, articulation and dynamics groups (see <a href="vocal-v3-style.html">Style</a>); none of the later expression fields exist.</li>
 </ul>
 <h2>Full API listing</h2><section class="file" id="wauvio-vocal-yune-v1-singer-hpp"><h3><code>wauvio/vocal/yune-v1/singer.hpp</code></h3>
@@ -44,6 +45,11 @@ public:
     Style&amp; style() { return style_; }                 // defaults applied to notes added afterwards
     const Style&amp; style() const { return style_; }
     ParseOptions&amp; parse_options() { return popt_; }
+    // Kanji lyrics: this Singer's dictionary (starts as a copy of the built-in list; add or load your own).
+    KanjiDictionary&amp; kanji_dictionary() { return kanji_; }
+    bool load_kanji_dictionary(const std::string&amp; path, std::string* err = nullptr) { return kanji_.load_file(path, err); }
+    // Notes whose kanji could not be read, or were read piece by piece (empty = none).
+    const std::vector&lt;std::string&gt;&amp; kanji_issues() const { return kanji_issues_; }
     Singer&amp; phrase_pitch_curve(const Curve&amp; semitones_vs_seconds) { phrase_curve_ = semitones_vs_seconds; return *this; }
     Singer&amp; seed(uint32_t s) { seed_ = s; return *this; }
     NoteRef note(int midi, int ticks, const std::string&amp; lyric, float velocity = 0.75f)
@@ -52,7 +58,7 @@ public:
     Singer&amp; rest_sec(double seconds) { cursor_ += seconds; return *this; }
     // Absolute placement; the cursor moves to the end of the note.
     NoteRef note_at(double start_sec, int midi, double seconds, const std::string&amp; lyric, float velocity = 0.75f)
-    void clear() { notes_.clear(); cursor_ = 0.0; phrase_curve_.clear(); }
+    void clear() { notes_.clear(); kanji_issues_.clear(); cursor_ = 0.0; phrase_curve_.clear(); }
     size_t size() const { return notes_.size(); }
     const std::vector&lt;SynthNote&gt;&amp; notes() const { return notes_; }
     double cursor() const { return cursor_; }
@@ -240,6 +246,11 @@ inline SurfaceMora surface(const Mora&amp; m)
     // "おう" / "えい" / "ああ" ... inside ONE lyric string become a single long
     // vowel (ō, ē, aa) instead of two separate morae.
     bool merge_long_vowels = true;
+    // Kanji in a lyric are converted to hiragana first (see kanji.hpp): ruby 漢字《かんじ》, then the dictionary.
+    // Not stored in .wvc banks. Off = kanji are ignored like any other unknown symbol.
+    bool kanji = true;
+    const KanjiDictionary* kanji_dictionary = nullptr;     // null = the built-in list
+    std::vector&lt;std::string&gt;* kanji_notes = nullptr;       // optional sink for "no reading" / "read piece by piece"
 // Kana (hiragana or katakana) -&gt; morae. Whitespace, '|', ',' and '/' are ignored.
 inline std::vector&lt;Mora&gt; parse_kana(const std::string&amp; text, const ParseOptions&amp; opt = {})
 // Hepburn/Kunrei-style romaji -&gt; morae.  "ka ki kya shi chi tsu fu n xtu(=っ) -"

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Composer, sections and songs · Wauvio Docs</title><meta name="description" content="Composer, sections, patterns and ComposedSong.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Compose engine (wauvio/compose)</div><h1>Composer, sections and songs</h1>
+
+<p>Header <code>compose/arrangement/song.hpp</code>. The <code>Composer</code> is a fluent builder around <code>ComposeConfig</code>; <code>compose()</code> returns a <code>ComposedSong</code>.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-compose.html#compose_02_composer">The Composer</a> &middot; <a href="guide-compose.html#compose_03_sections">Song structure</a></div>
+<h2>Composer</h2><table><thead><tr><th>Method</th><th>Meaning</th></tr></thead><tbody><tr><td><code>key(root, scale)</code>, <code>tempo(bpm)</code>, <code>meter(n, d)</code></td><td>Musical basics (defaults: C major, 120 BPM, 4/4)</td></tr><tr><td><code>mood(Mood)</code></td><td>Chooses default instruments, drum pattern and feel (see below)</td></tr><tr><td><code>genre(name, strength = 0.7)</code></td><td>Looks up a <a href="ext-genre.html">genre</a> (any name or alias) and restyles the instruments at that strength</td></tr><tr><td><code>progression(ChordProgression | name)</code>, <code>motif(Motif | name)</code></td><td>Use a built-in (by name) or your own; <code>use_wcp(bank, prog, motif)</code> takes both from a <a href="compose-wcp.html">.wcp bank</a></td></tr><tr><td><code>accompaniment(pattern)</code>, <code>bass_pattern(pattern)</code>, <code>drum_pattern(pattern)</code></td><td>Pattern choices (enums below). Drums default to <code>Auto</code> (from the mood; waltz for 3 beats per bar)</td></tr><tr><td><code>add_section(SectionSpec)</code>, <code>clear_sections()</code></td><td>Define the song structure</td></tr><tr><td><code>quick_draft(bars = 8)</code></td><td>One short section instead of a full song</td></tr><tr><td><code>lead_instrument</code>, <code>chord_instrument</code>, <code>bass_instrument</code>, <code>counter_instrument</code>, <code>drum_kit</code></td><td>Override the mood’s instruments (shared pointers)</td></tr><tr><td><code>seed(n)</code></td><td>Everything random derives from it (default 42)</td></tr><tr><td><code>compose()</code></td><td>Generate the <code>ComposedSong</code> (const; the Composer can be reused)</td></tr></tbody></table>
+<p>Shortcuts: <code>compose_draft(root, scale, bpm, mood, bars, seed)</code> and <code>compose_from_wcp(path, prog, motif, mood, seed)</code>.</p>
+<h2>Sections</h2>
+<p>A <code>SectionSpec</code> has <code>role</code> (<code>SectionRole</code>: Intro, Verse, PreChorus, Chorus, Bridge, Breakdown, Outro), <code>name</code>, <code>bars</code> (4), <code>energy</code> 0–1 (0.6; busier and louder when higher), its own <code>progression</code> and <code>motif</code>, and switches <code>enable_melody</code>, <code>enable_chords</code>, <code>enable_bass</code>, <code>enable_drums</code> (all true) and <code>enable_counter</code> (false). If you add none, the default structure is six sections of four bars: Intro (chords and bass), Verse 1, Chorus 1 (with countermelody), Verse 2, Chorus 2, Outro. With <code>quick_draft(n)</code> it is one “Draft” section of <code>n</code> bars at energy 0.75.</p>
+<h2>Patterns</h2><table><thead><tr><th>Enum</th><th>Values</th></tr></thead><tbody><tr><td><code>AccompanimentPattern</code></td><td>Pad, BlockChords, ArpUp, ArpDown, ArpBounce (default), Alberti, PulseEighths, OffbeatSkank</td></tr><tr><td><code>BassPattern</code></td><td>RootWhole, RootFifth (default), OctaveBounce, DrivingEighths, Walking, Syncopated</td></tr><tr><td><code>DrumPattern</code></td><td>Auto (default), None, PopRock, FourOnFloor, HalfTime, Breakbeat, Waltz, JazzSwing, Bossa, LoFi</td></tr></tbody></table>
+<h2 id="moods">Moods</h2>
+<p><code>Mood</code> = Bright, Melancholic, Epic, Chill, Energetic, Jazzy, Ambient, Retro. Each picks a default palette (any instrument you set yourself is kept):</p><table><thead><tr><th>Mood</th><th>Lead</th><th>Chords</th><th>Bass</th><th>Counter</th><th>Drum kit</th><th>Default drums</th></tr></thead><tbody><tr><td>Bright</td><td><code>AcousticGrandPiano</code></td><td><code>ElectricPiano</code></td><td><code>BassGuitar</code></td><td><code>StringEnsemble</code></td><td><code>StudioKit</code></td><td><code>PopRock</code></td></tr><tr><td>Melancholic</td><td><code>FeltPiano</code></td><td><code>ChamberStrings</code></td><td><code>FretlessBass</code></td><td><code>SoloCello</code></td><td><code>LoFiKit</code></td><td><code>HalfTime</code></td></tr><tr><td>Epic</td><td><code>FrenchHorn</code></td><td><code>FullStringSection</code></td><td><code>LowBrassSection</code></td><td><code>SoloViolin</code></td><td><code>OrchestralPercussionKit</code></td><td><code>HalfTime</code></td></tr><tr><td>Chill</td><td><code>RhodesMarkI</code></td><td><code>WarmPad</code></td><td><code>SubBass</code></td><td><code>Flute</code></td><td><code>LoFiKit</code></td><td><code>LoFi</code></td></tr><tr><td>Energetic</td><td><code>SynthLead</code></td><td><code>PolySynth</code></td><td><code>SynthBass</code></td><td><code>ArpeggioSynth</code></td><td><code>Kit909</code></td><td><code>FourOnFloor</code></td></tr><tr><td>Jazzy</td><td><code>TenorSaxophone</code></td><td><code>RhodesMarkII</code></td><td><code>UprightBassPluck</code></td><td><code>Vibraphone</code></td><td><code>JazzKit</code></td><td><code>JazzSwing</code></td></tr><tr><td>Ambient</td><td><code>Celesta</code></td><td><code>GlassPad</code></td><td><code>SubBass</code></td><td><code>Harp</code></td><td><code>LoFiKit</code></td><td><code>None</code></td></tr><tr><td>Retro</td><td><code>ChiptuneLead</code></td><td><code>SquareLead</code></td><td><code>ChiptuneBass</code></td><td><code>Pluck</code></td><td><code>Kit808</code></td><td><code>PopRock</code></td></tr></tbody></table>
+<h2>ComposedSong</h2>
+<ul>
+<li><code>config</code> (the resolved <code>ComposeConfig</code>), <code>sections</code> (<code>ComposedSection</code>: spec, <code>start_sec</code>, <code>duration_sec</code>, <code>chords</code>, <code>melody</code>, <code>bass</code>, <code>accompaniment</code>, <code>counter</code>), and <code>arrangement</code> (a normal <a href="ext-core.html"><code>music::Arrangement</code></a>).</li>
+<li><code>total_duration_seconds()</code>, <code>render(sample_rate, RenderOptions)</code> → <code>StereoBuffer</code>, <code>save(wav_path, RenderOptions)</code>, <code>summary()</code> (a readable description: key, tempo, sections and chords).</li>
+<li>The song owns its instruments (<code>owned_instruments</code>, <code>owned_kit</code>), so it is safe to return and keep. The drum parts use <code>DrumKitInstrument</code>, an <code>Instrument</code> adapter around a <code>DrumKit</code>.</li>
+<li>Because the arrangement is ordinary, you can add tracks, change gains, or hand it to <code>fx::mixer_from_arrangement</code> before rendering.</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-compose-arrangement-song-hpp"><h3><code>wauvio/compose/arrangement/song.hpp</code></h3>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-drumkitinstrument"><span class="ns">wauvio::compose::</span>class DrumKitInstrument</h4>
+<pre><code>class DrumKitInstrument : public wauvio::music::Instrument
+public:
+    std::shared_ptr&lt;wauvio::music::DrumKit&gt; kit;
+    explicit DrumKitInstrument(std::shared_ptr&lt;wauvio::music::DrumKit&gt; k = nullptr) : kit(std::move(k))
+    StereoBuffer render_note(const wauvio::music::Note&amp; note, int sample_rate = 0) const override</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-accompanimentpattern"><span class="ns">wauvio::compose::</span>enum class AccompanimentPattern</h4>
+<pre><code>enum class AccompanimentPattern
+    Pad,
+    BlockChords,
+    ArpUp,
+    ArpDown,
+    ArpBounce,
+    Alberti,
+    PulseEighths,
+    OffbeatSkank</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-basspattern"><span class="ns">wauvio::compose::</span>enum class BassPattern</h4>
+<pre><code>enum class BassPattern
+    RootWhole,
+    RootFifth,
+    OctaveBounce,
+    DrivingEighths,
+    Walking,
+    Syncopated</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-drumpattern"><span class="ns">wauvio::compose::</span>enum class DrumPattern</h4>
+<pre><code>enum class DrumPattern
+    Auto,
+    None,
+    PopRock,
+    FourOnFloor,
+    HalfTime,
+    Breakbeat,
+    Waltz,
+    JazzSwing,
+    Bossa,
+    LoFi</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-mood"><span class="ns">wauvio::compose::</span>enum class Mood</h4>
+<pre><code>enum class Mood { Bright, Melancholic, Epic, Chill, Energetic, Jazzy, Ambient, Retro };</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-sectionrole"><span class="ns">wauvio::compose::</span>enum class SectionRole</h4>
+<pre><code>enum class SectionRole { Intro, Verse, PreChorus, Chorus, Bridge, Breakdown, Outro };
+inline const char* section_role_name(SectionRole r) noexcept
+    inline wauvio::music::Melody generate_arp_track(const std::vector&lt;ChordSymbol&gt;&amp; chords,
+                                                    AccompanimentPattern pat,
+                                                    double bpm,
+                                                    int low_midi, int high_midi,
+                                                    wauvio::music::Dynamics dyn)
+
+    inline wauvio::music::Melody generate_bass_track(const Key&amp; key,
+                                                     const std::vector&lt;ChordSymbol&gt;&amp; chords,
+                                                     BassPattern pat,
+                                                     double bpm,
+                                                     int low_midi, int high_midi,
+                                                     wauvio::music::Dynamics dyn,
+                                                     Rng&amp; rng)
+
+    struct DrumTracks
+        wauvio::music::Melody kick, snare, hat, crash;
+    inline DrumTracks generate_drums(DrumPattern pat, int bars, int beats_per_bar, double bpm, double energy, Rng&amp; rng)</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-sectionspec"><span class="ns">wauvio::compose::</span>struct SectionSpec</h4>
+<pre><code>struct SectionSpec
+    SectionRole      role           = SectionRole::Verse;
+    std::string      name;
+    int              bars           = 4;
+    double           energy         = 0.6;
+    ChordProgression progression;
+    Motif            motif;
+    bool             enable_melody  = true;
+    bool             enable_chords  = true;
+    bool             enable_bass    = true;
+    bool             enable_drums   = true;
+    bool             enable_counter = false;</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-composeconfig"><span class="ns">wauvio::compose::</span>struct ComposeConfig</h4>
+<pre><code>struct ComposeConfig
+    Key         key            { PitchClass::C, ScaleType::Major };
+    double      bpm            = 120.0;
+    Meter       meter          { 4, 4 };
+    Mood        mood           = Mood::Bright;
+    std::string genre;
+    double      genre_strength = 0.7;
+    int         quick_bars     = 0;
+    uint64_t    seed           = 42;
+    ChordProgression progression;
+    Motif            motif;
+    std::vector&lt;SectionSpec&gt; sections;
+    AccompanimentPattern accompaniment = AccompanimentPattern::ArpBounce;
+    BassPattern          bass_pattern  = BassPattern::RootFifth;
+    DrumPattern          drum_pattern  = DrumPattern::Auto;
+    wauvio::music::InstrumentPtr             lead_instrument;
+    wauvio::music::InstrumentPtr             chord_instrument;
+    wauvio::music::InstrumentPtr             bass_instrument;
+    wauvio::music::InstrumentPtr             counter_instrument;
+    std::shared_ptr&lt;wauvio::music::DrumKit&gt;  drum_kit;</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-composedsection"><span class="ns">wauvio::compose::</span>struct ComposedSection</h4>
+<pre><code>struct ComposedSection
+    SectionSpec spec;
+    double start_sec    = 0.0;
+    double duration_sec = 0.0;
+    std::vector&lt;ChordSymbol&gt; chords;
+    wauvio::music::Melody melody;
+    wauvio::music::Melody bass;
+    wauvio::music::Melody accompaniment;
+    wauvio::music::Melody counter;</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-composedsong"><span class="ns">wauvio::compose::</span>struct ComposedSong</h4>
+<pre><code>struct ComposedSong
+    ComposeConfig config;
+    std::vector&lt;ComposedSection&gt; sections;
+    wauvio::music::Arrangement arrangement;
+    std::vector&lt;wauvio::music::InstrumentPtr&gt; owned_instruments;
+    std::shared_ptr&lt;wauvio::music::DrumKit&gt;   owned_kit;
+    double total_duration_seconds() const noexcept
+    StereoBuffer render(int sample_rate = 0, const RenderOptions&amp; opts = RenderOptions()) const
+    void save(const std::string&amp; wav_path, const RenderOptions&amp; opts = RenderOptions()) const
+    std::string summary() const
+    inline void pick_palette_for_mood(Mood mood,
+                                      wauvio::music::InstrumentPtr&amp; lead,
+                                      wauvio::music::InstrumentPtr&amp; chords,
+                                      wauvio::music::InstrumentPtr&amp; bass,
+                                      wauvio::music::InstrumentPtr&amp; counter,
+                                      std::shared_ptr&lt;wauvio::music::DrumKit&gt;&amp; kit)
+
+    inline DrumPattern default_drums_for_mood(Mood mood, int beats_per_bar) noexcept
+    inline std::vector&lt;SectionSpec&gt; default_sections(int quick_bars)</code></pre>
+<h4 id="wauvio-compose-arrangement-song-hpp-wauvio-compose-composer"><span class="ns">wauvio::compose::</span>class Composer</h4>
+<pre><code>class Composer
+public:
+    Composer() = default;
+    explicit Composer(ComposeConfig cfg) : cfg_(std::move(cfg)) {}
+    Composer&amp; key(PitchClass root, ScaleType scale = ScaleType::Major) { cfg_.key = Key(root, scale); return *this; }
+    Composer&amp; tempo(double bpm) { cfg_.bpm = bpm; return *this; }
+    Composer&amp; meter(int beats_per_bar, int beat_unit = 4) { cfg_.meter = Meter{ beats_per_bar, beat_unit }; return *this; }
+    Composer&amp; mood(Mood m) { cfg_.mood = m; return *this; }
+    Composer&amp; genre(const std::string&amp; g, double strength = 0.7) { cfg_.genre = g; cfg_.genre_strength = strength; return *this; }
+    Composer&amp; seed(uint64_t s) { cfg_.seed = s; return *this; }
+    Composer&amp; quick_draft(int bars = 8) { cfg_.quick_bars = bars; return *this; }
+    Composer&amp; progression(ChordProgression p) { cfg_.progression = std::move(p); return *this; }
+    Composer&amp; progression(const std::string&amp; name)
+    Composer&amp; motif(Motif m) { cfg_.motif = std::move(m); return *this; }
+    Composer&amp; motif(const std::string&amp; name)
+    Composer&amp; accompaniment(AccompanimentPattern p) { cfg_.accompaniment = p; return *this; }
+    Composer&amp; bass_pattern(BassPattern p) { cfg_.bass_pattern = p; return *this; }
+    Composer&amp; drum_pattern(DrumPattern p) { cfg_.drum_pattern = p; return *this; }
+    Composer&amp; add_section(SectionSpec s) { cfg_.sections.push_back(std::move(s)); return *this; }
+    Composer&amp; clear_sections() { cfg_.sections.clear(); return *this; }
+    Composer&amp; lead_instrument(wauvio::music::InstrumentPtr i)    { cfg_.lead_instrument = std::move(i); return *this; }
+    Composer&amp; chord_instrument(wauvio::music::InstrumentPtr i)   { cfg_.chord_instrument = std::move(i); return *this; }
+    Composer&amp; bass_instrument(wauvio::music::InstrumentPtr i)    { cfg_.bass_instrument = std::move(i); return *this; }
+    Composer&amp; counter_instrument(wauvio::music::InstrumentPtr i) { cfg_.counter_instrument = std::move(i); return *this; }
+    Composer&amp; drum_kit(std::shared_ptr&lt;wauvio::music::DrumKit&gt; k){ cfg_.drum_kit = std::move(k); return *this; }
+    Composer&amp; use_wcp(const WcpBank&amp; bank, const std::string&amp; prog_name = "", const std::string&amp; motif_name = "")
+    ComposedSong compose() const
+inline ComposedSong compose_draft(PitchClass root = PitchClass::C,
+                                  ScaleType scale = ScaleType::Major,
+                                  double bpm = 120.0,
+                                  Mood mood = Mood::Bright,
+                                  int bars = 8,
+                                  uint64_t seed = 42)
+
+inline ComposedSong compose_from_wcp(const std::string&amp; wcp_path,
+                                     const std::string&amp; prog_name = "",
+                                     const std::string&amp; motif_name = "",
+                                     Mood mood = Mood::Bright,
+                                     uint64_t seed = 42)
+</code></pre>
+</section>
+<div class="pager"><a href="compose-wcp.html"><small>Previous</small>The .wcp format</a><a class="r" href="compose-tools.html"><small>Next</small>MIDI export, mastering and the example</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

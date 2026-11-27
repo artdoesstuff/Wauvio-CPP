@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Keys, chords, progressions, motifs and melodies · Wauvio Docs</title><meta name="description" content="Compose building blocks.">
+<script>try{var t=localStorage.getItem("wauvio-docs:theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="layout">
+<nav class="side" id="sidebar" aria-label="Documentation"><noscript><a href="index.html">Documentation index</a></noscript></nav>
+<main><div class="content"><div class="crumbs">Compose engine (wauvio/compose)</div><h1>Keys, chords, progressions, motifs and melodies</h1>
+
+<p>The pieces beneath the <a href="compose-songs.html">Composer</a>, usable on their own. See <a href="guide-compose.html#compose_05_building_blocks">example 5</a>.</p><div class="tryit"><strong>See it in action:</strong> <a href="guide-compose.html#compose_05_building_blocks">The building blocks by hand</a></div>
+<h2>Key, scale and pitch class (<code>compose_common.hpp</code>)</h2>
+<ul>
+<li><code>PitchClass</code>: C, Cs/Db, D, Ds/Eb, E, F, Fs/Gb, G, Gs/Ab, A, As/Bb, B (0–11). <code>parse_pitch_class("Bb", out)</code>, <code>pitch_class_name(pc, prefer_flats)</code>, <code>wrap_pc</code>.</li>
+<li><code>ScaleType</code>: Major, NaturalMinor, HarmonicMinor, MelodicMinor, Dorian, Phrygian, Lydian, Mixolydian, PentatonicMajor, PentatonicMinor, Blues, WholeTone. <code>scale_intervals</code>, <code>parse_scale_type("natural_minor", out)</code>, <code>is_minor_scale</code>.</li>
+<li><code>Key{root, scale}</code>: <code>degree_midi(degree, octave, chromatic)</code>, <code>degree_pc</code>, <code>is_in_scale(midi)</code>, <code>snap_to_scale(midi)</code>, <code>midi_to_step(midi, base_octave)</code>, <code>name()</code>. <code>Meter{beats_per_bar, beat_unit}</code> with <code>bar_beats()</code>. <code>beats_to_seconds(beats, bpm)</code>.</li>
+<li><code>Rng</code> — seeded generator (<code>uniform</code>, <code>bipolar</code>, <code>range</code>, <code>range_int</code>, <code>chance</code>, <code>pick</code>, <code>weighted_index</code>) behind all generation. <code>ComposeError</code> (<code>std::runtime_error</code>) is thrown for invalid input.</li>
+</ul>
+<h2>Chords (<code>harmony.hpp</code>)</h2>
+<p><code>ChordQuality</code>: Major, Minor, Diminished, Augmented, Sus2, Sus4, Major7, Minor7, Dominant7, HalfDim7, Dim7, MinMaj7, Add9, Maj9, Min9, Dom9, Power5. A <code>RomanChord</code> (degree, accidental, quality, inversion, <code>duration_beats</code>, <code>secondary_of</code>) is resolved against a key into a <code>ChordSymbol</code> (root, quality, bass, duration; <code>pitch_classes()</code>, <code>tones_in_range()</code>, <code>nearest_chord_tone()</code>, <code>name()</code>) with <code>resolve_chord(rc, key)</code>. <code>voice_lead(prev, chord, low, high, voices)</code> and <code>voice_lead_progression(chords, …)</code> choose smooth voicings.</p>
+<h3>Roman-numeral chord syntax</h3>
+<p>Used by <code>parse_roman_chord</code> and in <a href="compose-wcp.html"><code>.wcp</code> files</a>. Form: <code>[accidentals]NUMERAL[suffix][^inversion][/target][:beats]</code>.</p><table><thead><tr><th>Part</th><th>Meaning</th><th>Examples</th></tr></thead><tbody><tr><td>Numeral</td><td>I–VII; upper case = major, lower case = minor</td><td><code>I</code> <code>vi</code> <code>V</code></td></tr><tr><td>Accidentals</td><td><code>b</code> flat or <code>#</code> sharp, before the numeral</td><td><code>bVII</code> <code>bIII</code></td></tr><tr><td>Suffix</td><td><code>maj7</code>/<code>M7</code>, <code>7</code>, <code>m7</code>, <code>m7b5</code>/<code>hdim7</code>, <code>dim</code>/<code>o</code>/<code>°</code>, <code>dim7</code>, <code>aug</code>/<code>+</code>, <code>sus2</code>, <code>sus4</code>, <code>maj9</code>, <code>9</code>, <code>m9</code>, <code>add9</code>, <code>5</code>, <code>m</code></td><td><code>Imaj7</code> <code>ii7</code> <code>V7</code> <code>vii°</code> <code>I5</code></td></tr><tr><td>Inversion</td><td><code>^0</code>–<code>^3</code></td><td><code>I^1</code></td></tr><tr><td>Secondary</td><td><code>/numeral</code>: chord of another degree</td><td><code>V7/vi</code></td></tr><tr><td>Length</td><td><code>:beats</code> (default one bar)</td><td><code>IV:2</code></td></tr></tbody></table>
+<p>A suffix-less lower-case numeral is minor and a bare <code>7</code> on a lower-case numeral is a minor 7th; on an upper-case numeral it is a dominant 7th.</p>
+<h2 id="progressions">Progressions (<code>progressions.hpp</code>)</h2>
+<ul>
+<li><code>ChordProgression</code> — <code>name</code>, <code>description</code>, <code>tags</code>, <code>minor_bias</code>, <code>chords</code>; <code>total_beats()</code>, <code>resolve(key)</code> → <code>ChordSymbol</code>s, <code>chord_index_at_beat(beat)</code>. <code>make_progression(name, tokens, default_beats, minor_bias, tags, desc)</code> builds one from Roman-numeral tokens.</li>
+<li><code>generate_progression(key, ProgressionOptions)</code> — <code>bars</code> 4, <code>beats_per_bar</code> 4, <code>harmonic_rhythm_beats</code> 4, <code>complexity</code> 0.35 (higher = more 7ths and colour chords), <code>cadence</code> (Authentic, Half, Plagal, Deceptive, Loop), <code>start_on_tonic</code> true, <code>seed</code>.</li>
+<li><code>builtin_progressions()</code> and <code>find_progression(name)</code> (nullptr if unknown). The built-ins:</li>
+</ul><table><thead><tr><th>Name</th><th>Beats</th><th>Tags</th><th>Chords</th></tr></thead><tbody><tr><td>Pop Axis</td><td>16</td><td>pop, bright, anthem</td><td><code>I V vi IV</code></td></tr><tr><td>Sensitive</td><td>16</td><td>pop, emotional</td><td><code>vi IV I V</code></td></tr><tr><td>Fifties</td><td>16</td><td>retro, doo-wop, pop</td><td><code>I vi IV V</code></td></tr><tr><td>Royal Road</td><td>16</td><td>jpop, anime, uplifting</td><td><code>IVmaj7 V7 iii7 vi7</code></td></tr><tr><td>Canon</td><td>16</td><td>classical, baroque</td><td><code>I V vi iii IV I IV V</code></td></tr><tr><td>Jazz ii-V-I</td><td>16</td><td>jazz, smooth</td><td><code>ii7 V7 Imaj7</code></td></tr><tr><td>Jazz Turnaround</td><td>16</td><td>jazz, swing, bossa</td><td><code>Imaj7 vi7 ii7 V7</code></td></tr><tr><td>Neo-Soul</td><td>16</td><td>rnb, neosoul, chill</td><td><code>IVmaj7 iii7 ii7 Imaj9</code></td></tr><tr><td>Andalusian</td><td>16</td><td>flamenco, dramatic, minor</td><td><code>i bVII bVI V</code></td></tr><tr><td>Epic Minor</td><td>16</td><td>epic, cinematic, rock</td><td><code>i bVI bIII bVII</code></td></tr><tr><td>Dark Tragic</td><td>16</td><td>minor, ballad, dark</td><td><code>i iv bVI V7</code></td></tr><tr><td>Dorian Vamp</td><td>16</td><td>funk, dorian, groove</td><td><code>i7 IV7 i7 IV7</code></td></tr><tr><td>Sentimental</td><td>16</td><td>ballad, nostalgic</td><td><code>I I7 IV iv</code></td></tr><tr><td>12-Bar Blues</td><td>48</td><td>blues, rock</td><td><code>I7 IV7 I7 I7 IV7 IV7 I7 I7 V7 IV7 I7 V7</code></td></tr><tr><td>Mixolydian Rock</td><td>16</td><td>rock, anthem</td><td><code>I bVII IV I</code></td></tr><tr><td>Lo-Fi Drift</td><td>16</td><td>lofi, chill, jazz</td><td><code>ii9 V7 Imaj9 vi7</code></td></tr></tbody></table>
+<h2 id="motifs">Motifs (<code>motifs.hpp</code>)</h2>
+<p>A <code>Motif</code> is a list of <code>MotifNote</code>s: scale <code>step</code> (relative to the key, so it transposes automatically) or a <code>ChordTone</code> basis (the Nth tone of the current chord), optional <code>chromatic</code> shift, <code>duration_beats</code>, rest flag, <code>dynamics</code> and <code>articulation</code>.</p>
+<ul>
+<li>Development: <code>transpose(m, steps)</code>, <code>invert(m, pivot)</code>, <code>retrograde(m)</code>, <code>scale_rhythm(m, factor)</code>, <code>sequence(m, repetitions, step_per_repeat)</code>, <code>vary_motif(m, rng, amount)</code>.</li>
+<li><code>generate_motif(MotifOptions)</code> — <code>length_beats</code> 4, <code>contour</code> (Arch, Ascending, Descending, Wave, Pendulum, Hook), <code>density</code> 0.55, <code>syncopation</code> 0.25, <code>rest_prob</code> 0.12, <code>range_steps</code> 5, <code>seed</code>.</li>
+<li><code>builtin_motifs()</code> and <code>find_motif(name)</code>:</li>
+</ul><table><thead><tr><th>Name</th><th>Description</th><th>Beats</th><th>Tags</th></tr></thead><tbody><tr><td>Rising Triad</td><td>Clean chordal climb with held top note.</td><td>4</td><td>bright, anthem, arpeggio</td></tr><tr><td>Sigh Step</td><td>Gentle appoggiatura-like downward step.</td><td>4</td><td>ballad, melancholic, lyrical</td></tr><tr><td>Syncopated Hook</td><td>Pop/EDM dotted-eighth rhythmic hook.</td><td>4</td><td>pop, hook, syncopated</td></tr><tr><td>Calling Fifth</td><td>Open heroic leap of a fifth followed by a step.</td><td>4</td><td>epic, heroic, open</td></tr><tr><td>Scalar Arch</td><td>Flowing 8th-note rise and fall.</td><td>4</td><td>classical, lyrical, smooth</td></tr><tr><td>Ostinato Pulse</td><td>Driving rhythmic cell for energetic verses.</td><td>4</td><td>driving, rock, electronic</td></tr><tr><td>Pentatonic Bounce</td><td>Playful syncopated cell suited to chiptune/jpop.</td><td>4</td><td>retro, jpop, bright</td></tr><tr><td>Floating Suspension</td><td>Sparse ambient/chill motif leaving breathing space.</td><td>4</td><td>ambient, chill, lofi</td></tr></tbody></table>
+<h2>Melody generation (<code>melody_gen.hpp</code>)</h2>
+<ul>
+<li><code>generate_melody(key, progression, seed_motif, MelodyOptions)</code> → <code>music::Melody</code>. Options: <code>low_midi</code>/<code>high_midi</code> (60–81), <code>motif_adherence</code> 0.75, <code>chord_tone_strength</code> 0.85, <code>passing_tone_prob</code> 0.30, <code>climax_pos</code> 0.72 (fraction through the phrase), <code>resolve_on_tonic</code> true, <code>form</code> (<code>PhraseForm</code>: AABA, ABAC, AA_Prime, AABB, Through), <code>bpm</code>, <code>beats_per_bar</code>, <code>seed</code>.</li>
+<li><code>generate_countermelody(key, progression, lead, bpm, low, high, seed)</code> — a complementary line against an existing melody (defaults 55–74).</li>
+<li><code>realize_motif_span(…)</code> — the lower-level step that places a motif over a stretch of the progression.</li>
+</ul>
+<h2>Full API listing</h2><section class="file" id="wauvio-compose-core-compose-common-hpp"><h3><code>wauvio/compose/core/compose_common.hpp</code></h3>
+<h4 id="wauvio-compose-core-compose-common-hpp-wauvio-compose-composeerror"><span class="ns">wauvio::compose::</span>class ComposeError</h4>
+<pre><code>class ComposeError : public std::runtime_error
+public:
+    explicit ComposeError(const std::string&amp; what) : std::runtime_error(what) {}
+inline uint64_t hash64(uint64_t x) noexcept</code></pre>
+<h4 id="wauvio-compose-core-compose-common-hpp-wauvio-compose-rng"><span class="ns">wauvio::compose::</span>class Rng</h4>
+<pre><code>class Rng
+public:
+    explicit Rng(uint64_t seed = 1) noexcept { reseed(seed); }
+    void reseed(uint64_t seed) noexcept
+    uint64_t next() noexcept
+    double uniform() noexcept { return static_cast&lt;double&gt;(next() &gt;&gt; 11) * (1.0 / 9007199254740992.0); }
+    double bipolar() noexcept { return uniform() * 2.0 - 1.0; }
+    double range(double a, double b) noexcept { return a + (b - a) * uniform(); }
+    int    range_int(int lo, int hi) noexcept
+    bool   chance(double p) noexcept { return uniform() &lt; p; }
+    template &lt;typename T&gt;
+    const T&amp; pick(const std::vector&lt;T&gt;&amp; v)
+    size_t weighted_index(const std::vector&lt;double&gt;&amp; weights) noexcept</code></pre>
+<h4 id="wauvio-compose-core-compose-common-hpp-wauvio-compose-pitchclass"><span class="ns">wauvio::compose::</span>enum class PitchClass</h4>
+<pre><code>enum class PitchClass : int
+    C = 0, Cs = 1, Db = 1, D = 2, Ds = 3, Eb = 3, E = 4, F = 5,
+    Fs = 6, Gb = 6, G = 7, Gs = 8, Ab = 8, A = 9, As = 10, Bb = 10, B = 11
+inline int wrap_pc(int pc) noexcept
+inline const char* pitch_class_name(int pc, bool prefer_flats = false) noexcept
+inline bool parse_pitch_class(const std::string&amp; text, PitchClass&amp; out)</code></pre>
+<h4 id="wauvio-compose-core-compose-common-hpp-wauvio-compose-scaletype"><span class="ns">wauvio::compose::</span>enum class ScaleType</h4>
+<pre><code>enum class ScaleType
+    Major,
+    NaturalMinor,
+    HarmonicMinor,
+    MelodicMinor,
+    Dorian,
+    Phrygian,
+    Lydian,
+    Mixolydian,
+    PentatonicMajor,
+    PentatonicMinor,
+    Blues,
+    WholeTone
+inline const std::vector&lt;int&gt;&amp; scale_intervals(ScaleType st)
+inline const char* scale_type_name(ScaleType st) noexcept
+inline bool parse_scale_type(const std::string&amp; raw, ScaleType&amp; out)
+inline bool is_minor_scale(ScaleType st) noexcept</code></pre>
+<h4 id="wauvio-compose-core-compose-common-hpp-wauvio-compose-key"><span class="ns">wauvio::compose::</span>struct Key</h4>
+<pre><code>struct Key
+    PitchClass root  = PitchClass::C;
+    ScaleType  scale = ScaleType::Major;
+    Key() = default;
+    Key(PitchClass r, ScaleType s = ScaleType::Major) : root(r), scale(s) {}
+    int root_pc() const noexcept { return wrap_pc(static_cast&lt;int&gt;(root)); }
+    int degree_midi(int degree, int octave = 4, int chromatic = 0) const
+    int degree_pc(int degree, int chromatic = 0) const
+    bool is_in_scale(int midi_note) const
+    int snap_to_scale(int midi_note) const
+    int midi_to_step(int midi_note, int base_octave = 4) const
+    std::string name() const</code></pre>
+<h4 id="wauvio-compose-core-compose-common-hpp-wauvio-compose-meter"><span class="ns">wauvio::compose::</span>struct Meter</h4>
+<pre><code>struct Meter
+    int beats_per_bar = 4;
+    int beat_unit     = 4;
+    double bar_beats() const noexcept { return static_cast&lt;double&gt;(beats_per_bar) * (4.0 / static_cast&lt;double&gt;(beat_unit)); }
+inline double beats_to_seconds(double beats, double bpm) noexcept</code></pre>
+</section>
+<section class="file" id="wauvio-compose-theory-harmony-hpp"><h3><code>wauvio/compose/theory/harmony.hpp</code></h3>
+<h4 id="wauvio-compose-theory-harmony-hpp-wauvio-compose-chordquality"><span class="ns">wauvio::compose::</span>enum class ChordQuality</h4>
+<pre><code>enum class ChordQuality
+    Major,
+    Minor,
+    Diminished,
+    Augmented,
+    Sus2,
+    Sus4,
+    Major7,
+    Minor7,
+    Dominant7,
+    HalfDim7,
+    Dim7,
+    MinMaj7,
+    Add9,
+    Maj9,
+    Min9,
+    Dom9,
+    Power5
+inline const std::vector&lt;int&gt;&amp; chord_intervals(ChordQuality q)
+inline const char* quality_suffix(ChordQuality q) noexcept</code></pre>
+<h4 id="wauvio-compose-theory-harmony-hpp-wauvio-compose-romanchord"><span class="ns">wauvio::compose::</span>struct RomanChord</h4>
+<pre><code>struct RomanChord
+    int          degree         = 0;
+    int          accidental     = 0;
+    ChordQuality quality        = ChordQuality::Major;
+    int          inversion      = 0;
+    double       duration_beats = 4.0;
+    int          secondary_of   = -1;
+    std::string to_string() const
+    inline bool parse_roman_numeral_head(const std::string&amp; s, size_t&amp; pos, int&amp; degree, bool&amp; is_upper)
+inline bool parse_roman_chord(const std::string&amp; token, RomanChord&amp; out, double default_beats = 4.0)</code></pre>
+<h4 id="wauvio-compose-theory-harmony-hpp-wauvio-compose-chordsymbol"><span class="ns">wauvio::compose::</span>struct ChordSymbol</h4>
+<pre><code>struct ChordSymbol
+    int          root_pc        = 0;
+    ChordQuality quality        = ChordQuality::Major;
+    int          bass_pc        = 0;
+    double       duration_beats = 4.0;
+    std::vector&lt;int&gt; pitch_classes() const
+    std::vector&lt;int&gt; tones_in_range(int low_midi, int high_midi) const
+    int nearest_chord_tone(int midi_note) const
+    std::string name() const
+inline ChordSymbol resolve_chord(const RomanChord&amp; rc, const Key&amp; key)
+inline std::vector&lt;int&gt; voice_lead(const std::vector&lt;int&gt;&amp; prev_voicing, const ChordSymbol&amp; target,
+                                   int low_midi = 48, int high_midi = 72, int num_voices = 4)
+
+inline std::vector&lt;std::vector&lt;int&gt;&gt; voice_lead_progression(const std::vector&lt;ChordSymbol&gt;&amp; chords,
+                                                            int low_midi = 48, int high_midi = 72,
+                                                            int num_voices = 4)
+</code></pre>
+</section>
+<section class="file" id="wauvio-compose-progression-progressions-hpp"><h3><code>wauvio/compose/progression/progressions.hpp</code></h3>
+<h4 id="wauvio-compose-progression-progressions-hpp-wauvio-compose-chordprogression"><span class="ns">wauvio::compose::</span>struct ChordProgression</h4>
+<pre><code>struct ChordProgression
+    std::string name;
+    std::string description;
+    std::vector&lt;std::string&gt; tags;
+    bool minor_bias = false;
+    std::vector&lt;RomanChord&gt; chords;
+    double total_beats() const noexcept
+    std::vector&lt;ChordSymbol&gt; resolve(const Key&amp; key) const
+    size_t chord_index_at_beat(double beat) const noexcept
+inline ChordProgression make_progression(std::string name, const std::vector&lt;std::string&gt;&amp; tokens,
+                                         double default_beats = 4.0, bool minor_bias = false,
+                                         std::vector&lt;std::string&gt; tags = {}, std::string desc = "")
+</code></pre>
+<h4 id="wauvio-compose-progression-progressions-hpp-wauvio-compose-cadencetype"><span class="ns">wauvio::compose::</span>enum class CadenceType</h4>
+<pre><code>enum class CadenceType { Authentic, Half, Plagal, Deceptive, Loop };</code></pre>
+<h4 id="wauvio-compose-progression-progressions-hpp-wauvio-compose-progressionoptions"><span class="ns">wauvio::compose::</span>struct ProgressionOptions</h4>
+<pre><code>struct ProgressionOptions
+    int         bars                  = 4;
+    int         beats_per_bar         = 4;
+    double      harmonic_rhythm_beats = 4.0;
+    double      complexity            = 0.35;
+    CadenceType cadence               = CadenceType::Authentic;
+    bool        start_on_tonic        = true;
+    uint64_t    seed                  = 1;
+inline ChordQuality diatonic_quality(const Key&amp; key, int degree, double complexity, Rng&amp; rng)
+inline ChordProgression generate_progression(const Key&amp; key, const ProgressionOptions&amp; opts = {})
+inline const std::vector&lt;ChordProgression&gt;&amp; builtin_progressions()
+inline const ChordProgression* find_progression(const std::string&amp; name)</code></pre>
+</section>
+<section class="file" id="wauvio-compose-motif-motifs-hpp"><h3><code>wauvio/compose/motif/motifs.hpp</code></h3>
+<h4 id="wauvio-compose-motif-motifs-hpp-wauvio-compose-stepbasis"><span class="ns">wauvio::compose::</span>enum class StepBasis</h4>
+<pre><code>enum class StepBasis { ScaleStep, ChordTone };</code></pre>
+<h4 id="wauvio-compose-motif-motifs-hpp-wauvio-compose-motifnote"><span class="ns">wauvio::compose::</span>struct MotifNote</h4>
+<pre><code>struct MotifNote
+    int step                  = 0;
+    int chromatic             = 0;
+    double duration_beats     = 0.5;
+    bool is_rest              = false;
+    StepBasis basis           = StepBasis::ScaleStep;
+    wauvio::music::Dynamics dynamics         = wauvio::music::Dynamics::mf;
+    wauvio::music::Articulation articulation = wauvio::music::Articulation::Sustain;</code></pre>
+<h4 id="wauvio-compose-motif-motifs-hpp-wauvio-compose-motif"><span class="ns">wauvio::compose::</span>struct Motif</h4>
+<pre><code>struct Motif
+    std::string name;
+    std::string description;
+    std::vector&lt;std::string&gt; tags;
+    std::vector&lt;MotifNote&gt; notes;
+    double total_beats() const noexcept
+inline Motif transpose(Motif m, int steps)
+inline Motif invert(Motif m, int pivot_step = 0)
+inline Motif retrograde(Motif m)
+inline Motif scale_rhythm(Motif m, double factor)
+inline Motif sequence(const Motif&amp; m, int repetitions, int step_per_repeat)
+inline Motif vary_motif(Motif m, Rng&amp; rng, double amount = 0.35)</code></pre>
+<h4 id="wauvio-compose-motif-motifs-hpp-wauvio-compose-contour"><span class="ns">wauvio::compose::</span>enum class Contour</h4>
+<pre><code>enum class Contour { Arch, Ascending, Descending, Wave, Pendulum, Hook };</code></pre>
+<h4 id="wauvio-compose-motif-motifs-hpp-wauvio-compose-motifoptions"><span class="ns">wauvio::compose::</span>struct MotifOptions</h4>
+<pre><code>struct MotifOptions
+    double   length_beats = 4.0;
+    Contour  contour      = Contour::Arch;
+    double   density      = 0.55;
+    double   syncopation  = 0.25;
+    double   rest_prob    = 0.12;
+    int      range_steps  = 5;
+    uint64_t seed         = 1;
+inline Motif generate_motif(const MotifOptions&amp; opts = {})
+inline const std::vector&lt;Motif&gt;&amp; builtin_motifs()
+inline const Motif* find_motif(const std::string&amp; name)</code></pre>
+</section>
+<section class="file" id="wauvio-compose-melody-melody-gen-hpp"><h3><code>wauvio/compose/melody/melody_gen.hpp</code></h3>
+<h4 id="wauvio-compose-melody-melody-gen-hpp-wauvio-compose-phraseform"><span class="ns">wauvio::compose::</span>enum class PhraseForm</h4>
+<pre><code>enum class PhraseForm { AABA, ABAC, AA_Prime, AABB, Through };</code></pre>
+<h4 id="wauvio-compose-melody-melody-gen-hpp-wauvio-compose-melodyoptions"><span class="ns">wauvio::compose::</span>struct MelodyOptions</h4>
+<pre><code>struct MelodyOptions
+    int        low_midi            = 60;
+    int        high_midi           = 81;
+    int        base_octave         = 4;
+    double     motif_adherence     = 0.75;
+    double     chord_tone_strength = 0.85;
+    double     passing_tone_prob   = 0.30;
+    double     climax_pos          = 0.72;
+    bool       resolve_on_tonic    = true;
+    PhraseForm form                = PhraseForm::ABAC;
+    double     bpm                 = 120.0;
+    int        beats_per_bar       = 4;
+    uint64_t   seed                = 1;
+    inline int nearest_chord_tone_in_range(const ChordSymbol&amp; chord, int target_midi, int low_midi, int high_midi)
+    inline int clamp_register(int midi, int low_midi, int high_midi)
+inline wauvio::music::Melody realize_motif_span(const Key&amp; key,
+                                                 const ChordProgression&amp; prog,
+                                                 const Motif&amp; motif,
+                                                 double prog_beat_offset,
+                                                 double span_beats,
+                                                 int anchor_step,
+                                                 const MelodyOptions&amp; opts,
+                                                 Rng&amp; rng)
+
+inline wauvio::music::Melody generate_melody(const Key&amp; key,
+                                              const ChordProgression&amp; prog,
+                                              const Motif&amp; seed_motif,
+                                              const MelodyOptions&amp; opts = {})
+
+inline wauvio::music::Melody generate_countermelody(const Key&amp; key,
+                                                     const ChordProgression&amp; prog,
+                                                     const wauvio::music::Melody&amp; lead,
+                                                     double bpm,
+                                                     int low_midi = 55,
+                                                     int high_midi = 74,
+                                                     uint64_t seed = 99)
+</code></pre>
+</section>
+<div class="pager"><a href="compose.html"><small>Previous</small>Compose engine overview</a><a class="r" href="compose-wcp.html"><small>Next</small>The .wcp format</a></div></div><aside class="toc" id="toc" aria-label="On this page"></aside></main>
+</div>
+<script src="nav.js"></script></body></html>

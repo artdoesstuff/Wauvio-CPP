@@ -13,6 +13,7 @@
 <ul>
 <li>Same <code>Singer</code> score-building API (<code>note</code>, <code>note_sec</code>, <code>note_at</code>, <code>rest</code>, <code>style()</code>, <code>parse_options()</code>, <code>seed</code>, <code>phrase_pitch_curve</code>, MIDI loading, <code>render</code>/<code>render_stereo</code>/<code>save</code>) and the same <code>NoteRef</code> setters.</li>
 <li>All new <code>Style</code> fields default to “off”, so a default <code>Style</code> renders as v1 does.</li>
+<li>Kanji lyrics (ruby, dictionary, diagnostics) were later added to v1, v2 and v3 alike; see <a href="vocal-lyrics.html#kanji">Kanji</a>.</li>
 <li>Same limits as v1: a <code>NoteRef</code> is valid only until the next note is added (notes are in a <code>std::vector</code>), and there is no streaming render.</li>
 </ul>
 <h2>Added in v2</h2>
@@ -106,6 +107,9 @@ public:
     Style&amp; style() { return style_; }                 // defaults applied to notes added afterwards
     const Style&amp; style() const { return style_; }
     ParseOptions&amp; parse_options() { return popt_; }
+    // Kanji lyrics: this Singer's dictionary (starts as a copy of the built-in list; add or load your own).
+    KanjiDictionary&amp; kanji_dictionary() { return kanji_; }
+    bool load_kanji_dictionary(const std::string&amp; path, std::string* err = nullptr) { return kanji_.load_file(path, err); }
     Singer&amp; phrase_pitch_curve(const Curve&amp; semitones_vs_seconds) { phrase_curve_ = semitones_vs_seconds; return *this; }
     Singer&amp; seed(uint32_t s) { seed_ = s; return *this; }
     // V2 personas. These move the Singer's default look for notes added afterwards.
@@ -142,11 +146,12 @@ public:
     NoteRef event(const std::string&amp; kind, int midi, double seconds, float intensity = 0.6f, const std::string&amp; variant = "")
     // Absolute placement; the cursor moves to the end of the note.
     NoteRef note_at(double start_sec, int midi, double seconds, const std::string&amp; lyric, float velocity = 0.75f)
-    void clear() { notes_.clear(); cursor_ = 0.0; phrase_curve_.clear(); lanes_.clear(); }
+    void clear() { notes_.clear(); kanji_issues_.clear(); cursor_ = 0.0; phrase_curve_.clear(); lanes_.clear(); }
     size_t size() const { return notes_.size(); }
     const std::vector&lt;SynthNote&gt;&amp; notes() const { return notes_; }
     double cursor() const { return cursor_; }
     double ticks_to_sec(int ticks) const { return static_cast&lt;double&gt;(ticks) / ppq_ * 60.0 / bpm_; }
+    // Debug/listening hook: when set (tests/wavtap.hpp), every finished render is passed to it.
     using TapFn = std::function&lt;void(const Buffer&amp;, int)&gt;;
     static TapFn&amp; render_tap() { static TapFn f; return f; }
     Buffer render(int sample_rate = 0) const
@@ -364,9 +369,9 @@ inline std::vector&lt;SynthNote&gt; expand_event(const SynthNote&amp; par, const
 </section>
 <section class="file" id="wauvio-vocal-yune-v2-voices-voices-hpp"><h3><code>wauvio/vocal/yune-v2/voices/voices.hpp</code></h3>
 <h4 id="wauvio-vocal-yune-v2-voices-voices-hpp-free-functions-constants-and-aliases">Free functions, constants and aliases</h4>
-<pre><code>// Registry of the built-in voices. To add a voice: write voices/voice-&lt;id&gt;.hpp (copy voice-template.md's checklist),
-// include it here and add one line to builtin_voices().
-            inline const std::vector&lt;std::pair&lt;std::string, std::function&lt;VoiceProfile()&gt;&gt;&gt;&amp; builtin_voices()
+<pre><code>// Built-in voices. builtin_voices() lives in voices_registry.hpp, which `voice_tool gen` rebuilds from voices/ (headers)
+// and voicebanks/ (.wvc files). To add a voice: drop its .wvc into voicebanks/ and run `voice_tool gen` (it writes
+// voices/voice-&lt;name&gt;.hpp if there is none), or write voices/voice-&lt;name&gt;.hpp by hand and run it to register it.
             inline std::vector&lt;std::string&gt; voice_ids() { std::vector&lt;std::string&gt; o; for (auto&amp; kv : builtin_voices()) o.push_back(kv.first); return o; }
             // "yune" -&gt; built-in voice; anything else is read as a .wvc file path. Returns false (and *err) if neither works.
             inline bool make_voice(const std::string&amp; id_or_path, VoiceProfile&amp; out, std::string* err = nullptr)</code></pre>
