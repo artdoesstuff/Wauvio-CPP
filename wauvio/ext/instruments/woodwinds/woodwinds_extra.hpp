@@ -5,114 +5,138 @@ namespace wauvio {
     namespace instruments {
         using namespace wauvio::music;
 
-        class Fife : public WoodwindInstrument {
+        // Small cylindrical flute: loud and bright at ff.
+        class Fife : public AirJetInstrument {
         public:
-            Fife() : WoodwindInstrument("Fife") {
-                recipe.filter_cutoff = 6800.0; recipe.noise_mix = 0.08; recipe.osc_mix = 0.1; recipe.vibrato_depth_cents = 4.0; recipe.envelope.attack = 0.03;
+            Fife() : AirJetInstrument("Fife") {
+                auto& w = recipe.wind;
+                w.tilt_soft = 0.8; w.tilt_loud = 0.8; w.g_soft = 0.35; w.g_loud = 0.7; w.cutoff_hz = 6500.0; w.breath_db = -34.0; w.chiff_db = -20.0;
+                w.chiff_center_hz = 3800.0; w.chiff_ms = 14.0; w.attack_ms = 22.0; w.vib_depth_cents = 4.0; w.pressure_pitch_cents = 20.0;
+                w.scoop_cents = 8.0;
             }
         };
 
-        class Quena : public WoodwindInstrument {
+        // Notched end-blown flute: breathy, scooped onset.
+        class Quena : public AirJetInstrument {
         public:
-            Quena() : WoodwindInstrument("Quena") {
-                recipe.filter_cutoff = 3600.0; recipe.noise_mix = 0.13; recipe.osc_mix = 0.1; recipe.noise_attack_burst = 0.15;
-                recipe.vibrato_depth_cents = 8.0; recipe.envelope.attack = 0.07;
+            Quena() : AirJetInstrument("Quena") {
+                auto& w = recipe.wind;
+                w.g_soft = 0.22; w.g_loud = 0.4; w.cutoff_hz = 3600.0; w.breath_db = -22.0; w.breath_center_hz = 2200.0; w.breath_follow = 0.4;
+                w.breath_tone_mod = 0.5; w.chiff_db = -16.0; w.chiff_ms = 45.0; w.chiff_center_hz = 2200.0; w.attack_ms = 70.0; w.vib_depth_cents = 14.0;
+                w.vib_rate_hz = 5.2; w.vib_delay_s = 0.5; w.vib_am = 0.15; w.scoop_cents = 18.0; w.scoop_ms = 60.0;
             }
         };
 
-        class Kaval : public WoodwindInstrument {
+        class Kaval : public AirJetInstrument {
         public:
-            Kaval() : WoodwindInstrument("Kaval") {
-                recipe.filter_cutoff = 3200.0; recipe.noise_mix = 0.10; recipe.osc_mix = 0.12; recipe.vibrato_depth_cents = 14.0; recipe.envelope.attack = 0.08;
+            Kaval() : AirJetInstrument("Kaval") {
+                auto& w = recipe.wind;
+                w.g_soft = 0.25; w.g_loud = 0.45; w.cutoff_hz = 3200.0; w.breath_db = -24.0; w.breath_center_hz = 2000.0; w.chiff_db = -18.0;
+                w.chiff_ms = 40.0; w.chiff_center_hz = 2000.0; w.attack_ms = 80.0; w.vib_depth_cents = 22.0; w.vib_rate_hz = 5.5; w.vib_am = 0.2;
+                w.scoop_cents = 14.0;
             }
         };
 
-        class BassetHorn : public WoodwindInstrument {
+        class BassetHorn : public SingleReedInstrument {
         public:
-            BassetHorn() : WoodwindInstrument("Basset Horn") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Square; recipe.osc_mix = 0.2; recipe.noise_mix = 0.03;
-                recipe.filter_cutoff = 3000.0; recipe.formant1_hz = 700.0; recipe.formant1_gain_db = 3.0;
+            BassetHorn() : SingleReedInstrument("Basset Horn") {
+                auto& w = recipe.wind;
+                w.cutoff_hz = 1500.0; w.even_open_hz = 1000.0; w.attack_ms = 32.0; w.breath_center_hz = 1600.0; w.chiff_center_hz = 600.0;
+                w.vib_depth_cents = 7.0; w.release_ms = 75.0;
             }
         };
 
-        class AltoClarinet : public WoodwindInstrument {
+        class AltoClarinet : public SingleReedInstrument {
         public:
-            AltoClarinet() : WoodwindInstrument("Alto Clarinet") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Square; recipe.osc_mix = 0.25; recipe.noise_mix = 0.03;
-                recipe.filter_cutoff = 3200.0; recipe.formant1_hz = 650.0; recipe.formant1_gain_db = 3.0;
+            AltoClarinet() : SingleReedInstrument("Alto Clarinet") {
+                auto& w = recipe.wind;
+                w.cutoff_hz = 1500.0; w.even_open_hz = 1050.0; w.attack_ms = 34.0; w.breath_center_hz = 1600.0; w.chiff_center_hz = 600.0;
+                w.vib_depth_cents = 7.0; w.release_ms = 75.0;
             }
         };
 
-        class ClarinetInA : public WoodwindInstrument {
+        class ClarinetInA : public SingleReedInstrument {
         public:
-            ClarinetInA() : WoodwindInstrument("Clarinet in A") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Square; recipe.osc_mix = 0.25; recipe.noise_mix = 0.03;
-                recipe.filter_cutoff = 3900.0; recipe.formant1_hz = 850.0; recipe.formant1_gain_db = 3.0;
+            ClarinetInA() : SingleReedInstrument("Clarinet in A") {
+                auto& w = recipe.wind;
+                w.cutoff_hz = 1900.0; w.even_open_hz = 1700.0; w.attack_ms = 28.0;
             }
         };
 
-        class OboeDAmore : public WoodwindInstrument {
+        class OboeDAmore : public DoubleReedInstrument {
         public:
-            OboeDAmore() : WoodwindInstrument("Oboe d'Amore") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Sawtooth; recipe.osc_mix = 0.3; recipe.noise_mix = 0.03;
-                recipe.formant1_hz = 1100.0; recipe.formant1_gain_db = 5.0; recipe.filter_cutoff = 4600.0;
+            OboeDAmore() : DoubleReedInstrument("Oboe d'Amore") {
+                auto& w = recipe.wind;
+                w.res[0] = { 950.0, 7.0, 1.4 }; w.res[1] = { 2600.0, 3.0, 2.0 }; w.cutoff_hz = 2800.0; w.attack_ms = 28.0; w.vib_depth_cents = 11.0;
             }
         };
 
         class SopraninoSaxophone : public SaxophoneInstrument {
         public:
             SopraninoSaxophone() : SaxophoneInstrument("Sopranino Saxophone") {
-                recipe.filter_cutoff = 6600.0; recipe.formant1_hz = 1700.0;
+                auto& w = recipe.wind;
+                w.cutoff_hz = 2300.0; w.res[0] = { 2200.0, 5.0, 1.2 }; w.res[1] = { 4000.0, 2.0, 1.8 }; w.attack_ms = 26.0; w.breath_center_hz = 3000.0;
+                w.vib_depth_cents = 14.0;
             }
         };
 
-        class Shawm : public WoodwindInstrument {
+        // Pirouette-free reed: loud, bright, no vibrato, abrupt onset.
+        class Shawm : public DoubleReedInstrument {
         public:
-            Shawm() : WoodwindInstrument("Shawm") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Sawtooth; recipe.osc_mix = 0.55; recipe.noise_mix = 0.04;
-                recipe.filter_cutoff = 6200.0; recipe.formant1_hz = 1500.0; recipe.formant1_gain_db = 8.0; recipe.formant1_q = 2.0;
-                recipe.vibrato_depth_cents = 3.0; recipe.envelope = wauvio::env::DAHDSR{0.0, 0.02, 0.0, 0.05, 0.95, 0.1};
+            Shawm() : DoubleReedInstrument("Shawm") {
+                auto& w = recipe.wind;
+                w.tilt_soft = 0.5; w.tilt_loud = 0.2; w.g_soft = 0.93; w.g_loud = 0.99; w.cutoff_hz = 5200.0; w.res[0] = { 1500.0, 8.0, 2.0 };
+                w.res[1] = { 3200.0, 3.0, 2.0 }; w.breath_db = -42.0; w.chiff_db = -28.0; w.chiff_ms = 10.0; w.attack_ms = 14.0; w.attack_shape = 0.7;
+                w.overshoot = 0.05; w.release_ms = 40.0; w.vib_depth_cents = 0.0; w.vib_am = 0.0; w.jitter_cents = 0.6; w.level = 0.36;
             }
         };
 
-        class Crumhorn : public WoodwindInstrument {
+        // Capped reed: no lip control, constant buzzy tone, cylindrical (odd-weighted).
+        class Crumhorn : public SingleReedInstrument {
         public:
-            Crumhorn() : WoodwindInstrument("Crumhorn") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Square; recipe.osc2_shape = wauvio::osc::WaveShape::BL_Square; recipe.osc_mix = 0.6; recipe.noise_mix = 0.02;
-                recipe.filter_cutoff = 2300.0; recipe.formant1_hz = 1000.0; recipe.formant1_gain_db = 4.0;
-                recipe.vibrato_depth_cents = 0.0; recipe.envelope.attack = 0.03;
+            Crumhorn() : SingleReedInstrument("Crumhorn") {
+                auto& w = recipe.wind;
+                w.tilt_soft = 0.6; w.tilt_loud = 0.6; w.g_soft = 0.95; w.g_loud = 0.98; w.fund_drop_db = 0.0; w.even_low = 0.25; w.even_open_hz = 2200.0;
+                w.cutoff_hz = 2600.0; w.res[0] = { 1000.0, 4.0, 1.5 }; w.breath_db = -46.0; w.chiff_db = -36.0; w.attack_ms = 26.0; w.attack_shape = 0.7;
+                w.overshoot = 0.0; w.vib_depth_cents = 0.0; w.vib_am = 0.0; w.jitter_cents = 0.3; w.amp_jitter = 0.0; w.pressure_pitch_cents = 0.0;
             }
         };
 
-        class Dulcian : public WoodwindInstrument {
+        class Dulcian : public DoubleReedInstrument {
         public:
-            Dulcian() : WoodwindInstrument("Dulcian") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Sawtooth; recipe.osc_mix = 0.3;
-                recipe.filter_cutoff = 2400.0; recipe.formant1_hz = 500.0; recipe.formant1_gain_db = 4.0; recipe.envelope.attack = 0.05;
+            Dulcian() : DoubleReedInstrument("Dulcian") {
+                auto& w = recipe.wind;
+                w.res[0] = { 480.0, 6.0, 1.5 }; w.res[1] = { 1100.0, 3.0, 1.5 }; w.cutoff_hz = 2000.0; w.attack_ms = 40.0; w.vib_depth_cents = 2.0;
+                w.vib_am = 0.0; w.breath_center_hz = 1400.0; w.release_ms = 85.0;
             }
         };
 
-        class Chalumeau : public WoodwindInstrument {
+        class Chalumeau : public SingleReedInstrument {
         public:
-            Chalumeau() : WoodwindInstrument("Chalumeau") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Square; recipe.osc_mix = 0.25; recipe.noise_mix = 0.04;
-                recipe.filter_cutoff = 2400.0; recipe.formant1_hz = 600.0; recipe.formant1_gain_db = 3.0; recipe.envelope.attack = 0.06;
+            Chalumeau() : SingleReedInstrument("Chalumeau") {
+                auto& w = recipe.wind;
+                w.even_low = 0.1; w.cutoff_hz = 1400.0; w.even_open_hz = 1200.0; w.attack_ms = 45.0; w.breath_db = -36.0; w.vib_depth_cents = 0.0;
+                w.vib_am = 0.0; w.release_ms = 80.0;
             }
         };
 
-        class Kazoo : public WoodwindInstrument {
+        // Voice-driven membrane buzz with a nasal formant.
+        class Kazoo : public SingleReedInstrument {
         public:
-            Kazoo() : WoodwindInstrument("Kazoo") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Sawtooth; recipe.osc_mix = 0.6; recipe.noise_mix = 0.12;
-                recipe.filter_cutoff = 3800.0; recipe.formant1_hz = 1500.0; recipe.formant1_gain_db = 8.0; recipe.formant1_q = 3.0;
-                recipe.vibrato_depth_cents = 6.0; recipe.envelope.attack = 0.02;
+            Kazoo() : SingleReedInstrument("Kazoo") {
+                auto& w = recipe.wind;
+                w.tilt_soft = 0.9; w.tilt_loud = 0.5; w.g_soft = 0.9; w.g_loud = 0.97; w.fund_drop_db = 0.0; w.even_low = 1.0; w.cutoff_hz = 3800.0;
+                w.res[0] = { 1500.0, 9.0, 3.0 }; w.breath_db = -24.0; w.chiff_db = -28.0; w.attack_ms = 18.0; w.vib_depth_cents = 9.0; w.vib_rate_hz = 5.5;
+                w.vib_delay_s = 0.2; w.amp_jitter = 0.04; w.jitter_cents = 2.0;
             }
         };
 
-        class Gemshorn : public WoodwindInstrument {
+        class Gemshorn : public AirJetInstrument {
         public:
-            Gemshorn() : WoodwindInstrument("Gemshorn") {
-                recipe.osc_mix = 0.2; recipe.noise_mix = 0.03; recipe.filter_cutoff = 2800.0; recipe.envelope.attack = 0.06;
+            Gemshorn() : AirJetInstrument("Gemshorn") {
+                auto& w = recipe.wind;
+                w.tilt_soft = 1.4; w.tilt_loud = 1.4; w.g_soft = 0.12; w.g_loud = 0.2; w.cutoff_hz = 2800.0; w.breath_db = -36.0; w.breath_center_hz = 1800.0;
+                w.chiff_db = -28.0; w.chiff_ms = 40.0; w.attack_ms = 60.0; w.vib_depth_cents = 4.0; w.vib_am = 0.03;
             }
         };
 

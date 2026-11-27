@@ -57,10 +57,553 @@ namespace wauvio {
             std::vector<Mode> modes;
             double mode_decay_pitch_exp = 0.6;
             double mode_vel_brightness  = 0.7;
+
+            // Wind-instrument model (air jet, single reed, double reed, lip reed). Opt-in: with kind == None (the default) the
+            // legacy subtractive path runs and nothing below is read. See render_wind() for how the fields are used.
+            struct Wind {
+                enum class Kind { None, AirJet, SingleReed, DoubleReed, LipReed };
+                struct Res { double hz = 0.0, gain_db = 0.0, q = 2.0; };
+                Kind kind = Kind::None;
+
+                // source spectrum: harmonic k has amplitude k^-tilt * g^(k-1); tilt and g move with blowing pressure (0..1)
+                double tilt_soft = 1.0, tilt_loud = 1.0;
+                double g_soft = 0.5, g_loud = 0.8, g_pow = 1.0;
+                double tilt_per_octave = 0.0;        // added to tilt per octave above C4
+                double fund_drop_db = 0.0;           // fundamental weakens by this much from pp to ff (reeds)
+
+                // bore: even harmonics suppressed below even_open_hz (cylinder closed at one end), lattice/bell cutoff, radiation
+                double even_low = 1.0, even_open_hz = 1500.0;
+                double cutoff_hz = 6000.0, cutoff_order = 2.0, cutoff_loud_gain = 0.0;
+                double bell_hz = 0.0, bell_depth = 0.0;
+                Res res[4];                          // bore / bell / mouthpiece resonances
+                Res mute_res;                        // extra resonance engaged by Muted / PalmMute
+                double mute_cutoff_mult = 0.55;
+
+                // breath: band-limited turbulence relative to tone level, plus a short attack chiff
+                double breath_db = -40.0, breath_center_hz = 3000.0, breath_center_mult = 0.0, breath_q = 0.8;
+                double breath_follow = 0.5, breath_tone_mod = 0.0;
+                double chiff_db = -100.0, chiff_ms = 20.0, chiff_center_hz = 3000.0, chiff_q = 0.9;
+
+                // blowing pressure envelope
+                double attack_ms = 40.0, attack_shape = 1.0, attack_vel_exp = 0.0;
+                double overshoot = 0.0, overshoot_ms = 100.0, release_ms = 80.0;
+
+                // pitch behaviour
+                double scoop_cents = 0.0, scoop_ms = 40.0, pressure_pitch_cents = 0.0;
+                double vib_rate_hz = 5.2, vib_depth_cents = 0.0, vib_delay_s = 0.3, vib_onset_s = 0.3, vib_am = 0.0, vib_wander = 0.1;
+                double jitter_cents = 0.0, amp_jitter = 0.0;
+
+                // sections: several detuned, staggered voices
+                int    ensemble_voices = 1;
+                double ensemble_cents = 0.0, ensemble_stagger_ms = 0.0;
+
+                double power_comp = 0.5;             // 0 = brightness adds loudness, 1 = loudness held constant as spectrum brightens
+                double level = 0.28;                 // overall output level before recipe.gain
+            } wind;
+
+            // Bowed-string model (Helmholtz sawtooth, body resonances, bow noise, scrape, sections). Opt-in like `wind`.
+            struct Bowed {
+                enum class Kind { None, Bowed };
+                Kind kind = Kind::None;
+                double tilt_soft = 1.3, tilt_loud = 0.9, tilt_per_octave = 0.0;     // harmonic k ~ k^-tilt (ideal Helmholtz = 1)
+                double bow_pos = 0.12, bow_tilt_per_beta = 6.0;                      // bow-bridge distance / length; nearer the bridge is brighter
+                double cutoff_hz = 9000.0, cutoff_order = 1.5, mute_cutoff_mult = 0.5;
+                Wind::Res res[8];                                                    // body modes, bridge hill
+                double bow_noise_db = -34.0, bow_noise_center_hz = 3500.0, bow_noise_q = 0.7, bow_noise_follow = 1.0;
+                double scrape_db = -11.0, scrape_ms = 30.0, scrape_center_hz = 2500.0;
+                double onset_tilt = 1.5, onset_ms = 35.0;                            // extra tilt that decays while the string settles into Helmholtz motion
+                double attack_ms = 60.0, attack_shape = 1.0, attack_vel_exp = 0.5, overshoot = 0.05, overshoot_ms = 100.0, release_ms = 120.0;
+                double scoop_cents = 6.0, scoop_ms = 25.0;
+                double vib_rate_hz = 5.5, vib_depth_cents = 18.0, vib_delay_s = 0.2, vib_onset_s = 0.3, vib_am = 0.0, vib_wander = 0.15;
+                double jitter_cents = 1.0, amp_jitter = 0.01;
+                double pluck_pos = 0.15, pluck_tau_s = 0.5, pluck_hf_damp = 0.25, pluck_gain = 1.0, pluck_tilt = 1.2;
+                double pluck_thump_db = -18.0, pluck_thump_hz = 300.0, pluck_wood_db = -6.0, pluck_wood_hz = 1800.0;
+                int    ensemble_voices = 1;
+                double ensemble_cents = 0.0, ensemble_stagger_ms = 0.0, ensemble_vib_spread = 0.12, ensemble_drift_cents = 0.0;
+                double power_comp = 0.5, level = 0.26;
+            } bowed;
         };
+
+        namespace detail_wind {
+            struct Biquad {
+                double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
+                static Biquad bandpass(double f0, double q, double sr) {
+                    f0 = std::max(20.0, std::min(f0, 0.45 * sr));
+                    const double w = 2.0 * M_PI * f0 / sr, al = std::sin(w) / (2.0 * std::max(0.1, q)), c = std::cos(w), a0 = 1.0 + al;
+                    Biquad b; b.b0 = al / a0; b.b1 = 0.0; b.b2 = -al / a0; b.a1 = -2.0 * c / a0; b.a2 = (1.0 - al) / a0;
+                    return b;
+                }
+                double tick(double x) { const double y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
+            };
+            inline double smooth01(double x) { x = std::max(0.0, std::min(1.0, x)); return x * x * (3.0 - 2.0 * x); }
+            inline double lerp(double a, double b, double t) { return a + (b - a) * t; }
+            inline double res_mag(double f, const TimbreRecipe::Wind::Res& r) {
+                if (r.gain_db == 0.0 || r.hz <= 0.0) return 1.0;
+                const double G = std::pow(10.0, r.gain_db / 20.0), x = f / r.hz - r.hz / f;
+                return 1.0 + (G - 1.0) / std::sqrt(1.0 + r.q * r.q * x * x);
+            }
+            // rms-calibration of a band-passed white-noise source so that "breath_db" is relative to a unit-rms tone
+            inline double bp_noise_calib(const Biquad& proto, uint32_t seed) {
+                Biquad b = proto; wauvio::osc::NoiseGenerator ng(seed); double s2 = 0.0; const int N = 16384;
+                for (int i = 0; i < N; ++i) { const double y = b.tick(ng.tick_white()); if (i > 512) s2 += y * y; }
+                return 1.0 / std::sqrt(std::max(1e-12, s2 / (N - 512)));
+            }
+
+            inline StereoBuffer render(const TimbreRecipe& r, const Note& note, int sample_rate) {
+                using W = TimbreRecipe::Wind;
+                const W& w = r.wind;
+                const double duration = std::max(0.02, note.duration);
+                const size_t n = static_cast<size_t>(duration * sample_rate);
+                if (n == 0) return StereoBuffer();
+                const double sr = static_cast<double>(sample_rate);
+
+                const Articulation art = note.articulation;
+                auto get = [](const std::map<Articulation, double>& m, Articulation a, double def) { auto it = m.find(a); return it != m.end() ? it->second : def; };
+                double filter_scale = get(r.art_filter_scale, art, 1.0);
+                const double pitch_shift_semi = get(r.art_pitch_shift, art, 0.0) + (art == Articulation::Harmonic ? 12.0 : 0.0);
+                double att_mult = 1.0, over_add = 0.0, chiff_mult = 1.0, rel_mult = 1.0, tone_scale = 1.0, breath_extra = 0.0, tilt_add = 0.0;
+                double gate_len = duration, flutter = 0.0, fall_cents = 0.0;
+                bool muted = false;
+                switch (art) {
+                    case Articulation::Staccato:  att_mult = 0.6; chiff_mult = 1.3; gate_len = std::min(duration, 0.26); rel_mult = 0.35; break;
+                    case Articulation::ShortStab: att_mult = 0.5; chiff_mult = 1.3; gate_len = std::min(duration, 0.12); rel_mult = 0.3; break;
+                    case Articulation::Marcato:   att_mult = 0.55; over_add = 0.12; chiff_mult = 1.5; break;
+                    case Articulation::Legato:    att_mult = 1.7; chiff_mult = 0.15; break;
+                    case Articulation::FlutterTongue: flutter = 1.0; breath_extra = 0.04; break;
+                    case Articulation::Fall:      fall_cents = -700.0; break;
+                    case Articulation::Doit:      fall_cents = 450.0; break;
+                    case Articulation::Muted: case Articulation::PalmMute: muted = true; break;
+                    case Articulation::Harmonic:  tilt_add = 1.0; break;
+                    case Articulation::Breath:    tone_scale = 0.15; breath_extra = 0.35; break;
+                    case Articulation::Whisper:   tone_scale = 0.05; breath_extra = 0.55; break;
+                    default: break;
+                }
+                if (art == Articulation::Hard) filter_scale *= 1.3;
+                if (art == Articulation::Soft) filter_scale *= 0.7;
+
+                const double base_freq = wauvio::theory::midi_to_freq(note.midi_note) * std::pow(2.0, pitch_shift_semi / 12.0);
+                const double velocity = dynamics_to_velocity(note.dynamics) * std::max(0.0, std::min(1.0, note.expression));
+                const bool has_glide = (note.glide_from_midi >= 0);
+                const double glide_start_cents = has_glide ? 1200.0 * std::log2(wauvio::theory::midi_to_freq(note.glide_from_midi) / std::max(1.0, base_freq)) : 0.0;
+                const double glide_time = std::max(0.001, note.glide_time);
+
+                auto eval_mod_sum = [&](ModTarget target, double t) -> double {
+                    double sum = 0.0;
+                    for (auto& route : r.modulation) {
+                        if (route.target != target) continue;
+                        double v = 0.0;
+                        switch (route.source) {
+                            case ModSource::Velocity:    v = velocity; break;
+                            case ModSource::ModWheel:    v = note.mod_wheel; break;
+                            case ModSource::Aftertouch:  v = note.aftertouch; break;
+                            case ModSource::Expression:  v = note.expression; break;
+                            case ModSource::KeyPosition: v = note.midi_note / 127.0; break;
+                            case ModSource::LFO1:        v = std::sin(TWO_PI * 5.0 * t); break;
+                            case ModSource::LFO2:        v = std::sin(TWO_PI * 0.5 * t); break;
+                            case ModSource::Envelope1:   v = std::max(0.0, 1.0 - t / duration); break;
+                        }
+                        sum += v * route.amount;
+                    }
+                    return sum;
+                };
+
+                // ---- spectrum: harmonic amplitudes at fundamental f0 and blowing pressure qb ---------------------------------
+                static const int KMAX = 96;
+                double logk[KMAX + 2]; for (int k = 1; k <= KMAX + 1; ++k) logk[k] = std::log(static_cast<double>(k));
+                const double cutoff_base = w.cutoff_hz * (muted ? w.mute_cutoff_mult : 1.0);
+                const double global_fc = std::max(60.0, r.filter_cutoff * filter_scale);   // recipe.filter_cutoff stays a live tone control (genre presets use it)
+                const double fund_lin = std::pow(10.0, -w.fund_drop_db / 20.0);
+                auto spectrum = [&](double f0, double qb, double* A) -> double {
+                    const double qs = std::max(0.0, std::min(1.0, qb));
+                    double tilt = lerp(w.tilt_soft, w.tilt_loud, qs) + w.tilt_per_octave * std::log2(std::max(20.0, f0) / 261.6256) + tilt_add;
+                    tilt = std::max(0.0, tilt);
+                    const double g = std::max(0.01, std::min(1.0, lerp(w.g_soft, w.g_loud, std::pow(qs, w.g_pow))));
+                    const double lg = std::log(g);
+                    const double fc = std::max(100.0, cutoff_base * (1.0 + w.cutoff_loud_gain * qs));
+                    double power = 0.0;
+                    const int K = std::max(1, std::min(KMAX, static_cast<int>(0.45 * sr / std::max(20.0, f0))));
+                    for (int k = 1; k <= KMAX; ++k) {
+                        if (k > K) { A[k] = 0.0; continue; }
+                        const double f = k * f0;
+                        double a = std::exp(-tilt * logk[k] + (k - 1) * lg);
+                        if (k == 1) a *= lerp(1.0, fund_lin, qs);
+                        if ((k & 1) == 0 && w.even_low < 1.0) {
+                            const double x = smooth01((f / w.even_open_hz - 0.3) / 0.7);
+                            a *= w.even_low + (1.0 - w.even_low) * x;
+                        }
+                        a /= std::sqrt(1.0 + std::pow(f / fc, 2.0 * w.cutoff_order));
+                        if (w.bell_depth > 0.0 && w.bell_hz > 0.0) {
+                            const double x = f / w.bell_hz, rad = x / std::sqrt(1.0 + x * x);
+                            a *= (1.0 - w.bell_depth) + w.bell_depth * rad;
+                        }
+                        for (int j = 0; j < 4; ++j) a *= res_mag(f, w.res[j]);
+                        if (muted) a *= res_mag(f, w.mute_res);
+                        a /= std::sqrt(1.0 + std::pow(f / global_fc, 4.0));
+                        A[k] = a; power += a * a;
+                    }
+                    return power;
+                };
+                double Aref[KMAX + 2];
+                const double P_ref = std::max(1e-12, spectrum(base_freq, 0.66, Aref));
+                const double norm = 1.0 / std::sqrt(0.5 * P_ref);
+
+                // ---- envelope timing ----------------------------------------------------------------------------------------
+                const double rel_s = std::max(0.004, std::min(0.45 * duration, w.release_ms * 0.001 * rel_mult));
+                const double gate_end = std::min(gate_len, duration - rel_s);
+                const double attack_s = std::max(0.003, std::min(0.6 * std::max(0.01, gate_end),
+                                        w.attack_ms * 0.001 * att_mult * std::pow(0.66 / std::max(0.1, velocity), w.attack_vel_exp)));
+                const double over = w.overshoot + over_add, over_tau = std::max(0.01, w.overshoot_ms * 0.001);
+                const double scoop_s = std::max(0.005, w.scoop_ms * 0.001);
+
+                // ---- voices ---------------------------------------------------------------------------------------------------
+                const int nv = std::max(1, w.ensemble_voices);
+                Buffer mono(n);
+                std::vector<double> voice(n);
+                std::fill(mono.begin(), mono.end(), 0.0f);
+                for (int v = 0; v < nv; ++v) {
+                    const double vpos = (nv == 1) ? 0.0 : (static_cast<double>(v) / (nv - 1) - 0.5);          // -0.5 .. +0.5
+                    const double v_detune = vpos * w.ensemble_cents;
+                    const uint32_t seed = static_cast<uint32_t>(note.midi_note * 7919u + 17u + static_cast<uint32_t>(v) * 1013u);
+                    const double stagger = (nv == 1) ? 0.0 : w.ensemble_stagger_ms * 0.001 * (0.5 + 0.5 * std::sin(1.7 * v + 0.9));
+                    wauvio::osc::NoiseGenerator noise(seed), chiff_noise(seed ^ 0x9E3779B9u), jit(seed + 5u), rnd(seed + 11u);
+
+                    const double bc = std::max(w.breath_center_hz, w.breath_center_mult * base_freq);
+                    Biquad breath_bp = Biquad::bandpass(bc, w.breath_q, sr);
+                    Biquad chiff_bp  = Biquad::bandpass(w.chiff_center_hz, w.chiff_q, sr);
+                    const double breath_cal = bp_noise_calib(breath_bp, seed), chiff_cal = bp_noise_calib(chiff_bp, seed ^ 0x9E3779B9u);
+                    const double breath_lin = std::pow(10.0, w.breath_db / 20.0) + r.noise_mix * 0.35 + breath_extra;
+                    const double chiff_lin  = std::pow(10.0, w.chiff_db / 20.0) * chiff_mult;
+                    const double chiff_tau  = std::max(0.002, w.chiff_ms * 0.001 / 2.5);
+
+                    double phase = 0.0, lfo_ph = 2.0 * M_PI * (0.37 * v), rate_walk = 0.0, jn = 0.0, an = 0.0;
+                    double Acur[KMAX + 2], Adel[KMAX + 2], Atgt[KMAX + 2];
+                    for (int k = 0; k <= KMAX + 1; ++k) { Acur[k] = 0.0; Adel[k] = 0.0; Atgt[k] = 0.0; }
+                    const int BLK = 32;
+                    bool primed = false;
+
+                    for (size_t i = 0; i < n; ++i) {
+                        const double t = static_cast<double>(i) / sr, ton = t - stagger;
+                        double a = 0.0;
+                        if (ton > 0.0) {
+                            a = (ton < attack_s) ? std::pow(ton / attack_s, w.attack_shape) * (1.0 + over)
+                                                 : 1.0 + over * std::exp(-(ton - attack_s) / over_tau);
+                            if (t > gate_end) { const double rel = (t - gate_end) / rel_s; a *= (rel >= 1.0) ? 0.0 : 0.5 + 0.5 * std::cos(M_PI * rel); }
+                        }
+                        const double qb = velocity * a;
+
+                        // pitch (cents)
+                        double cents = v_detune;
+                        if (note.bend_at(t) != 0.0) cents += 100.0 * note.bend_at(t);
+                        if (has_glide && t < glide_time) cents += glide_start_cents * (1.0 - t / glide_time);
+                        if (ton > 0.0 && ton < scoop_s) cents -= w.scoop_cents * (1.0 - smooth01(ton / scoop_s));
+                        cents += w.pressure_pitch_cents * (qb - velocity);
+                        const double vib_scale = 1.0 + eval_mod_sum(ModTarget::VibratoDepth, t);
+                        double vib_wave = 0.0, vib_ramp = 0.0;
+                        if (w.vib_depth_cents > 0.0 && t > w.vib_delay_s) {
+                            rate_walk += (rnd.tick_white() - rate_walk) * 0.0002;
+                            lfo_ph += TWO_PI * w.vib_rate_hz * (1.0 + w.vib_wander * 3.0 * rate_walk) / sr;
+                            vib_ramp = smooth01((t - w.vib_delay_s) / std::max(0.01, w.vib_onset_s));
+                            vib_wave = std::sin(lfo_ph);
+                            cents += vib_wave * w.vib_depth_cents * vib_ramp * vib_scale;
+                        }
+                        if (w.jitter_cents > 0.0) { jn += (jit.tick_white() - jn) * 0.002; cents += w.jitter_cents * jn * 55.0; }
+                        if (fall_cents != 0.0) { const double s0 = (fall_cents < 0.0) ? 0.55 : 0.62; cents += fall_cents * smooth01((t / duration - s0) / (1.0 - s0 - 0.04)); }
+                        cents += eval_mod_sum(ModTarget::Pitch, t) * 100.0;
+                        const double f = base_freq * std::pow(2.0, cents / 1200.0);
+                        phase += TWO_PI * f / sr; if (phase > TWO_PI) phase -= TWO_PI;
+
+                        // spectrum update per block (amplitudes interpolate linearly inside the block)
+                        if (static_cast<int>(i % BLK) == 0) {
+                            const double qs = std::max(qb, 0.0);
+                            double P = spectrum(f, qs, Atgt);
+                            const double comp = std::pow(P_ref / std::max(P, 1e-12), 0.5 * w.power_comp);
+                            const double scale = norm * comp;
+                            if (!primed) { for (int k = 1; k <= KMAX; ++k) Acur[k] = Atgt[k] * scale; primed = true; }
+                            for (int k = 1; k <= KMAX; ++k) { const double nxt = Atgt[k] * scale; Adel[k] = (nxt - Acur[k]) / BLK; Atgt[k] = nxt; }
+                        }
+                        const double c1 = std::cos(phase), s1 = std::sin(phase);
+                        double sk_prev = 0.0, sk = s1, tone = 0.0;
+                        for (int k = 1; k <= KMAX; ++k) {
+                            tone += Acur[k] * sk;
+                            const double sn = 2.0 * c1 * sk - sk_prev; sk_prev = sk; sk = sn;
+                            Acur[k] += Adel[k];
+                        }
+
+                        // amplitude behaviour: vibrato AM, reed/lip amplitude jitter, flutter-tongue
+                        double am = 1.0 + w.vib_am * vib_wave * vib_ramp;
+                        if (w.amp_jitter > 0.0) { an += (jit.tick_white() - an) * 0.004; am *= 1.0 + w.amp_jitter * an * 40.0; }
+                        if (flutter > 0.0) am *= 1.0 - 0.7 * flutter * (0.5 + 0.5 * std::sin(TWO_PI * 24.0 * t));
+
+                        // breath turbulence follows pressure (and, optionally, is modulated at the tone frequency)
+                        double nz = 0.0;
+                        if (breath_lin > 0.0 && ton > 0.0) {
+                            nz = breath_bp.tick(noise.tick_white()) * breath_cal * breath_lin
+                               * std::pow(std::max(qb, 0.02) / 0.66, w.breath_follow) * (1.0 + w.breath_tone_mod * c1);
+                        }
+                        double ch = 0.0;
+                        if (chiff_lin > 0.0 && ton > 0.0) ch = chiff_bp.tick(chiff_noise.tick_white()) * chiff_cal * chiff_lin * std::exp(-ton / chiff_tau);
+
+                        const double mod_volume = std::max(0.0, 1.0 + eval_mod_sum(ModTarget::Volume, t));
+                        voice[i] = ((tone * tone_scale * am + nz) * velocity * a + ch * velocity) * mod_volume;
+                    }
+                    for (size_t i = 0; i < n; ++i) mono[i] += static_cast<float>(voice[i] / std::sqrt(static_cast<double>(nv)));
+                }
+                apply_gain(mono, static_cast<float>(r.gain * w.level));
+                for (auto& v : mono) v = static_cast<float>(std::tanh(static_cast<double>(v)));   // soft ceiling: brassy ff peaks round off instead of hard-clipping
+                clamp_buffer(mono);
+
+                StereoBuffer out = pan_mono(mono, 0.0f, sample_rate);
+                if (r.stereo_width > 0.0) {
+                    StereoBuffer widened = haas_widen(mono, r.stereo_width * 18.0, sample_rate);
+                    for (size_t i = 0; i < out.size(); ++i)
+                        out.R[i] = out.R[i] * static_cast<float>(1.0 - r.stereo_width) + widened.R[i] * static_cast<float>(r.stereo_width);
+                }
+                const size_t f = std::min(out.L.size() / 4, static_cast<size_t>(0.006 * sample_rate));
+                for (size_t i = 0; i < f; ++i) {
+                    const float g = static_cast<float>(0.5 - 0.5 * std::cos(M_PI * static_cast<double>(i) / static_cast<double>(std::max<size_t>(1, f))));
+                    out.L[out.L.size() - 1 - i] *= g; out.R[out.R.size() - 1 - i] *= g;
+                }
+                return out;
+            }
+        }
+
+        namespace detail_bowed {
+            inline StereoBuffer render(const TimbreRecipe& r, const Note& note, int sample_rate) {
+                using detail_wind::Biquad; using detail_wind::smooth01; using detail_wind::lerp; using detail_wind::res_mag; using detail_wind::bp_noise_calib;
+                const TimbreRecipe::Bowed& b = r.bowed;
+                const double duration = std::max(0.02, note.duration);
+                const size_t n = static_cast<size_t>(duration * sample_rate);
+                if (n == 0) return StereoBuffer();
+                const double sr = static_cast<double>(sample_rate);
+
+                const Articulation art = note.articulation;
+                auto get = [](const std::map<Articulation, double>& m, Articulation a, double def) { auto it = m.find(a); return it != m.end() ? it->second : def; };
+                double filter_scale = get(r.art_filter_scale, art, 1.0);
+                const double pitch_shift_semi = get(r.art_pitch_shift, art, 0.0) + (art == Articulation::Harmonic ? 12.0 : 0.0);
+                double att_mult = 1.0, scrape_mult = 1.0, noise_mult = 1.0, tilt_add = 0.0, bow_pos = b.bow_pos, gate_len = duration, ring_s = 0.0, rel_mult = 1.0;
+                bool pluck = false, wood = false, tremolo = false, muted = false;
+                switch (art) {
+                    case Articulation::Staccato:  att_mult = 0.6; scrape_mult = 1.5; gate_len = std::min(duration, 0.28); ring_s = 0.12; break;
+                    case Articulation::ShortStab: att_mult = 0.5; scrape_mult = 1.6; gate_len = std::min(duration, 0.14); ring_s = 0.10; break;
+                    case Articulation::Spiccato:  att_mult = 0.25; scrape_mult = 2.0; gate_len = std::min(duration, 0.10); ring_s = 0.14; break;
+                    case Articulation::Tremolo:   tremolo = true; break;
+                    case Articulation::Harmonic:  tilt_add = 2.0; noise_mult = 1.3; break;       // flautando natural harmonic: nearly sinusoidal
+                    case Articulation::SulPonticello: bow_pos = 0.035; scrape_mult = 1.4; noise_mult = 2.2; break;
+                    case Articulation::Pizzicato: pluck = true; break;
+                    case Articulation::ColLegno:  pluck = true; wood = true; break;
+                    case Articulation::Muted: case Articulation::PalmMute: muted = true; break;
+                    case Articulation::Legato:    att_mult = 1.6; scrape_mult = 0.3; break;
+                    case Articulation::Whisper: case Articulation::Breath: noise_mult = 4.0; tilt_add = 1.0; break;
+                    default: break;
+                }
+                if (art == Articulation::Hard) filter_scale *= 1.3;
+                if (art == Articulation::Soft) filter_scale *= 0.7;
+
+                const double base_freq = wauvio::theory::midi_to_freq(note.midi_note) * std::pow(2.0, pitch_shift_semi / 12.0);
+                const double velocity = dynamics_to_velocity(note.dynamics) * std::max(0.0, std::min(1.0, note.expression));
+                const bool has_glide = (note.glide_from_midi >= 0);
+                const double glide_start_cents = has_glide ? 1200.0 * std::log2(wauvio::theory::midi_to_freq(note.glide_from_midi) / std::max(1.0, base_freq)) : 0.0;
+                const double glide_time = std::max(0.001, note.glide_time);
+
+                auto eval_mod_sum = [&](ModTarget target, double t) -> double {
+                    double sum = 0.0;
+                    for (auto& route : r.modulation) {
+                        if (route.target != target) continue;
+                        double v = 0.0;
+                        switch (route.source) {
+                            case ModSource::Velocity:    v = velocity; break;
+                            case ModSource::ModWheel:    v = note.mod_wheel; break;
+                            case ModSource::Aftertouch:  v = note.aftertouch; break;
+                            case ModSource::Expression:  v = note.expression; break;
+                            case ModSource::KeyPosition: v = note.midi_note / 127.0; break;
+                            case ModSource::LFO1:        v = std::sin(TWO_PI * 5.0 * t); break;
+                            case ModSource::LFO2:        v = std::sin(TWO_PI * 0.5 * t); break;
+                            case ModSource::Envelope1:   v = std::max(0.0, 1.0 - t / duration); break;
+                        }
+                        sum += v * route.amount;
+                    }
+                    return sum;
+                };
+
+                static const int KMAX = 96;
+                double logk[KMAX + 2]; for (int k = 1; k <= KMAX + 1; ++k) logk[k] = std::log(static_cast<double>(k));
+                const double cutoff_base = b.cutoff_hz * (muted ? b.mute_cutoff_mult : 1.0);
+                const double global_fc = std::max(60.0, r.filter_cutoff * filter_scale);
+                // body: string/bridge roll-off and resonances, evaluated at the partial's instantaneous frequency
+                auto body = [&](double f) {
+                    double a = 1.0 / std::sqrt(1.0 + std::pow(f / std::max(100.0, cutoff_base), 2.0 * b.cutoff_order));
+                    for (int j = 0; j < 8; ++j) a *= res_mag(f, b.res[j]);
+                    a /= std::sqrt(1.0 + std::pow(f / global_fc, 4.0));
+                    return a;
+                };
+                // bowed spectrum: Helmholtz sawtooth k^-tilt; bow position, bow pressure (qb) and the onset scrape move the tilt
+                auto bowed_spectrum = [&](double f0, double qb, double onset_extra, double* A) -> double {
+                    const double qs = std::max(0.0, std::min(1.0, qb));
+                    double tilt = lerp(b.tilt_soft, b.tilt_loud, qs) + b.tilt_per_octave * std::log2(std::max(20.0, f0) / 261.6256)
+                                + b.bow_tilt_per_beta * (bow_pos - 0.12) + tilt_add + onset_extra;
+                    tilt = std::max(0.0, tilt);
+                    const int K = std::max(1, std::min(KMAX, static_cast<int>(0.45 * sr / std::max(20.0, f0))));
+                    double power = 0.0;
+                    for (int k = 1; k <= KMAX; ++k) {
+                        if (k > K) { A[k] = 0.0; continue; }
+                        const double f = k * f0, a = std::exp(-tilt * logk[k]) * body(f);
+                        A[k] = a; power += a * a;
+                    }
+                    return power;
+                };
+                // plucked spectrum at t=0: pluck-position comb |sin(k pi x)|, k^-tilt (brighter with velocity), same body
+                const double pluck_tilt = b.pluck_tilt + 0.8 * (1.0 - velocity);
+                auto pluck_spectrum = [&](double f0, double* A) -> double {
+                    const int K = std::max(1, std::min(KMAX, static_cast<int>(0.45 * sr / std::max(20.0, f0))));
+                    double power = 0.0;
+                    for (int k = 1; k <= KMAX; ++k) {
+                        if (k > K) { A[k] = 0.0; continue; }
+                        const double f = k * f0, comb = std::fabs(std::sin(M_PI * k * b.pluck_pos));
+                        const double a = std::exp(-pluck_tilt * logk[k]) * (0.15 + 0.85 * comb) * body(f);
+                        A[k] = a; power += a * a;
+                    }
+                    return power;
+                };
+                double Aref[KMAX + 2];
+                const double P_ref = std::max(1e-12, pluck ? pluck_spectrum(base_freq, Aref) : bowed_spectrum(base_freq, 0.66, 0.0, Aref));
+                const double norm = 1.0 / std::sqrt(0.5 * P_ref);
+
+                const double rel_s = std::max(0.004, std::min(0.45 * duration, b.release_ms * 0.001 * rel_mult));
+                const double gate_end = std::min(gate_len, duration - rel_s);
+                const double attack_s = std::max(0.002, std::min(0.6 * std::max(0.01, gate_end),
+                                        b.attack_ms * 0.001 * att_mult * std::pow(0.66 / std::max(0.1, velocity), b.attack_vel_exp)));
+                const double over = b.overshoot, over_tau = std::max(0.01, b.overshoot_ms * 0.001);
+                const double scoop_s = std::max(0.005, b.scoop_ms * 0.001);
+                const double onset_s = std::max(0.004, b.onset_ms * 0.001);
+
+                const int nv = (pluck) ? std::max(1, b.ensemble_voices) : std::max(1, b.ensemble_voices);
+                std::vector<double> Lacc(n, 0.0), Racc(n, 0.0), voice(n);
+                for (int v = 0; v < nv; ++v) {
+                    const double vpos = (nv == 1) ? 0.0 : (static_cast<double>(v) / (nv - 1) - 0.5);        // -0.5 .. +0.5
+                    const double v_detune = vpos * b.ensemble_cents;
+                    const uint32_t seed = static_cast<uint32_t>(note.midi_note * 6007u + 29u + static_cast<uint32_t>(v) * 1543u);
+                    const double hv = 0.5 + 0.5 * std::sin(2.3 * v + 0.7), hv2 = 0.5 + 0.5 * std::sin(4.1 * v + 1.9);
+                    const double stagger = (nv == 1) ? 0.0 : b.ensemble_stagger_ms * 0.001 * hv;
+                    const double rate_v = b.vib_rate_hz * (1.0 + b.ensemble_vib_spread * (2.0 * hv2 - 1.0));
+                    const double drift_rate = 0.30 + 0.45 * hv2, drift_ph = 6.2831853 * hv;
+                    wauvio::osc::NoiseGenerator noise(seed), scrape_noise(seed ^ 0x85EBCA6Bu), jit(seed + 3u), rnd(seed + 13u), thump_noise(seed + 77u);
+
+                    Biquad bow_bp = Biquad::bandpass(b.bow_noise_center_hz, b.bow_noise_q, sr);
+                    Biquad scr_bp = Biquad::bandpass(wood ? b.pluck_wood_hz : b.scrape_center_hz, 0.9, sr);
+                    Biquad thump_bp = Biquad::bandpass(b.pluck_thump_hz, 1.2, sr);
+                    const double bow_cal = bp_noise_calib(bow_bp, seed), scr_cal = bp_noise_calib(scr_bp, seed ^ 0x85EBCA6Bu), thump_cal = bp_noise_calib(thump_bp, seed + 77u);
+                    const double bow_lin = (std::pow(10.0, b.bow_noise_db / 20.0) + r.noise_mix * 0.35) * noise_mult;
+                    const double scr_lin = std::pow(10.0, (wood ? b.pluck_wood_db : b.scrape_db) / 20.0) * scrape_mult;
+                    const double thump_lin = std::pow(10.0, b.pluck_thump_db / 20.0);
+                    const double scr_tau = std::max(0.002, (wood ? 8.0 : b.scrape_ms) * 0.001 / 2.5);
+
+                    double phase = 0.0, lfo_ph = 6.2831853 * hv2, rate_walk = 0.0, jn = 0.0, an = 0.0;
+                    double Acur[KMAX + 2], Adel[KMAX + 2], Atgt[KMAX + 2];
+                    for (int k = 0; k <= KMAX + 1; ++k) { Acur[k] = 0.0; Adel[k] = 0.0; Atgt[k] = 0.0; }
+                    double A0[KMAX + 2]; for (int k = 0; k <= KMAX + 1; ++k) A0[k] = 0.0;
+                    if (pluck) pluck_spectrum(base_freq * std::pow(2.0, v_detune / 1200.0), A0);
+                    const int BLK = 32; bool primed = false;
+
+                    for (size_t i = 0; i < n; ++i) {
+                        const double t = static_cast<double>(i) / sr, ton = t - stagger;
+                        double a = 0.0;
+                        if (ton > 0.0) {
+                            if (pluck) a = std::min(1.0, ton / 0.0012);
+                            else {
+                                a = (ton < attack_s) ? std::pow(ton / attack_s, b.attack_shape) * (1.0 + over) : 1.0 + over * std::exp(-(ton - attack_s) / over_tau);
+                                if (t > gate_end) {
+                                    const double rel = t - gate_end;
+                                    a *= (ring_s > 0.0) ? std::exp(-rel / ring_s) : ((rel / rel_s >= 1.0) ? 0.0 : 0.5 + 0.5 * std::cos(M_PI * rel / rel_s));
+                                }
+                            }
+                        }
+                        const double qb = velocity * a;
+
+                        double cents = v_detune;
+                        if (note.bend_at(t) != 0.0) cents += 100.0 * note.bend_at(t);
+                        if (has_glide && t < glide_time) cents += glide_start_cents * (1.0 - t / glide_time);
+                        if (!pluck && ton > 0.0 && ton < scoop_s) cents -= b.scoop_cents * (1.0 - smooth01(ton / scoop_s));
+                        double vib_wave = 0.0, vib_ramp = 0.0;
+                        if (!pluck && b.vib_depth_cents > 0.0 && t > b.vib_delay_s) {
+                            rate_walk += (rnd.tick_white() - rate_walk) * 0.0002;
+                            lfo_ph += TWO_PI * rate_v * (1.0 + b.vib_wander * 3.0 * rate_walk) / sr;
+                            vib_ramp = smooth01((t - b.vib_delay_s) / std::max(0.01, b.vib_onset_s));
+                            vib_wave = std::sin(lfo_ph);
+                            cents += vib_wave * b.vib_depth_cents * vib_ramp * (1.0 + eval_mod_sum(ModTarget::VibratoDepth, t));
+                        }
+                        if (nv > 1 && b.ensemble_drift_cents > 0.0) cents += b.ensemble_drift_cents * std::sin(TWO_PI * drift_rate * t + drift_ph);
+                        if (!pluck && b.jitter_cents > 0.0) { jn += (jit.tick_white() - jn) * 0.002; cents += b.jitter_cents * jn * 55.0; }
+                        cents += eval_mod_sum(ModTarget::Pitch, t) * 100.0;
+                        const double f = base_freq * std::pow(2.0, cents / 1200.0);
+                        phase += TWO_PI * f / sr; if (phase > TWO_PI) phase -= TWO_PI;
+
+                        if (static_cast<int>(i % BLK) == 0) {
+                            double scale;
+                            if (pluck) {
+                                // each partial decays at its own rate: high partials die first
+                                const double tt = std::max(0.0, ton);
+                                double P = 0.0; const double fscale = f / base_freq;
+                                for (int k = 1; k <= KMAX; ++k) {
+                                    const double tau = b.pluck_tau_s / (1.0 + b.pluck_hf_damp * (k - 1) * fscale);
+                                    Atgt[k] = A0[k] * std::exp(-tt / std::max(0.003, tau)); P += Atgt[k] * Atgt[k];
+                                }
+                                (void)P; scale = norm * b.pluck_gain;
+                            } else {
+                                const double onset_extra = b.onset_tilt * std::exp(-std::max(0.0, ton) / onset_s);
+                                const double P = bowed_spectrum(f, std::max(qb, 0.0), onset_extra, Atgt);
+                                scale = norm * std::pow(P_ref / std::max(P, 1e-12), 0.5 * b.power_comp);
+                            }
+                            if (!primed) { for (int k = 1; k <= KMAX; ++k) Acur[k] = Atgt[k] * scale; primed = true; }
+                            for (int k = 1; k <= KMAX; ++k) { const double nxt = Atgt[k] * scale; Adel[k] = (nxt - Acur[k]) / BLK; Atgt[k] = nxt; }
+                        }
+                        const double c1 = std::cos(phase), s1 = std::sin(phase);
+                        double sk_prev = 0.0, sk = s1, tone = 0.0;
+                        for (int k = 1; k <= KMAX; ++k) { tone += Acur[k] * sk; const double sn = 2.0 * c1 * sk - sk_prev; sk_prev = sk; sk = sn; Acur[k] += Adel[k]; }
+
+                        double am = 1.0;
+                        if (!pluck) {
+                            am += b.vib_am * vib_wave * vib_ramp;
+                            if (b.amp_jitter > 0.0) { an += (jit.tick_white() - an) * 0.004; am *= 1.0 + b.amp_jitter * an * 40.0; }
+                            if (tremolo) am *= 1.0 - 0.8 * (0.5 - 0.5 * std::cos(TWO_PI * 13.0 * t));        // bow reversals ~13 Hz
+                        }
+                        double nz = 0.0, sc = 0.0;
+                        if (!pluck && ton > 0.0) {
+                            nz = bow_bp.tick(noise.tick_white()) * bow_cal * bow_lin * std::pow(std::max(qb, 0.02) / 0.66, b.bow_noise_follow);
+                            sc = scr_bp.tick(scrape_noise.tick_white()) * scr_cal * scr_lin * std::exp(-ton / scr_tau);
+                            if (tremolo) sc *= 1.0 + 3.0 * (0.5 + 0.5 * std::cos(TWO_PI * 13.0 * t));
+                        } else if (pluck && ton > 0.0) {
+                            const double th = thump_bp.tick(thump_noise.tick_white()) * thump_cal * thump_lin * std::exp(-ton / 0.006);
+                            sc = th + scr_bp.tick(scrape_noise.tick_white()) * scr_cal * scr_lin * (wood ? 1.0 : 0.0) * std::exp(-ton / scr_tau);
+                        }
+                        const double mod_volume = std::max(0.0, 1.0 + eval_mod_sum(ModTarget::Volume, t));
+                        voice[i] = pluck ? ((tone * a + sc) * velocity * mod_volume)
+                                         : ((tone * am + nz) * velocity * a + sc * velocity) * mod_volume;
+                    }
+                    const double pan = (nv == 1) ? 0.0 : std::max(-0.95, std::min(0.95, vpos * 2.0 * std::min(1.0, r.stereo_width * 1.6)));
+                    const double gl = std::cos((pan + 1.0) * M_PI / 4.0), gr = std::sin((pan + 1.0) * M_PI / 4.0), vs = 1.0 / std::sqrt(static_cast<double>(nv));
+                    for (size_t i = 0; i < n; ++i) { Lacc[i] += voice[i] * gl * vs * 1.4142135; Racc[i] += voice[i] * gr * vs * 1.4142135; }
+                }
+                const double G = r.gain * b.level;
+                StereoBuffer out; out.L.resize(n); out.R.resize(n);
+                for (size_t i = 0; i < n; ++i) { out.L[i] = static_cast<float>(std::tanh(Lacc[i] * G)); out.R[i] = static_cast<float>(std::tanh(Racc[i] * G)); }
+                if (nv == 1 && r.stereo_width > 0.0) {
+                    Buffer m(n); for (size_t i = 0; i < n; ++i) m[i] = out.L[i];
+                    StereoBuffer widened = haas_widen(m, r.stereo_width * 18.0, sample_rate);
+                    for (size_t i = 0; i < n; ++i) out.R[i] = out.R[i] * static_cast<float>(1.0 - r.stereo_width) + widened.R[i] * static_cast<float>(r.stereo_width);
+                }
+                const size_t fd = std::min(out.L.size() / 4, static_cast<size_t>(0.006 * sample_rate));
+                for (size_t i = 0; i < fd; ++i) {
+                    const float g = static_cast<float>(0.5 - 0.5 * std::cos(M_PI * static_cast<double>(i) / static_cast<double>(std::max<size_t>(1, fd))));
+                    out.L[out.L.size() - 1 - i] *= g; out.R[out.R.size() - 1 - i] *= g;
+                }
+                return out;
+            }
+        }
 
         inline StereoBuffer render_timbre(const TimbreRecipe& r, const Note& note, int sample_rate) {
             if (sample_rate <= 0) sample_rate = global_config().sample_rate;
+            if (r.wind.kind != TimbreRecipe::Wind::Kind::None) return detail_wind::render(r, note, sample_rate);
+            if (r.bowed.kind != TimbreRecipe::Bowed::Kind::None) return detail_bowed::render(r, note, sample_rate);
             const double duration = std::max(0.02, note.duration);
             const size_t n = static_cast<size_t>(duration * sample_rate);
             if (n == 0) return StereoBuffer();
@@ -335,6 +878,16 @@ namespace wauvio {
             }
         };
 
+        // Bowed strings with the physical model (Helmholtz source, body resonances, bow noise, scrape, section ensemble).
+        // Erhu in world/ still uses BowedStringInstrument and is unchanged.
+        class BowedModelInstrument : public BowedStringInstrument {
+        public:
+            explicit BowedModelInstrument(std::string n) : BowedStringInstrument(std::move(n)) {
+                using K = TimbreRecipe::Bowed::Kind; recipe.bowed.kind = K::Bowed;
+                recipe.filter_cutoff = 16000.0; recipe.noise_mix = 0.0; recipe.art_decay_scale.clear();
+            }
+        };
+
         class PluckedStringInstrument : public ModeledInstrument {
         public:
             explicit PluckedStringInstrument(std::string n) : ModeledInstrument(std::move(n)) {
@@ -389,14 +942,98 @@ namespace wauvio {
             }
         };
 
-        class SaxophoneInstrument : public WoodwindInstrument {
+        // ---- wind families (opt-in wind model; WoodwindInstrument / BrassInstrument above stay as they were) ----------------------
+        // Air jet: flute, piccolo, recorder, whistle, pan flute, ocarina. Near-sinusoidal source, jet noise, slow soft attack.
+        class AirJetInstrument : public WoodwindInstrument {
         public:
-            explicit SaxophoneInstrument(std::string n) : WoodwindInstrument(std::move(n)) {
-                recipe.osc1_shape = wauvio::osc::WaveShape::BL_Sawtooth;
-                recipe.osc_mix = 0.4; recipe.noise_mix = 0.09; recipe.noise_attack_burst = 0.14;
-                recipe.filter_cutoff = 5200.0; recipe.filter_q = 1.0;
-                recipe.formant1_hz = 1100.0; recipe.formant1_gain_db = 5.0; recipe.formant1_q = 2.2;
-                recipe.formant2_hz = 2600.0; recipe.formant2_gain_db = 3.0; recipe.formant2_q = 2.5;
+            explicit AirJetInstrument(std::string n) : WoodwindInstrument(std::move(n)) {
+                using K = TimbreRecipe::Wind::Kind; auto& w = recipe.wind;
+                w.kind = K::AirJet;
+                w.tilt_soft = 0.9; w.tilt_loud = 0.9; w.g_soft = 0.28; w.g_loud = 0.55; w.tilt_per_octave = 0.35;
+                w.cutoff_hz = 5000.0; w.cutoff_loud_gain = 0.5;
+                w.breath_db = -32.0; w.breath_center_hz = 2800.0; w.breath_center_mult = 6.0; w.breath_q = 0.5; w.breath_follow = 0.4; w.breath_tone_mod = 0.35;
+                w.chiff_db = -22.0; w.chiff_ms = 28.0; w.chiff_center_hz = 2600.0;
+                w.attack_ms = 55.0; w.attack_shape = 1.3; w.attack_vel_exp = 0.35; w.release_ms = 90.0;
+                w.scoop_cents = 10.0; w.scoop_ms = 45.0; w.pressure_pitch_cents = 15.0;
+                w.vib_rate_hz = 5.3; w.vib_depth_cents = 17.0; w.vib_delay_s = 0.30; w.vib_onset_s = 0.40; w.vib_am = 0.18; w.vib_wander = 0.15;
+                w.jitter_cents = 1.5; w.amp_jitter = 0.01; w.power_comp = 0.3; w.level = 0.48;
+                recipe.filter_cutoff = 16000.0; recipe.noise_mix = 0.0;
+            }
+        };
+
+        // Single reed: clarinet family and saxophones. Odd-harmonic cylinder (clarinet) or full conical series (sax), tone-hole cutoff.
+        class SingleReedInstrument : public WoodwindInstrument {
+        public:
+            explicit SingleReedInstrument(std::string n) : WoodwindInstrument(std::move(n)) {
+                using K = TimbreRecipe::Wind::Kind; auto& w = recipe.wind;
+                w.kind = K::SingleReed;
+                w.tilt_soft = 1.4; w.tilt_loud = 0.3; w.g_soft = 0.70; w.g_loud = 0.97; w.fund_drop_db = 4.0;
+                w.even_low = 0.12; w.even_open_hz = 1800.0;
+                w.cutoff_hz = 2000.0; w.cutoff_loud_gain = 0.6;
+                w.breath_db = -42.0; w.breath_center_hz = 2200.0; w.breath_q = 0.8; w.breath_follow = 0.8;
+                w.chiff_db = -34.0; w.chiff_ms = 15.0; w.chiff_center_hz = 900.0;
+                w.attack_ms = 28.0; w.attack_shape = 0.9; w.attack_vel_exp = 0.55; w.overshoot = 0.06; w.overshoot_ms = 120.0; w.release_ms = 60.0;
+                w.pressure_pitch_cents = 6.0;
+                w.vib_rate_hz = 5.0; w.vib_depth_cents = 6.0; w.vib_delay_s = 0.5; w.vib_onset_s = 0.5; w.vib_am = 0.03; w.vib_wander = 0.15;
+                w.jitter_cents = 0.8; w.amp_jitter = 0.01; w.power_comp = 0.5; w.level = 0.48;
+                recipe.filter_cutoff = 16000.0; recipe.noise_mix = 0.0;
+            }
+        };
+
+        // Double reed: oboe, English horn, bassoon families, shawm. Pulse-like reed source with strong bore formants.
+        class DoubleReedInstrument : public WoodwindInstrument {
+        public:
+            explicit DoubleReedInstrument(std::string n) : WoodwindInstrument(std::move(n)) {
+                using K = TimbreRecipe::Wind::Kind; auto& w = recipe.wind;
+                w.kind = K::DoubleReed;
+                w.tilt_soft = 0.8; w.tilt_loud = 0.4; w.g_soft = 0.86; w.g_loud = 0.97; w.fund_drop_db = 1.0;
+                w.cutoff_hz = 3200.0; w.cutoff_order = 1.5; w.cutoff_loud_gain = 0.5;
+                w.res[0] = { 1150.0, 7.0, 1.4 }; w.res[1] = { 3000.0, 3.0, 2.0 };
+                w.breath_db = -38.0; w.breath_center_hz = 3000.0; w.breath_q = 0.8; w.breath_follow = 0.6;
+                w.chiff_db = -30.0; w.chiff_ms = 12.0; w.chiff_center_hz = 1500.0;
+                w.attack_ms = 24.0; w.attack_shape = 0.9; w.attack_vel_exp = 0.3; w.overshoot = 0.08; w.overshoot_ms = 100.0; w.release_ms = 70.0;
+                w.vib_rate_hz = 5.8; w.vib_depth_cents = 12.0; w.vib_delay_s = 0.35; w.vib_onset_s = 0.40; w.vib_am = 0.10; w.vib_wander = 0.20;
+                w.jitter_cents = 1.0; w.amp_jitter = 0.015; w.power_comp = 0.5; w.level = 0.48;
+                recipe.filter_cutoff = 16000.0; recipe.noise_mix = 0.0;
+            }
+        };
+
+        // Lip reed: trumpets, horns, trombones, tubas. Harmonic k grows roughly as pressure^k, so high partials enter later in the
+        // attack and with loudness (brassy at ff); bell radiation tilts the spectrum up.
+        class LipReedInstrument : public BrassInstrument {
+        public:
+            explicit LipReedInstrument(std::string n) : BrassInstrument(std::move(n)) {
+                using K = TimbreRecipe::Wind::Kind; auto& w = recipe.wind;
+                w.kind = K::LipReed;
+                w.tilt_soft = 0.5; w.tilt_loud = 0.3; w.g_soft = 0.28; w.g_loud = 1.0; w.g_pow = 1.6;
+                w.cutoff_hz = 5500.0; w.cutoff_loud_gain = 0.6; w.bell_hz = 900.0; w.bell_depth = 1.0;
+                w.res[0] = { 1300.0, 3.0, 1.0 };
+                w.mute_res = { 1500.0, 6.0, 2.5 };
+                w.breath_db = -40.0; w.breath_center_hz = 2500.0; w.breath_q = 0.8; w.breath_follow = 0.5;
+                w.chiff_db = -30.0; w.chiff_ms = 18.0; w.chiff_center_hz = 1800.0;
+                w.attack_ms = 35.0; w.attack_shape = 1.4; w.attack_vel_exp = 0.35; w.overshoot = 0.06; w.overshoot_ms = 150.0; w.release_ms = 70.0;
+                w.scoop_cents = 14.0; w.scoop_ms = 45.0; w.pressure_pitch_cents = 8.0;
+                w.vib_rate_hz = 5.0; w.vib_depth_cents = 7.0; w.vib_delay_s = 0.45; w.vib_onset_s = 0.5; w.vib_am = 0.04; w.vib_wander = 0.15;
+                w.jitter_cents = 2.5; w.amp_jitter = 0.02; w.power_comp = 0.7; w.level = 0.62;
+                recipe.filter_cutoff = 16000.0; recipe.noise_mix = 0.0;
+                recipe.art_filter_scale.clear();
+            }
+        };
+
+        // Saxophones: single reed on a conical bore, so the full harmonic series (no odd-only suppression); sizes set the cutoff and formant.
+        class SaxophoneInstrument : public SingleReedInstrument {
+        public:
+            explicit SaxophoneInstrument(std::string n) : SingleReedInstrument(std::move(n)) {
+                auto& w = recipe.wind;
+                w.tilt_soft = 1.2; w.tilt_loud = 0.5; w.g_soft = 0.78; w.g_loud = 0.96; w.fund_drop_db = 2.0;
+                w.even_low = 1.0;
+                w.cutoff_hz = 1300.0; w.cutoff_loud_gain = 0.8;
+                w.res[0] = { 1300.0, 5.0, 1.2 }; w.res[1] = { 3000.0, 2.0, 1.8 };
+                w.breath_db = -33.0; w.breath_center_hz = 2000.0;
+                w.chiff_db = -30.0; w.chiff_ms = 14.0; w.chiff_center_hz = 1200.0;
+                w.attack_ms = 32.0; w.overshoot = 0.10;
+                w.vib_rate_hz = 5.5; w.vib_depth_cents = 16.0; w.vib_delay_s = 0.40; w.vib_onset_s = 0.5; w.vib_am = 0.08;
+                w.jitter_cents = 1.2;
             }
         };
 
