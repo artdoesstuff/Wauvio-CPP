@@ -5,111 +5,171 @@ namespace wauvio {
     namespace instruments {
         using namespace wauvio::music;
 
-        class FolkFiddle : public BowedStringInstrument {
+        class FolkFiddle : public BowedModelInstrument {
         public:
-            FolkFiddle() : BowedStringInstrument("Folk Fiddle") {
-                recipe.filter_cutoff = 6400.0; recipe.formant1_hz = 1100.0; recipe.detune_cents = 8.0; recipe.noise_mix = 0.03;
-                recipe.vibrato_depth_cents = 8.0; recipe.envelope.attack = 0.05;
+            FolkFiddle() : BowedModelInstrument("Folk Fiddle") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 275.0, 5.0, 8.0 }; s.res[1] = { 470.0, 5.0, 7.0 }; s.res[2] = { 560.0, 5.0, 7.0 }; s.res[3] = { 1000.0, 2.5, 2.0 };
+                s.res[4] = { 2800.0, 5.0, 1.2 }; s.cutoff_hz = 8000.0; s.attack_ms = 45.0; s.onset_ms = 30.0; s.vib_rate_hz = 5.6; s.vib_depth_cents = 8.0;
+                s.bow_noise_center_hz = 3500.0; s.scrape_ms = 25.0; s.scoop_cents = 8.0; s.pluck_tau_s = 0.22; s.pluck_pos = 0.13; s.pluck_hf_damp = 0.3;
+                s.pluck_gain = 0.75; s.pluck_thump_hz = 450.0; s.bow_noise_db = -30.0;
             }
         };
 
-        class ViolaDAmore : public BowedStringInstrument {
+        // Sympathetic strings approximated as a second voice (estimate).
+        class ViolaDAmore : public BowedModelInstrument {
         public:
-            ViolaDAmore() : BowedStringInstrument("Viola d'Amore") {
-                recipe.filter_cutoff = 5200.0; recipe.formant1_hz = 1000.0; recipe.detune_cents = 9.0; recipe.envelope.attack = 0.08;
+            ViolaDAmore() : BowedModelInstrument("Viola d'Amore") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 225.0, 5.0, 8.0 }; s.res[1] = { 390.0, 4.0, 7.0 }; s.res[2] = { 460.0, 4.0, 7.0 }; s.res[3] = { 850.0, 2.5, 2.0 };
+                s.res[4] = { 2500.0, 4.0, 1.2 }; s.cutoff_hz = 6000.0; s.attack_ms = 75.0; s.onset_ms = 38.0; s.vib_rate_hz = 5.3; s.vib_depth_cents = 18.0;
+                s.bow_noise_center_hz = 3000.0; s.scrape_ms = 30.0; s.scoop_cents = 9.0; s.pluck_tau_s = 0.3; s.pluck_pos = 0.13; s.pluck_hf_damp = 0.28;
+                s.pluck_gain = 0.75; s.pluck_thump_hz = 380.0; s.tilt_soft = 1.5; s.tilt_loud = 1.1; s.ensemble_voices = 2; s.ensemble_cents = 6.0;
+                s.ensemble_drift_cents = 1.5; recipe.stereo_width = 0.3;
             }
         };
 
-        class Violone : public BowedStringInstrument {
+        class Violone : public BowedModelInstrument {
         public:
-            Violone() : BowedStringInstrument("Violone") {
-                recipe.filter_cutoff = 2600.0; recipe.formant1_hz = 350.0; recipe.envelope.attack = 0.1;
+            Violone() : BowedModelInstrument("Violone") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 80.6, 6.0, 8.0 }; s.res[1] = { 123.5, 5.0, 7.0 }; s.res[2] = { 156.0, 4.0, 7.0 }; s.res[3] = { 455.0, 2.5, 2.0 };
+                s.res[4] = { 910.0, 3.0, 1.2 }; s.cutoff_hz = 2800.0; s.attack_ms = 100.0; s.onset_ms = 80.0; s.vib_rate_hz = 4.2; s.vib_depth_cents = 14.0;
+                s.vib_delay_s = 0.3; s.bow_noise_db = -31.0; s.bow_noise_center_hz = 1200.0; s.scrape_ms = 60.0; s.scrape_center_hz = 900.0;
+                s.scoop_cents = 12.0; s.release_ms = 160.0; s.pluck_tau_s = 0.7; s.pluck_pos = 0.18; s.pluck_hf_damp = 0.2; s.pluck_gain = 0.9;
+                s.pluck_thump_hz = 100.0; s.tilt_soft = 1.5; s.tilt_loud = 1.1;
             }
         };
 
-        class Kemenche : public BowedStringInstrument {
+        class Kemenche : public BowedModelInstrument {
         public:
-            Kemenche() : BowedStringInstrument("Kemenche") {
-                recipe.filter_cutoff = 5800.0; recipe.formant1_hz = 1500.0; recipe.formant1_gain_db = 5.0; recipe.vibrato_depth_cents = 14.0; recipe.noise_mix = 0.03;
+            Kemenche() : BowedModelInstrument("Kemenche") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 275.0, 5.0, 8.0 }; s.res[1] = { 470.0, 5.0, 7.0 }; s.res[2] = { 560.0, 5.0, 7.0 }; s.res[3] = { 1000.0, 2.5, 2.0 };
+                s.res[4] = { 1500.0, 5.0, 2.0 }; s.cutoff_hz = 6500.0; s.attack_ms = 45.0; s.onset_ms = 30.0; s.vib_rate_hz = 5.6; s.vib_depth_cents = 14.0;
+                s.bow_noise_center_hz = 3500.0; s.scrape_ms = 25.0; s.scoop_cents = 8.0; s.pluck_tau_s = 0.22; s.pluck_pos = 0.13; s.pluck_hf_damp = 0.3;
+                s.pluck_gain = 0.75; s.pluck_thump_hz = 450.0; s.bow_noise_db = -30.0;
             }
         };
 
-        class Sarangi : public BowedStringInstrument {
+        // Skin belly and sympathetic strings (approximated as three slightly detuned voices; estimate).
+        class Sarangi : public BowedModelInstrument {
         public:
-            Sarangi() : BowedStringInstrument("Sarangi") {
-                recipe.filter_cutoff = 4600.0; recipe.formant1_hz = 1300.0; recipe.formant1_gain_db = 6.0; recipe.formant1_q = 3.0;
-                recipe.detune_cents = 12.0; recipe.noise_mix = 0.05; recipe.vibrato_depth_cents = 18.0;
+            Sarangi() : BowedModelInstrument("Sarangi") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 260.0, 5.0, 6.0 }; s.res[1] = { 1300.0, 6.0, 3.0 }; s.res[2] = { 2600.0, 3.0, 1.5 }; s.tilt_soft = 1.2; s.tilt_loud = 0.9;
+                s.cutoff_hz = 5200.0; s.attack_ms = 55.0; s.vib_depth_cents = 16.0; s.bow_noise_db = -28.0; s.ensemble_voices = 3; s.ensemble_cents = 14.0;
+                s.ensemble_drift_cents = 2.0; recipe.stereo_width = 0.3;
             }
         };
 
-        class Rebab : public BowedStringInstrument {
+        // Skin-faced body: nasal, noisy.
+        class Rebab : public BowedModelInstrument {
         public:
-            Rebab() : BowedStringInstrument("Rebab") {
-                recipe.filter_cutoff = 3600.0; recipe.formant1_hz = 1200.0; recipe.formant1_gain_db = 6.0; recipe.noise_mix = 0.06; recipe.envelope.attack = 0.06; recipe.vibrato_depth_cents = 10.0;
+            Rebab() : BowedModelInstrument("Rebab") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 400.0, 4.0, 6.0 }; s.res[1] = { 1200.0, 6.0, 2.0 }; s.tilt_soft = 1.2; s.tilt_loud = 0.9; s.cutoff_hz = 3800.0;
+                s.attack_ms = 50.0; s.vib_depth_cents = 10.0; s.bow_noise_db = -27.0; s.bow_noise_center_hz = 2400.0;
             }
         };
 
-        class MorinKhuur : public BowedStringInstrument {
+        class MorinKhuur : public BowedModelInstrument {
         public:
-            MorinKhuur() : BowedStringInstrument("Morin Khuur") {
-                recipe.filter_cutoff = 3000.0; recipe.formant1_hz = 600.0; recipe.formant1_gain_db = 4.0; recipe.noise_mix = 0.05; recipe.envelope.attack = 0.1;
+            MorinKhuur() : BowedModelInstrument("Morin Khuur") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 250.0, 5.0, 6.0 }; s.res[1] = { 600.0, 4.0, 2.0 }; s.cutoff_hz = 3300.0; s.attack_ms = 90.0; s.vib_depth_cents = 6.0;
+                s.bow_noise_db = -28.0; s.bow_noise_center_hz = 2000.0; s.onset_ms = 55.0;
             }
         };
 
-        class Octobass : public BowedStringInstrument {
+        // Giant bass: very slow string speech.
+        class Octobass : public BowedModelInstrument {
         public:
-            Octobass() : BowedStringInstrument("Octobass") {
-                recipe.filter_cutoff = 900.0; recipe.formant1_hz = 120.0; recipe.envelope.attack = 0.2;
+            Octobass() : BowedModelInstrument("Octobass") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 35.0, 6.0, 8.0 }; s.res[1] = { 55.0, 5.0, 7.0 }; s.res[2] = { 80.0, 3.0, 2.0 }; s.cutoff_hz = 1200.0; s.attack_ms = 200.0;
+                s.onset_ms = 140.0; s.bow_noise_db = -30.0; s.bow_noise_center_hz = 700.0; s.scrape_center_hz = 600.0; s.scrape_ms = 90.0;
+                s.vib_rate_hz = 3.5; s.vib_depth_cents = 3.0; s.vib_delay_s = 0.4; s.release_ms = 220.0; s.scoop_cents = 14.0;
             }
         };
 
-        class Rebec : public BowedStringInstrument {
+        class Rebec : public BowedModelInstrument {
         public:
-            Rebec() : BowedStringInstrument("Rebec") {
-                recipe.filter_cutoff = 5200.0; recipe.formant1_hz = 1400.0; recipe.noise_mix = 0.05;
+            Rebec() : BowedModelInstrument("Rebec") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 500.0, 4.0, 6.0 }; s.res[1] = { 1400.0, 5.0, 2.0 }; s.cutoff_hz = 5500.0; s.attack_ms = 45.0; s.vib_depth_cents = 5.0;
+                s.bow_noise_db = -29.0;
             }
         };
 
-        class BowedPsaltery : public BowedStringInstrument {
+        class BowedPsaltery : public BowedModelInstrument {
         public:
-            BowedPsaltery() : BowedStringInstrument("Bowed Psaltery") {
-                recipe.osc1_shape = wauvio::osc::WaveShape::Triangle; recipe.osc2_shape = wauvio::osc::WaveShape::Sine; recipe.filter_cutoff = 6000.0; recipe.noise_mix = 0.03; recipe.vibrato_depth_cents = 0.0; recipe.stereo_width = 0.3;
-                recipe.envelope = wauvio::env::DAHDSR{0.0, 0.12, 0.0, 0.1, 0.9, 0.3};
+            BowedPsaltery() : BowedModelInstrument("Bowed Psaltery") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 800.0, 3.0, 2.0 }; s.tilt_soft = 1.8; s.tilt_loud = 1.4; s.cutoff_hz = 5000.0; s.attack_ms = 120.0; s.vib_depth_cents = 0.0;
+                s.bow_noise_db = -30.0; s.onset_ms = 60.0; recipe.stereo_width = 0.3;
             }
         };
 
-        class ViolinSection : public BowedStringInstrument {
+        class ViolinSection : public BowedModelInstrument {
         public:
-            ViolinSection() : BowedStringInstrument("Violin Section") {
-                recipe.detune_cents = 16.0; recipe.stereo_width = 0.45; recipe.filter_cutoff = 6800.0; recipe.formant1_hz = 1200.0; recipe.envelope.attack = 0.12;
+            ViolinSection() : BowedModelInstrument("Violin Section") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 275.0, 5.0, 8.0 }; s.res[1] = { 470.0, 5.0, 7.0 }; s.res[2] = { 560.0, 5.0, 7.0 }; s.res[3] = { 1000.0, 2.5, 2.0 };
+                s.res[4] = { 2800.0, 5.0, 1.2 }; s.cutoff_hz = 8000.0; s.attack_ms = 85.0; s.onset_ms = 50.0; s.vib_rate_hz = 5.6; s.vib_depth_cents = 13.0;
+                s.bow_noise_center_hz = 3500.0; s.scrape_ms = 25.0; s.scoop_cents = 8.0; s.pluck_tau_s = 0.22; s.pluck_pos = 0.13; s.pluck_hf_damp = 0.3;
+                s.pluck_gain = 0.75; s.pluck_thump_hz = 450.0; s.ensemble_voices = 8; s.ensemble_cents = 24.0; s.ensemble_stagger_ms = 40.0;
+                s.ensemble_drift_cents = 4.0; recipe.stereo_width = 0.45;
             }
         };
 
-        class ViolaSection : public BowedStringInstrument {
+        class ViolaSection : public BowedModelInstrument {
         public:
-            ViolaSection() : BowedStringInstrument("Viola Section") {
-                recipe.detune_cents = 16.0; recipe.stereo_width = 0.45; recipe.filter_cutoff = 5200.0; recipe.formant1_hz = 900.0; recipe.envelope.attack = 0.13;
+            ViolaSection() : BowedModelInstrument("Viola Section") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 225.0, 5.0, 8.0 }; s.res[1] = { 390.0, 4.0, 7.0 }; s.res[2] = { 460.0, 4.0, 7.0 }; s.res[3] = { 850.0, 2.5, 2.0 };
+                s.res[4] = { 2200.0, 4.0, 1.2 }; s.cutoff_hz = 6500.0; s.attack_ms = 95.0; s.onset_ms = 55.0; s.vib_rate_hz = 5.3; s.vib_depth_cents = 12.0;
+                s.bow_noise_center_hz = 3000.0; s.scrape_ms = 30.0; s.scoop_cents = 9.0; s.pluck_tau_s = 0.3; s.pluck_pos = 0.13; s.pluck_hf_damp = 0.28;
+                s.pluck_gain = 0.75; s.pluck_thump_hz = 380.0; s.ensemble_voices = 8; s.ensemble_cents = 24.0; s.ensemble_stagger_ms = 40.0;
+                s.ensemble_drift_cents = 4.0; recipe.stereo_width = 0.45;
             }
         };
 
-        class CelloSection : public BowedStringInstrument {
+        class CelloSection : public BowedModelInstrument {
         public:
-            CelloSection() : BowedStringInstrument("Cello Section") {
-                recipe.detune_cents = 14.0; recipe.stereo_width = 0.42; recipe.filter_cutoff = 3800.0; recipe.formant1_hz = 600.0; recipe.envelope.attack = 0.14;
+            CelloSection() : BowedModelInstrument("Cello Section") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 105.0, 6.0, 8.0 }; s.res[1] = { 170.0, 5.0, 7.0 }; s.res[2] = { 210.0, 5.0, 7.0 }; s.res[3] = { 600.0, 2.5, 2.0 };
+                s.res[4] = { 1200.0, 3.0, 1.2 }; s.cutoff_hz = 5000.0; s.attack_ms = 100.0; s.onset_ms = 65.0; s.vib_rate_hz = 4.9; s.vib_depth_cents = 13.0;
+                s.vib_delay_s = 0.25; s.bow_noise_db = -33.0; s.bow_noise_center_hz = 2200.0; s.scrape_ms = 40.0; s.scrape_center_hz = 1800.0;
+                s.scoop_cents = 10.0; s.pluck_tau_s = 0.45; s.pluck_pos = 0.12; s.pluck_hf_damp = 0.22; s.pluck_gain = 0.8; s.pluck_thump_hz = 200.0;
+                s.ensemble_voices = 8; s.ensemble_cents = 20.0; s.ensemble_stagger_ms = 45.0; s.ensemble_drift_cents = 4.0; recipe.stereo_width = 0.42;
             }
         };
 
-        class DoubleBassSection : public BowedStringInstrument {
+        class DoubleBassSection : public BowedModelInstrument {
         public:
-            DoubleBassSection() : BowedStringInstrument("Double Bass Section") {
-                recipe.detune_cents = 12.0; recipe.stereo_width = 0.4; recipe.filter_cutoff = 1800.0; recipe.formant1_hz = 250.0; recipe.envelope.attack = 0.16;
+            DoubleBassSection() : BowedModelInstrument("Double Bass Section") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 62.0, 6.0, 8.0 }; s.res[1] = { 95.0, 5.0, 7.0 }; s.res[2] = { 120.0, 4.0, 7.0 }; s.res[3] = { 350.0, 2.5, 2.0 };
+                s.res[4] = { 700.0, 3.0, 1.2 }; s.cutoff_hz = 3000.0; s.attack_ms = 130.0; s.onset_ms = 90.0; s.vib_rate_hz = 4.2; s.vib_depth_cents = 9.0;
+                s.vib_delay_s = 0.3; s.bow_noise_db = -31.0; s.bow_noise_center_hz = 1200.0; s.scrape_ms = 60.0; s.scrape_center_hz = 900.0;
+                s.scoop_cents = 12.0; s.release_ms = 160.0; s.pluck_tau_s = 0.7; s.pluck_pos = 0.18; s.pluck_hf_damp = 0.2; s.pluck_gain = 0.9;
+                s.pluck_thump_hz = 100.0; s.ensemble_voices = 6; s.ensemble_cents = 18.0; s.ensemble_stagger_ms = 55.0; s.ensemble_drift_cents = 3.0;
+                recipe.stereo_width = 0.4;
             }
         };
 
-        class MutedStrings : public BowedStringInstrument {
+        // Con sordino: the mute damps the bridge hill and high partials.
+        class MutedStrings : public BowedModelInstrument {
         public:
-            MutedStrings() : BowedStringInstrument("Muted Strings") {
-                recipe.detune_cents = 14.0; recipe.stereo_width = 0.4; recipe.filter_cutoff = 3000.0; recipe.envelope.attack = 0.15;
+            MutedStrings() : BowedModelInstrument("Muted Strings") {
+                auto& s = recipe.bowed;
+                s.res[0] = { 275.0, 5.0, 8.0 }; s.res[1] = { 470.0, 5.0, 7.0 }; s.res[2] = { 560.0, 5.0, 7.0 }; s.res[3] = { 1000.0, 2.5, 2.0 };
+                s.res[4] = { 2800.0, -2.0, 1.2 }; s.cutoff_hz = 3200.0; s.attack_ms = 100.0; s.onset_ms = 55.0; s.vib_rate_hz = 5.6; s.vib_depth_cents = 10.0;
+                s.bow_noise_center_hz = 3500.0; s.scrape_ms = 25.0; s.scoop_cents = 8.0; s.pluck_tau_s = 0.22; s.pluck_pos = 0.13; s.pluck_hf_damp = 0.3;
+                s.pluck_gain = 0.75; s.pluck_thump_hz = 450.0; s.ensemble_voices = 6; s.ensemble_cents = 20.0; s.ensemble_stagger_ms = 35.0;
+                s.ensemble_drift_cents = 4.0; recipe.stereo_width = 0.4; s.bow_noise_db = -36.0;
             }
         };
 
